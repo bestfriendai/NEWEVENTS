@@ -1,19 +1,33 @@
 import { z } from 'zod'
 
+// Helper function to create conditional validation based on environment
+const createApiKeySchema = (name: string, required: boolean = false) => {
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  
+  if (required || !isDevelopment) {
+    // Required in production or when explicitly marked as required
+    return z.string().min(1, `${name} is required`)
+  } else {
+    // Optional in development - allow placeholder values
+    return z.string().optional().or(z.string().startsWith('dev-placeholder-').optional())
+  }
+}
+
 // Environment schema for validation
 const envSchema = z.object({
-  // Public environment variables (available on client)
+  // Public environment variables (always required)
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
   
-  // Server-side only environment variables
-  RAPIDAPI_KEY: z.string().min(1, 'RapidAPI key is required'),
+  // Server-side API keys - required in production, optional in development
+  RAPIDAPI_KEY: createApiKeySchema('RapidAPI key'),
   RAPIDAPI_HOST: z.string().default('real-time-events-search.p.rapidapi.com'),
-  TICKETMASTER_API_KEY: z.string().min(1, 'Ticketmaster API key is required'),
+  TICKETMASTER_API_KEY: createApiKeySchema('Ticketmaster API key'),
   TICKETMASTER_SECRET: z.string().optional(),
-  TOMTOM_API_KEY: z.string().min(1, 'TomTom API key is required'),
+  TOMTOM_API_KEY: createApiKeySchema('TomTom API key'),
+  MAPBOX_API_KEY: createApiKeySchema('Mapbox API key'),
   
-  // Optional API keys
+  // Optional API keys (always optional)
   EVENTBRITE_API_KEY: z.string().optional(),
   EVENTBRITE_CLIENT_SECRET: z.string().optional(),
   EVENTBRITE_PRIVATE_TOKEN: z.string().optional(),
@@ -49,6 +63,7 @@ export const RAPIDAPI_HOST = env.RAPIDAPI_HOST
 export const TICKETMASTER_API_KEY = env.TICKETMASTER_API_KEY
 export const TICKETMASTER_SECRET = env.TICKETMASTER_SECRET
 export const TOMTOM_API_KEY = env.TOMTOM_API_KEY
+export const MAPBOX_API_KEY = env.MAPBOX_API_KEY
 export const EVENTBRITE_API_KEY = env.EVENTBRITE_API_KEY
 export const EVENTBRITE_CLIENT_SECRET = env.EVENTBRITE_CLIENT_SECRET
 export const EVENTBRITE_PRIVATE_TOKEN = env.EVENTBRITE_PRIVATE_TOKEN
@@ -56,13 +71,18 @@ export const EVENTBRITE_PUBLIC_TOKEN = env.EVENTBRITE_PUBLIC_TOKEN
 export const PREDICTHQ_API_KEY = env.PREDICTHQ_API_KEY
 export const OPENROUTER_API_KEY = env.OPENROUTER_API_KEY
 
+// Helper function to check if API key is valid (not a placeholder)
+const isValidApiKey = (key: string | undefined): boolean => {
+  return !!(key && !key.startsWith('dev-placeholder-') && key !== 'your-' && key.length > 10)
+}
+
 // API availability checks
-export const hasTicketmasterApiKey = !!env.TICKETMASTER_API_KEY
-export const hasEventbriteApiKey = !!env.EVENTBRITE_API_KEY
-export const hasPredictHQApiKey = !!env.PREDICTHQ_API_KEY
-export const hasMapboxApiKey = false // Mapbox not configured
-export const hasTomTomApiKey = !!env.TOMTOM_API_KEY
-export const hasRapidApiKey = !!env.RAPIDAPI_KEY
+export const hasTicketmasterApiKey = isValidApiKey(env.TICKETMASTER_API_KEY)
+export const hasEventbriteApiKey = isValidApiKey(env.EVENTBRITE_API_KEY)
+export const hasPredictHQApiKey = isValidApiKey(env.PREDICTHQ_API_KEY)
+export const hasMapboxApiKey = isValidApiKey(env.MAPBOX_API_KEY)
+export const hasTomTomApiKey = isValidApiKey(env.TOMTOM_API_KEY)
+export const hasRapidApiKey = isValidApiKey(env.RAPIDAPI_KEY)
 
 // Default API provider
 export const DEFAULT_API_PROVIDER = "rapidapi"
@@ -92,7 +112,7 @@ export const API_CONFIG = {
   },
   maps: {
     mapbox: {
-      apiKey: null, // Not configured
+      apiKey: env.MAPBOX_API_KEY,
     },
     tomtom: {
       apiKey: env.TOMTOM_API_KEY,
@@ -107,6 +127,7 @@ if (env.NODE_ENV === 'development') {
   console.log("- RapidAPI:", hasRapidApiKey ? "✅ Configured" : "❌ Missing")
   console.log("- Ticketmaster:", hasTicketmasterApiKey ? "✅ Configured" : "❌ Missing")
   console.log("- TomTom Maps:", hasTomTomApiKey ? "✅ Configured" : "❌ Missing")
+  console.log("- Mapbox Maps:", hasMapboxApiKey ? "✅ Configured" : "❌ Missing")
   console.log("- Eventbrite:", hasEventbriteApiKey ? "✅ Configured" : "⚠️ Optional")
   console.log("- PredictHQ:", hasPredictHQApiKey ? "✅ Configured" : "⚠️ Optional")
 }
