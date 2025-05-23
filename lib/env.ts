@@ -1,82 +1,112 @@
-// Environment variables for the application
-// Note: Using a placeholder Mapbox key - replace with valid key for production
-export const MAPBOX_API_KEY = null // Set to null to trigger fallback geocoding
+import { z } from 'zod'
 
-// RapidAPI configuration - using the exact values provided
-export const RAPIDAPI_KEY = "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"
-export const RAPIDAPI_HOST = "real-time-events-search.p.rapidapi.com"
+// Environment schema for validation
+const envSchema = z.object({
+  // Public environment variables (available on client)
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
+  
+  // Server-side only environment variables
+  RAPIDAPI_KEY: z.string().min(1, 'RapidAPI key is required'),
+  RAPIDAPI_HOST: z.string().default('real-time-events-search.p.rapidapi.com'),
+  TICKETMASTER_API_KEY: z.string().min(1, 'Ticketmaster API key is required'),
+  TICKETMASTER_SECRET: z.string().optional(),
+  TOMTOM_API_KEY: z.string().min(1, 'TomTom API key is required'),
+  
+  // Optional API keys
+  EVENTBRITE_API_KEY: z.string().optional(),
+  EVENTBRITE_CLIENT_SECRET: z.string().optional(),
+  EVENTBRITE_PRIVATE_TOKEN: z.string().optional(),
+  EVENTBRITE_PUBLIC_TOKEN: z.string().optional(),
+  PREDICTHQ_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
+  
+  // Application settings
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+})
 
-// Ticketmaster API configuration
-export const TICKETMASTER_API_KEY = "DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"
+// Parse and validate environment variables
+function validateEnv() {
+  try {
+    return envSchema.parse(process.env)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const missingVars = error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join('\n')
+      throw new Error(`Environment validation failed:\n${missingVars}`)
+    }
+    throw error
+  }
+}
 
-// Eventbrite API configuration
-export const EVENTBRITE_API_KEY = "YJH4KGIHRNHOKODPZD"
+// Export validated environment variables
+export const env = validateEnv()
 
-// PredictHQ API configuration
-export const PREDICTHQ_API_KEY = "Pbax0yFsCfXX8OfpC_-wnk3aqPP_JKb2rROBuE5s"
+// Legacy exports for backward compatibility (will be deprecated)
+export const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL
+export const SUPABASE_ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+export const RAPIDAPI_KEY = env.RAPIDAPI_KEY
+export const RAPIDAPI_HOST = env.RAPIDAPI_HOST
+export const TICKETMASTER_API_KEY = env.TICKETMASTER_API_KEY
+export const TICKETMASTER_SECRET = env.TICKETMASTER_SECRET
+export const TOMTOM_API_KEY = env.TOMTOM_API_KEY
+export const EVENTBRITE_API_KEY = env.EVENTBRITE_API_KEY
+export const EVENTBRITE_CLIENT_SECRET = env.EVENTBRITE_CLIENT_SECRET
+export const EVENTBRITE_PRIVATE_TOKEN = env.EVENTBRITE_PRIVATE_TOKEN
+export const EVENTBRITE_PUBLIC_TOKEN = env.EVENTBRITE_PUBLIC_TOKEN
+export const PREDICTHQ_API_KEY = env.PREDICTHQ_API_KEY
+export const OPENROUTER_API_KEY = env.OPENROUTER_API_KEY
 
-export const TICKETMASTER_SECRET = "H1dYvpxiiaTgJow5"
+// API availability checks
+export const hasTicketmasterApiKey = !!env.TICKETMASTER_API_KEY
+export const hasEventbriteApiKey = !!env.EVENTBRITE_API_KEY
+export const hasPredictHQApiKey = !!env.PREDICTHQ_API_KEY
+export const hasMapboxApiKey = false // Mapbox not configured
+export const hasTomTomApiKey = !!env.TOMTOM_API_KEY
+export const hasRapidApiKey = !!env.RAPIDAPI_KEY
 
-export const EVENTBRITE_CLIENT_SECRET = "QGVOJ2QGDI2TMBZKOW5IKKPMZOVP6FA2VXLNGWSI4FP43BNLSQ"
-export const EVENTBRITE_PRIVATE_TOKEN = "EUB5KUFLJH2SKVCHVD3E"
-export const EVENTBRITE_PUBLIC_TOKEN = "C4WQAR3XB7XX2AYOUEQ4"
-
-// Supabase credentials - DateApril project
-export const SUPABASE_URL = "https://akwvmljopucsnorvdwuu.supabase.co"
-export const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrd3ZtbGpvcHVjc25vcnZkd3V1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3NTI1MzIsImV4cCI6MjA2MDMyODUzMn0.0cMnBX7ODkL16AlbzogsDpm-ykGjLXxJmT3ddB8_LGk"
-
-// OpenRouter API key
-export const OPENROUTER_API_KEY = "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"
-
-// Check if API keys are available
-export const hasTicketmasterApiKey = true
-export const hasEventbriteApiKey = !!EVENTBRITE_API_KEY
-export const hasPredictHQApiKey = !!PREDICTHQ_API_KEY
-export const hasMapboxApiKey = false // Set to false since we're using fallback
-export const TOMTOM_API_KEY = "L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz"
-export const hasTomTomApiKey = true
-export const hasRapidApiKey = true // We have a hardcoded key now
-
-// Default API provider - only use RapidAPI
+// Default API provider
 export const DEFAULT_API_PROVIDER = "rapidapi"
 
 // API configuration
 export const API_CONFIG = {
   ticketmaster: {
     baseUrl: "https://app.ticketmaster.com/discovery/v2",
-    apiKey: TICKETMASTER_API_KEY,
-    secret: TICKETMASTER_SECRET,
+    apiKey: env.TICKETMASTER_API_KEY,
+    secret: env.TICKETMASTER_SECRET,
   },
   eventbrite: {
     baseUrl: "https://www.eventbriteapi.com/v3",
-    apiKey: EVENTBRITE_API_KEY,
-    clientSecret: EVENTBRITE_CLIENT_SECRET,
-    privateToken: EVENTBRITE_PRIVATE_TOKEN,
-    publicToken: EVENTBRITE_PUBLIC_TOKEN,
+    apiKey: env.EVENTBRITE_API_KEY,
+    clientSecret: env.EVENTBRITE_CLIENT_SECRET,
+    privateToken: env.EVENTBRITE_PRIVATE_TOKEN,
+    publicToken: env.EVENTBRITE_PUBLIC_TOKEN,
   },
   predicthq: {
     baseUrl: "https://api.predicthq.com/v1",
-    apiKey: PREDICTHQ_API_KEY,
+    apiKey: env.PREDICTHQ_API_KEY,
   },
   rapidapi: {
     baseUrl: "https://real-time-events-search.p.rapidapi.com",
-    apiKey: RAPIDAPI_KEY,
-    host: RAPIDAPI_HOST,
+    apiKey: env.RAPIDAPI_KEY,
+    host: env.RAPIDAPI_HOST,
   },
   maps: {
     mapbox: {
-      apiKey: MAPBOX_API_KEY,
+      apiKey: null, // Not configured
     },
     tomtom: {
-      apiKey: TOMTOM_API_KEY,
+      apiKey: env.TOMTOM_API_KEY,
     },
   },
-}
+} as const
 
-// Log configuration for debugging (only in development)
-// Removed process.env check to avoid TypeScript issues
-// console.log("API Configuration Debug:")
-// console.log("- Mapbox API Key:", hasMapboxApiKey ? "Present" : "Using Fallback Geocoding")
-// console.log("- RapidAPI Key:", hasRapidApiKey ? "Present" : "Missing")
-// console.log("- RapidAPI Host:", RAPIDAPI_HOST)
+// Development logging (only in development)
+if (env.NODE_ENV === 'development') {
+  console.log("🔧 API Configuration Status:")
+  console.log("- Supabase:", env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Configured" : "❌ Missing")
+  console.log("- RapidAPI:", hasRapidApiKey ? "✅ Configured" : "❌ Missing")
+  console.log("- Ticketmaster:", hasTicketmasterApiKey ? "✅ Configured" : "❌ Missing")
+  console.log("- TomTom Maps:", hasTomTomApiKey ? "✅ Configured" : "❌ Missing")
+  console.log("- Eventbrite:", hasEventbriteApiKey ? "✅ Configured" : "⚠️ Optional")
+  console.log("- PredictHQ:", hasPredictHQApiKey ? "✅ Configured" : "⚠️ Optional")
+}
