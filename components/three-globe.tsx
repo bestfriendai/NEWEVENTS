@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls"
+import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 
 export default function ThreeGlobe() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -97,7 +97,7 @@ export default function ThreeGlobe() {
     ]
 
     // Convert lat/lng to 3D coordinates
-    const latLngToVector3 = (lat, lng) => {
+    const latLngToVector3 = (lat: number, lng: number) => {
       const phi = (90 - lat) * (Math.PI / 180)
       const theta = (lng + 180) * (Math.PI / 180)
 

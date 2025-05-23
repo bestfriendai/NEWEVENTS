@@ -366,7 +366,7 @@ export function MapExplorer() {
         addMarkersToMap()
       })
     } catch (err) {
-      console.error("Error initializing map:", err)
+      // console.error("Error initializing map:", err)
       setIsLoading(false)
     }
 
@@ -798,7 +798,7 @@ export function MapExplorer() {
           event={selectedEvent}
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
-          onToggleFavorite={() => handleToggleFavorite(selectedEvent.id)}
+          onFavorite={handleToggleFavorite}
         />
       )}
     </div>

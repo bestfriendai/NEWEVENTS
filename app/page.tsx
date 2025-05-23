@@ -546,7 +546,7 @@ export default function Home() {
 }
 
 // Floating Card Component
-function FloatingCard({ icon, title, subtitle }) {
+function FloatingCard({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
     <div className="bg-[#12141D]/90 backdrop-blur-md rounded-xl p-3 border border-gray-800 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
       <div className="flex items-center gap-3">
@@ -561,7 +561,7 @@ function FloatingCard({ icon, title, subtitle }) {
 }
 
 // Event Card Component
-function EventCard({ title, date, location, image, category }) {
+function EventCard({ title, date, location, image, category }: { title: string; date: string; location: string; image: string; category: string }) {
   return (
     <div className="group relative rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
       <div className="aspect-[3/2] w-full">

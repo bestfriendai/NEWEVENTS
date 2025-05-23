@@ -369,7 +369,7 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
         addMarkersToMap()
       })
     } catch (err) {
-      console.error("Error initializing map:", err)
+      // console.error("Error initializing map:", err)
       setIsLoading(false)
     }
 
@@ -723,7 +723,7 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
           event={selectedEvent}
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
-          onToggleFavorite={() => handleToggleFavorite(selectedEvent.id)}
+          onFavorite={handleToggleFavorite}
         />
       )}
 

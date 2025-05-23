@@ -24,7 +24,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
     const encodedAddress = encodeURIComponent(address.trim())
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${MAPBOX_API_KEY}`
 
-    console.log("Geocoding address:", address)
+    // console.log("Geocoding address:", address)
 
     const response = await fetch(url, {
       method: "GET",
@@ -55,7 +55,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
       address: feature.place_name || address,
     }
 
-    console.log("Geocoding successful:", result)
+    // console.log("Geocoding successful:", result)
     return result
   } catch (error) {
     console.error("Error geocoding address:", error)
@@ -78,7 +78,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_API_KEY}`
 
-    console.log("Reverse geocoding coordinates:", { lat, lng })
+    // console.log("Reverse geocoding coordinates:", { lat, lng })
 
     const response = await fetch(url, {
       method: "GET",
@@ -100,9 +100,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     }
 
     // Try to get a meaningful place name
-    const place = data.features.find((f: any) => f.place_type.includes("place") || f.place_type.includes("locality"))
-    const neighborhood = data.features.find((f: any) => f.place_type.includes("neighborhood"))
-    const region = data.features.find((f: any) => f.place_type.includes("region"))
+    const place = data.features.find((f: any) => f.place_type?.includes("place") || f.place_type?.includes("locality"))
+    const neighborhood = data.features.find((f: any) => f.place_type?.includes("neighborhood"))
+    const region = data.features.find((f: any) => f.place_type?.includes("region"))
 
     let locationName = "Unknown location"
 
@@ -116,7 +116,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       locationName = data.features[0].place_name || data.features[0].text || "Unknown location"
     }
 
-    console.log("Reverse geocoding successful:", locationName)
+    // console.log("Reverse geocoding successful:", locationName)
     return locationName
   } catch (error) {
     console.error("Error reverse geocoding:", error)

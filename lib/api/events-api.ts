@@ -24,7 +24,7 @@ export async function searchEvents(params: EventSearchParams): Promise<{
   sources?: string[]
 }> {
   try {
-    console.log("Searching events with params:", params)
+    // console.log("Searching events with params:", params)
 
     // Convert to enhanced params
     const enhancedParams: EnhancedEventSearchParams = {
@@ -53,7 +53,7 @@ export async function searchEvents(params: EventSearchParams): Promise<{
 // Function to get event details - enhanced with multiple source checking
 export async function getEventDetails(eventId: string): Promise<EventDetailProps | null> {
   try {
-    console.log("Getting event details for ID:", eventId)
+    // console.log("Getting event details for ID:", eventId)
 
     // Try to get details directly from RapidAPI
     try {
@@ -62,7 +62,7 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
         {
           method: "GET",
           headers: {
-            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-key": RAPIDAPI_KEY || "",
             "x-rapidapi-host": RAPIDAPI_HOST,
           },
         },
@@ -70,7 +70,7 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
 
       if (response.ok) {
         const data = await response.json()
-        console.log("RapidAPI event details response:", data)
+        // console.log("RapidAPI event details response:", data)
 
         if (data.status === "OK" && data.data) {
           // Transform the event data
@@ -214,7 +214,7 @@ function extractCategory(tags: string[]): string {
 // Function to get featured events using enhanced search with more results
 export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]> {
   try {
-    console.log("Getting featured events with limit:", limit)
+    // console.log("Getting featured events with limit:", limit)
 
     const { events } = await searchEnhancedEvents({
       keyword: "featured popular trending concerts festivals",
@@ -237,7 +237,7 @@ export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]>
 // Function to get events by category using enhanced search with more results
 export async function getEventsByCategory(category: string, limit = 30): Promise<EventDetailProps[]> {
   try {
-    console.log("Getting events for category:", category)
+    // console.log("Getting events for category:", category)
 
     const { events } = await searchEnhancedEvents({
       keyword: category,
@@ -266,7 +266,7 @@ export async function getEventsByLocation(
   userPreferences?: EnhancedEventSearchParams["userPreferences"],
 ): Promise<EventDetailProps[]> {
   try {
-    console.log("Getting events by location:", location)
+    // console.log("Getting events by location:", location)
 
     const { events } = await searchEnhancedEvents({
       keyword: "events",
@@ -298,7 +298,7 @@ export async function getPersonalizedEvents(
   sources: string[]
 }> {
   try {
-    console.log("Getting personalized events for coordinates:", coordinates)
+    // console.log("Getting personalized events for coordinates:", coordinates)
 
     const result = await searchEnhancedEvents({
       coordinates,
@@ -318,6 +318,27 @@ export async function getPersonalizedEvents(
       events: [],
       sources: [],
     }
+  }
+}
+
+// Function to test RapidAPI connection
+export async function testRapidApiConnection(): Promise<boolean> {
+  try {
+    const response = await fetch(
+      "https://real-time-events-search.p.rapidapi.com/search-events?query=test&date=any&is_virtual=false&start=0",
+      {
+        method: "GET",
+        headers: {
+          "x-rapidapi-key": RAPIDAPI_KEY || "",
+          "x-rapidapi-host": RAPIDAPI_HOST,
+        },
+      }
+    )
+
+    return response.ok
+  } catch (error) {
+    console.error("RapidAPI connection test failed:", error)
+    return false
   }
 }
 

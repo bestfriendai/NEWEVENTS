@@ -45,6 +45,16 @@ export default function EnhancedGlobe() {
       baseColor: [0.3, 0.3, 0.3],
       markerColor: [0.8, 0.4, 1.0],
       glowColor: [0.8, 0.4, 1.0],
+      markers: [
+        // Add some example markers for major cities
+        { location: [37.7595, -122.4367], size: 0.05 }, // San Francisco
+        { location: [40.7128, -74.0060], size: 0.05 },  // New York
+        { location: [51.5074, -0.1278], size: 0.05 },   // London
+        { location: [35.6762, 139.6503], size: 0.05 },  // Tokyo
+        { location: [-33.8688, 151.2093], size: 0.05 }, // Sydney
+        { location: [19.4326, -99.1332], size: 0.05 },  // Mexico City
+        { location: [-22.9068, -43.1729], size: 0.05 }, // Rio de Janeiro
+      ],
       onRender: (state) => {
         // This prevents rotation when dragging
         if (!pointerInteracting.current) {
@@ -56,22 +66,28 @@ export default function EnhancedGlobe() {
       },
     })
 
-    const onPointerDown = (e) => {
+    const onPointerDown = (e: PointerEvent) => {
       pointerInteracting.current = e.clientX - pointerInteractionMovement.current
-      canvasRef.current.style.cursor = "grabbing"
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = "grabbing"
+      }
     }
 
     const onPointerUp = () => {
       pointerInteracting.current = null
-      canvasRef.current.style.cursor = "grab"
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = "grab"
+      }
     }
 
     const onPointerOut = () => {
       pointerInteracting.current = null
-      canvasRef.current.style.cursor = "grab"
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = "grab"
+      }
     }
 
-    const onMouseMove = (e) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (pointerInteracting.current !== null) {
         const delta = e.clientX - pointerInteracting.current
         pointerInteractionMovement.current = delta / 100
@@ -79,12 +95,13 @@ export default function EnhancedGlobe() {
     }
 
     // Add event listeners for interaction
-    canvasRef.current.addEventListener("pointerdown", onPointerDown)
-    canvasRef.current.addEventListener("pointerup", onPointerUp)
-    canvasRef.current.addEventListener("pointerout", onPointerOut)
-    canvasRef.current.addEventListener("mousemove", onMouseMove)
-
-    canvasRef.current.style.cursor = "grab"
+    if (canvasRef.current) {
+      canvasRef.current.addEventListener("pointerdown", onPointerDown)
+      canvasRef.current.addEventListener("pointerup", onPointerUp)
+      canvasRef.current.addEventListener("pointerout", onPointerOut)
+      canvasRef.current.addEventListener("mousemove", onMouseMove)
+      canvasRef.current.style.cursor = "grab"
+    }
 
     return () => {
       globe.destroy()

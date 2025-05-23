@@ -37,8 +37,8 @@ export async function signUp(email: string, password: string): Promise<{ user: U
       },
       error: null,
     }
-  } catch (error: any) {
-    return { user: null, error: error.message || "An error occurred during sign up" }
+  } catch (error: unknown) {
+    return { user: null, error: (error instanceof Error ? error.message : String(error)) || "An error occurred during sign up" }
   }
 }
 
@@ -67,8 +67,8 @@ export async function signIn(email: string, password: string): Promise<{ user: U
       },
       error: null,
     }
-  } catch (error: any) {
-    return { user: null, error: error.message || "An error occurred during sign in" }
+  } catch (error: unknown) {
+    return { user: null, error: (error instanceof Error ? error.message : String(error)) || "An error occurred during sign in" }
   }
 }
 
@@ -82,8 +82,8 @@ export async function signOut(): Promise<{ error: string | null }> {
     }
 
     return { error: null }
-  } catch (error: any) {
-    return { error: error.message || "An error occurred during sign out" }
+  } catch (error: unknown) {
+    return { error: (error instanceof Error ? error.message : String(error)) || "An error occurred during sign out" }
   }
 }
 
@@ -135,8 +135,8 @@ export async function updateUserProfile(
       },
       error: null,
     }
-  } catch (error: any) {
-    return { user: null, error: error.message || "An error occurred while updating profile" }
+  } catch (error: unknown) {
+    return { user: null, error: (error instanceof Error ? error.message : String(error)) || "An error occurred while updating profile" }
   }
 }
 
@@ -150,8 +150,8 @@ export async function saveFavoriteEvent(userId: string, eventId: number): Promis
     }
 
     return { error: null }
-  } catch (error: any) {
-    return { error: error.message || "An error occurred while saving favorite" }
+  } catch (error: unknown) {
+    return { error: (error instanceof Error ? error.message : String(error)) || "An error occurred while saving favorite" }
   }
 }
 
@@ -165,8 +165,8 @@ export async function removeFavoriteEvent(userId: string, eventId: number): Prom
     }
 
     return { error: null }
-  } catch (error: any) {
-    return { error: error.message || "An error occurred while removing favorite" }
+  } catch (error: unknown) {
+    return { error: (error instanceof Error ? error.message : String(error)) || "An error occurred while removing favorite" }
   }
 }
 
@@ -180,8 +180,8 @@ export async function getFavoriteEvents(userId: string): Promise<{ eventIds: num
     }
 
     return { eventIds: data.map((item) => item.event_id), error: null }
-  } catch (error: any) {
-    return { eventIds: [], error: error.message || "An error occurred while getting favorites" }
+  } catch (error: unknown) {
+    return { eventIds: [], error: (error instanceof Error ? error.message : String(error)) || "An error occurred while getting favorites" }
   }
 }
 

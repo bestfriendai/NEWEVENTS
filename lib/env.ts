@@ -122,12 +122,29 @@ export const API_CONFIG = {
 
 // Development logging (only in development)
 if (env.NODE_ENV === 'development') {
-  console.log("🔧 API Configuration Status:")
-  console.log("- Supabase:", env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Configured" : "❌ Missing")
-  console.log("- RapidAPI:", hasRapidApiKey ? "✅ Configured" : "❌ Missing")
-  console.log("- Ticketmaster:", hasTicketmasterApiKey ? "✅ Configured" : "❌ Missing")
-  console.log("- TomTom Maps:", hasTomTomApiKey ? "✅ Configured" : "❌ Missing")
-  console.log("- Mapbox Maps:", hasMapboxApiKey ? "✅ Configured" : "❌ Missing")
-  console.log("- Eventbrite:", hasEventbriteApiKey ? "✅ Configured" : "⚠️ Optional")
-  console.log("- PredictHQ:", hasPredictHQApiKey ? "✅ Configured" : "⚠️ Optional")
+  // console.log("🔧 API Configuration Status:")
+  
+  // Required services
+  const supabaseConfigured = env.NEXT_PUBLIC_SUPABASE_URL && !env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project')
+  // console.log("- Supabase:", supabaseConfigured ? "✅ Configured" : "⚠️ Using placeholder (update required)")
+  
+  // API services with placeholder detection
+  // console.log("- RapidAPI:", hasRapidApiKey ? "✅ Configured" : "⚠️ Using placeholder")
+  // console.log("- Ticketmaster:", hasTicketmasterApiKey ? "✅ Configured" : "⚠️ Using placeholder")
+  // console.log("- TomTom Maps:", hasTomTomApiKey ? "✅ Configured" : "⚠️ Using placeholder")
+  // console.log("- Mapbox Maps:", hasMapboxApiKey ? "✅ Configured" : "⚠️ Using placeholder")
+  
+  // Optional services
+  // console.log("- Eventbrite:", hasEventbriteApiKey ? "✅ Configured" : "⚠️ Optional")
+  // console.log("- PredictHQ:", hasPredictHQApiKey ? "✅ Configured" : "⚠️ Optional")
+  
+  if (!supabaseConfigured) {
+    // console.log("\n🚨 Important: Update Supabase credentials in .env for database functionality")
+  }
+  
+  const placeholderCount = [hasRapidApiKey, hasTicketmasterApiKey, hasTomTomApiKey, hasMapboxApiKey].filter(Boolean).length
+  if (placeholderCount < 4) {
+    // console.log(`\n💡 ${4 - placeholderCount} API key(s) using placeholders - some features may not work`)
+    // console.log("   Replace placeholder values in .env with real API keys when needed")
+  }
 }

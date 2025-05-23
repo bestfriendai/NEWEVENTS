@@ -98,7 +98,7 @@ export function EventsClient() {
   const [locationError, setLocationError] = useState<string | null>(null)
   const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null)
   const [searchRadius, setSearchRadius] = useState(25)
-  const [locationPermissionStatus, setLocationPermissionStatus] = useState<PermissionState | null>(null)
+  const [_locationPermissionStatus, setLocationPermissionStatus] = useState<PermissionState | null>(null)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [dateFilter, setDateFilter] = useState("any")
   const [priceFilter, setPriceFilter] = useState("any")
@@ -121,8 +121,8 @@ export function EventsClient() {
         result.onchange = () => {
           setLocationPermissionStatus(result.state)
         }
-      } catch (error) {
-        console.error("Error checking geolocation permission:", error)
+      } catch (_error) {
+        // console.error("Error checking geolocation permission:", error)
       }
     }
 
@@ -145,7 +145,7 @@ export function EventsClient() {
 
       try {
         const locationToUse = locationParam || location || defaultLocation
-        console.log("Loading events for location:", locationToUse)
+        // console.log("Loading events for location:", locationToUse)
 
         // Prepare date range if date filter is set
         let startDateTime: string | undefined
@@ -220,8 +220,8 @@ export function EventsClient() {
 
         // Prepare user preferences
         const userPreferences = {
-          timePreference: timeFilter !== "any" ? timeFilter : undefined,
-          pricePreference: priceFilter === "free" ? "free" : priceFilter === "paid" ? "paid" : "any",
+          timePreference: timeFilter !== "any" ? timeFilter as "morning" | "afternoon" | "evening" : undefined,
+          pricePreference: priceFilter === "free" ? "free" as const : priceFilter === "paid" ? "paid" as const : "any" as const,
           favoriteCategories: selectedCategory !== "all" ? [selectedCategory] : undefined,
         }
 
@@ -238,7 +238,7 @@ export function EventsClient() {
           userPreferences,
         })
 
-        console.log("Fetch result:", result)
+        // console.log("Fetch result:", result)
 
         if (result.error) {
           setError(result.error)
@@ -253,7 +253,7 @@ export function EventsClient() {
           setDataSources(result.sources || [])
         } else {
           // If no events found, try with a larger radius
-          console.log("No events found, trying with larger radius")
+          // console.log("No events found, trying with larger radius")
           const largerRadiusResult = await fetchEnhancedEvents({
             keyword: searchQuery || "events",
             location: locationToUse,
@@ -280,7 +280,7 @@ export function EventsClient() {
           }
         }
       } catch (err) {
-        console.error("Error loading events:", err)
+        // console.error("Error loading events:", err)
         const errorMessage = err instanceof Error ? err.message : "Failed to load events"
         setError(errorMessage)
         setEvents([])
@@ -377,15 +377,15 @@ export function EventsClient() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
-          console.log("Got user coordinates:", latitude, longitude)
+          // console.log("Got user coordinates:", latitude, longitude)
           setUserCoordinates({ lat: latitude, lng: longitude })
 
           // Get location name with error handling - use fallback if API fails
           try {
             const locationName = await reverseGeocode(latitude, longitude)
             setLocationName(locationName || "Your Location")
-          } catch (error) {
-            console.warn("Reverse geocoding failed, using generic location name:", error)
+          } catch (_error) {
+            // console.warn("Reverse geocoding failed, using generic location name:", error)
             setLocationName("Your Location")
           }
 
@@ -396,15 +396,15 @@ export function EventsClient() {
 
           // Load events with the coordinates
           await loadEvents(locationString)
-        } catch (error) {
-          console.error("Error processing location:", error)
+        } catch (_error) {
+          // console.error("Error processing location:", error)
           setLocationError("Error processing your location. Please try again.")
         } finally {
           setIsRequestingLocation(false)
         }
       },
       (error) => {
-        console.error("Error getting location:", error)
+        // console.error("Error getting location:", error)
         setLocationError(
           error.code === 1
             ? "Location permission denied. Please enable location services or enter your location manually."
@@ -864,14 +864,12 @@ export function EventsClient() {
       </AnimatePresence>
 
       {/* Event detail modal */}
-      {selectedEvent && (
-        <EventDetailModal
-          event={selectedEvent}
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          onToggleFavorite={() => handleToggleFavorite(selectedEvent.id)}
-        />
-      )}
+      <EventDetailModal
+        event={selectedEvent}
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        onFavorite={handleToggleFavorite}
+      />
     </div>
   )
 }

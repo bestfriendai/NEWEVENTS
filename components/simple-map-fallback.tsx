@@ -186,7 +186,7 @@ export function SimpleMapFallback({ events, onViewDetails, onToggleFavorite }: S
           event={selectedEvent}
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
-          onToggleFavorite={() => onToggleFavorite(selectedEvent.id)}
+          onFavorite={() => onToggleFavorite(selectedEvent.id)}
         />
       )}
     </div>

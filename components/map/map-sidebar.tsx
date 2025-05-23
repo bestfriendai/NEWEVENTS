@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Input } from "@/components/ui/input"
-import { Search, MapPin } from "lucide-react"
+import { Search, MapPin, Heart, Calendar, Clock } from "lucide-react"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface MapSidebarProps {
@@ -30,6 +30,11 @@ export function MapSidebar({
   isLoadingEvents,
   locationError,
 }: MapSidebarProps) {
+  const filteredEvents = events.filter(event =>
+    event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.location?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <motion.div
       initial={{ x: -350 }}
@@ -56,4 +61,95 @@ export function MapSidebar({
       <div className="p-4 border-b border-gray-800">
         <div className="flex items-center">
           <MapPin className="h-4 w-4 text-purple-400 mr-2" />
-          <span className="text-gray-\
+          <span className="text-gray-300 text-sm">
+            {locationError ? "Location unavailable" : locationName || "Loading location..."}
+          </span>
+        </div>
+      </div>
+
+      {/* Events list */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoadingEvents ? (
+          <div className="p-4">
+            <div className="text-center text-gray-400">Loading events...</div>
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="p-4">
+            <div className="text-center text-gray-400">
+              {searchQuery ? "No events match your search" : "No events found in this area"}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 p-4">
+            {filteredEvents.map((event) => (
+              <motion.div
+                key={event.id}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleEventSelect(event)}
+                className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                  selectedEvent?.id === event.id
+                    ? "bg-purple-600/20 border border-purple-500/50"
+                    : "bg-[#22252F] hover:bg-[#2A2D37] border border-gray-800"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-white font-medium text-sm line-clamp-2">
+                    {event.title}
+                  </h3>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleFavorite(event.id)
+                    }}
+                    className="text-gray-400 hover:text-red-400 transition-colors"
+                  >
+                    <Heart className="h-4 w-4" />
+                  </button>
+                </div>
+                
+                {event.location && (
+                  <div className="flex items-center text-gray-400 text-xs mb-1">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    <span className="line-clamp-1">{event.location}</span>
+                  </div>
+                )}
+                
+                {event.date && (
+                  <div className="flex items-center text-gray-400 text-xs mb-1">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    <span>{new Date(event.date).toLocaleDateString()}</span>
+                  </div>
+                )}
+                
+                {event.time && (
+                  <div className="flex items-center text-gray-400 text-xs">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>{event.time}</span>
+                  </div>
+                )}
+                
+                <div className="mt-2 flex justify-between items-center">
+                  {event.price && (
+                    <span className="text-purple-400 text-sm font-medium">
+                      {event.price}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleViewDetails(event)
+                    }}
+                    className="text-purple-400 hover:text-purple-300 text-xs transition-colors"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}

@@ -10,6 +10,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
+// Notification type definition
+interface Notification {
+  id: number
+  type: string
+  title: string
+  message: string
+  time: string
+  read: boolean
+  image: string
+  link: string
+  actions?: string[]
+  actionTaken?: string
+}
+
 // Sample notification data
 const sampleNotifications = [
   {
@@ -82,7 +96,7 @@ interface NotificationDropdownProps {
 
 export function NotificationDropdown({ className }: NotificationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [notifications, setNotifications] = useState(sampleNotifications)
+  const [notifications, setNotifications] = useState<Notification[]>(sampleNotifications)
   const [activeTab, setActiveTab] = useState("all")
   const [hasNewNotifications, setHasNewNotifications] = useState(true)
 
@@ -146,7 +160,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
 
   const handleAction = (id: number, action: string) => {
     // In a real app, this would send a request to the server
-    console.log(`Notification ${id}: ${action}`)
+    // console.log(`Notification ${id}: ${action}`)
 
     // Mark as read and update UI
     setNotifications(

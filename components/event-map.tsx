@@ -6,7 +6,7 @@ import { geocodeAddress } from "@/lib/api/map-api"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface EventMapProps {
-  event: EventDetailProps
+  event: EventDetailProps | null
 }
 
 export function EventMap({ event }: EventMapProps) {
@@ -15,8 +15,12 @@ export function EventMap({ event }: EventMapProps) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Skip if no map container
-    if (!mapRef.current) return
+    // Skip if no map container or no event
+    if (!mapRef.current || !event) {
+      setError("No event data available")
+      setIsLoading(false)
+      return
+    }
 
     const initMap = async () => {
       try {
@@ -100,7 +104,7 @@ export function EventMap({ event }: EventMapProps) {
           map.remove()
         }
       } catch (err) {
-        console.error("Error initializing map:", err)
+        // console.error("Error initializing map:", err)
         setError("Could not load map")
         setIsLoading(false)
       }

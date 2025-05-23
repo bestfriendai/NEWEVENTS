@@ -138,7 +138,7 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
         lng: location.lng,
       })
     } catch (err) {
-      console.error("Error geocoding address:", err)
+      // console.error("Error geocoding address:", err)
       setError("An error occurred while finding this location.")
     } finally {
       setIsLoading(false)
@@ -190,7 +190,7 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
           setIsLoading(false)
         },
         (error) => {
-          console.error("Error getting current location:", error)
+          // console.error("Error getting current location:", error)
           setError("Could not get your current location. Please try entering an address.")
           setIsLoading(false)
         },

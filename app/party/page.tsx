@@ -286,7 +286,7 @@ export default function PartyPage() {
         event={selectedEvent}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onToggleFavorite={handleToggleFavorite}
+        onFavorite={handleToggleFavorite}
       />
     </div>
   )

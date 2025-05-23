@@ -274,7 +274,8 @@ export function EnhancedMapExplorer({
       })
     } catch (err) {
       console.error("Error initializing map:", err)
-      if (err.message && err.message.includes("401")) {
+      const error = err as Error
+      if (error.message && error.message.includes("401")) {
         setMapError("Invalid Mapbox API key. Please check your configuration.")
       } else {
         setMapError("Failed to initialize the map. Please refresh the page.")
@@ -1592,7 +1593,7 @@ export function EnhancedMapExplorer({
           event={selectedEvent}
           isOpen={showDetailModal}
           onClose={() => setShowDetailModal(false)}
-          onToggleFavorite={() => handleToggleFavorite(selectedEvent.id)}
+          onFavorite={handleToggleFavorite}
         />
       )}
     </div>

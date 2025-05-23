@@ -127,7 +127,7 @@ async function searchRapidApiEvents(params: EnhancedEventSearchParams): Promise<
             {
               method: "GET",
               headers: {
-                "x-rapidapi-key": RAPIDAPI_KEY,
+                "x-rapidapi-key": RAPIDAPI_KEY || "",
                 "x-rapidapi-host": RAPIDAPI_HOST,
               },
             },

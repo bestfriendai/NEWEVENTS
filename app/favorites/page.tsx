@@ -207,9 +207,7 @@ export default function FavoritesPage() {
         event={selectedEvent}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onFavorite={() => {
-          if (selectedEvent) handleRemoveFavorite(selectedEvent.id)
-        }}
+        onFavorite={handleRemoveFavorite}
       />
     </div>
   )

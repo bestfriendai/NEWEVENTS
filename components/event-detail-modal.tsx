@@ -29,17 +29,29 @@ export interface EventDetailProps {
 }
 
 interface EventDetailModalProps {
-  event: EventDetailProps
+  event: EventDetailProps | null
   isOpen: boolean
   onClose: () => void
-  onToggleFavorite: () => void
+  onFavorite: (id: number) => void
 }
 
-export function EventDetailModal({ event, isOpen, onClose, onToggleFavorite }: EventDetailModalProps) {
+export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDetailModalProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
 
   const toggleDescription = () => {
     setShowFullDescription(!showFullDescription)
+  }
+
+  // If no event is provided, don't render the content
+  if (!event) {
+    return <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] p-6">
+        <DialogHeader>
+          <DialogTitle>Event details</DialogTitle>
+          <DialogDescription>Loading event information...</DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
   }
 
   return (
@@ -52,7 +64,7 @@ export function EventDetailModal({ event, isOpen, onClose, onToggleFavorite }: E
             variant="ghost"
             size="icon"
             className="absolute top-2 right-2 text-white hover:bg-white/20"
-            onClick={onToggleFavorite}
+            onClick={() => onFavorite(event.id)}
           >
             <Heart className={`h-5 w-5 ${event.isFavorite ? "fill-red-500 text-red-500" : ""}`} />
           </Button>
