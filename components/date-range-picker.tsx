@@ -8,13 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-interface DatePickerWithRangeProps {
+interface DateRangePickerProps {
   className?: string
-  dateRange: DateRange | undefined
-  onDateRangeChange: (dateRange: DateRange | undefined) => void
+  dateRange?: DateRange
+  onDateRangeChange?: (dateRange: DateRange | undefined) => void
 }
 
-export function DatePickerWithRange({ className, dateRange, onDateRangeChange }: DatePickerWithRangeProps) {
+export function DateRangePicker({ className, dateRange, onDateRangeChange }: DateRangePickerProps) {
+  // Provide default values for props to prevent errors
+  const handleDateChange = onDateRangeChange || (() => {})
+
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
@@ -47,7 +50,7 @@ export function DatePickerWithRange({ className, dateRange, onDateRangeChange }:
             mode="range"
             defaultMonth={dateRange?.from}
             selected={dateRange}
-            onSelect={onDateRangeChange}
+            onSelect={handleDateChange}
             numberOfMonths={2}
             className="bg-[#1A1D25] text-gray-300"
           />
@@ -56,3 +59,6 @@ export function DatePickerWithRange({ className, dateRange, onDateRangeChange }:
     </div>
   )
 }
+
+// For backward compatibility, also export as DatePickerWithRange
+export { DateRangePicker as DatePickerWithRange }

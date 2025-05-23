@@ -161,7 +161,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Mobile Header */}
       <header
         className={cn(
-          "fixed top-0 left-0 right-0 md:left-20 bg-[#12141D]/80 backdrop-blur-md z-30 transition-all duration-300 border-b border-gray-800/50",
+          "fixed top-0 left-0 right-0 md:left-20 bg-black backdrop-blur-md z-30 transition-all duration-300 border-b border-gray-800/50",
           scrolled ? "py-3" : "py-4",
         )}
       >

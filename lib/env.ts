@@ -9,7 +9,11 @@ export const EVENTBRITE_PUBLIC_TOKEN = "C4WQAR3XB7XX2AYOUEQ4"
 
 export const PREDICTHQ_API_KEY = process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "Pbax0yFsCfXX8OfpC_-wnk3aqPP_JKb2rROBuE5s"
 
-// Map API keys
+// RapidAPI configuration - using the exact values provided
+export const RAPIDAPI_KEY = "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"
+export const RAPIDAPI_HOST = "real-time-events-search.p.rapidapi.com"
+
+// Map API keys - Using the provided Mapbox token
 export const MAPBOX_API_KEY =
   "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow"
 export const TOMTOM_API_KEY = "L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz"
@@ -23,15 +27,15 @@ export const SUPABASE_ANON_KEY =
 export const OPENROUTER_API_KEY = "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"
 
 // Check if API keys are available
-export const hasTicketmasterApiKey = true
-export const hasEventbriteApiKey = true
-export const hasPredictHQApiKey = true
-export const hasMapboxApiKey = true
-export const hasTomTomApiKey = true
+export const hasTicketmasterApiKey = !!TICKETMASTER_API_KEY
+export const hasEventbriteApiKey = !!EVENTBRITE_API_KEY
+export const hasPredictHQApiKey = !!PREDICTHQ_API_KEY
+export const hasMapboxApiKey = !!MAPBOX_API_KEY
+export const hasTomTomApiKey = !!TOMTOM_API_KEY
+export const hasRapidApiKey = true // We have a hardcoded key now
 
-// Default API provider
-// export const DEFAULT_API_PROVIDER = "eventbrite"
-export const DEFAULT_API_PROVIDER = "mock" // Use mock data by default
+// Default API provider - only use RapidAPI
+export const DEFAULT_API_PROVIDER = "rapidapi"
 
 // API configuration
 export const API_CONFIG = {
@@ -51,6 +55,11 @@ export const API_CONFIG = {
     baseUrl: "https://api.predicthq.com/v1",
     apiKey: PREDICTHQ_API_KEY,
   },
+  rapidapi: {
+    baseUrl: "https://real-time-events-search.p.rapidapi.com",
+    apiKey: RAPIDAPI_KEY,
+    host: RAPIDAPI_HOST,
+  },
   maps: {
     mapbox: {
       apiKey: MAPBOX_API_KEY,
@@ -59,4 +68,11 @@ export const API_CONFIG = {
       apiKey: TOMTOM_API_KEY,
     },
   },
+}
+
+// Log configuration for debugging (only in development)
+if (process.env.NODE_ENV === "development") {
+  console.log("API Configuration Debug:")
+  console.log("- Mapbox API Key:", MAPBOX_API_KEY ? "Present" : "Missing")
+  console.log("- RapidAPI Key:", hasRapidApiKey ? "Present" : "Missing")
 }

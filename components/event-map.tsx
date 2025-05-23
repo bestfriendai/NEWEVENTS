@@ -1,99 +1,127 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { geocodeAddress } from "@/lib/api/map-api"
-import { API_CONFIG } from "@/lib/env"
 import { Loader2 } from "lucide-react"
+import { geocodeAddress } from "@/lib/api/map-api"
+import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface EventMapProps {
-  address: string
-  className?: string
-  height?: string
+  event: EventDetailProps
 }
 
-export function EventMap({ address, className = "", height = "300px" }: EventMapProps) {
+export function EventMap({ event }: EventMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load Mapbox script
-    const script = document.createElement("script")
-    script.src = `https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js`
-    script.async = true
-    document.body.appendChild(script)
+    // Skip if no map container
+    if (!mapRef.current) return
 
-    // Load Mapbox CSS
-    const link = document.createElement("link")
-    link.href = `https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css`
-    link.rel = "stylesheet"
-    document.head.appendChild(link)
-
-    script.onload = async () => {
-      if (!mapRef.current) return
-
+    const initMap = async () => {
       try {
-        // Geocode the address
-        const location = await geocodeAddress(address)
+        setIsLoading(true)
+        setError(null)
 
-        if (!location) {
-          setError("Could not find location on map")
-          setIsLoading(false)
-          return
+        // Check if we already have coordinates
+        let lat: number, lng: number
+
+        if (event.coordinates) {
+          // Use provided coordinates
+          lat = event.coordinates.lat
+          lng = event.coordinates.lng
+        } else {
+          // Geocode the address
+          const location = await geocodeAddress(event.address)
+          if (!location) {
+            throw new Error("Could not geocode address")
+          }
+          lat = location.lat
+          lng = location.lng
+        }
+
+        // Load the Mapbox script
+        let mapboxgl = (window as any).mapboxgl
+        if (!mapboxgl) {
+          const script = document.createElement("script")
+          script.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"
+          script.async = true
+          document.body.appendChild(script)
+
+          const link = document.createElement("link")
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
+          link.rel = "stylesheet"
+          document.head.appendChild(link)
+
+          await new Promise((resolve) => {
+            script.onload = resolve
+          })
         }
 
         // Initialize the map
-        const mapboxgl = (window as any).mapboxgl
-        mapboxgl.accessToken = API_CONFIG.maps.mapbox.apiKey
+        mapboxgl = (window as any).mapboxgl
+        mapboxgl.accessToken =
+          "pk.eyJ1IjoiZGF0ZWFpIiwiYSI6ImNsbjRtYnFvejAyaWsycXBmcTkzYnN0am0ifQ.Z5Z9_rv0PVvJAGrb7AJmRg"
 
         const map = new mapboxgl.Map({
           container: mapRef.current,
           style: "mapbox://styles/mapbox/dark-v11",
-          center: [location.lng, location.lat],
+          center: [lng, lat],
           zoom: 14,
         })
 
         // Add marker
-        new mapboxgl.Marker({ color: "#8B5CF6" }).setLngLat([location.lng, location.lat]).addTo(map)
+        const el = document.createElement("div")
+        el.className = "marker"
+        el.style.width = "24px"
+        el.style.height = "24px"
+        el.style.borderRadius = "50%"
+        el.style.backgroundColor = "#8B5CF6"
+        el.style.border = "3px solid white"
+        el.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)"
 
-        // Add navigation controls
-        map.addControl(new mapboxgl.NavigationControl())
+        new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map)
 
-        setIsLoading(false)
+        // Add popup
+        new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 25,
+        })
+          .setLngLat([lng, lat])
+          .setHTML(`<div class="p-2"><div class="font-medium text-sm">${event.title}</div></div>`)
+          .addTo(map)
+
+        map.on("load", () => {
+          setIsLoading(false)
+        })
+
+        return () => {
+          map.remove()
+        }
       } catch (err) {
         console.error("Error initializing map:", err)
-        setError("Failed to load map")
+        setError("Could not load map")
         setIsLoading(false)
       }
     }
 
-    script.onerror = () => {
-      setError("Failed to load map")
-      setIsLoading(false)
-    }
-
-    return () => {
-      document.body.removeChild(script)
-      if (link.parentNode) {
-        document.head.removeChild(link)
-      }
-    }
-  }, [address])
+    initMap()
+  }, [event])
 
   return (
-    <Card className={`overflow-hidden rounded-xl border-gray-800/50 ${className}`} style={{ height }}>
+    <div className="relative w-full h-full">
       {isLoading && (
-        <div className="flex items-center justify-center h-full bg-gray-900/50">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
         </div>
       )}
       {error && (
-        <div className="flex items-center justify-center h-full bg-gray-900/50 text-gray-400">
-          <p>{error}</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="text-red-500 text-sm">{error}</div>
         </div>
       )}
-      <div ref={mapRef} className="w-full h-full" style={{ display: isLoading || error ? "none" : "block" }} />
-    </Card>
+      <div ref={mapRef} className="w-full h-full" />
+    </div>
   )
 }
