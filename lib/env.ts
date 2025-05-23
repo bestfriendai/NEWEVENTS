@@ -1,22 +1,25 @@
-// Event API keys
-export const TICKETMASTER_API_KEY = process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || "DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"
-export const TICKETMASTER_SECRET = "H1dYvpxiiaTgJow5"
-
-export const EVENTBRITE_API_KEY = process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "YJH4KGIHRNHOKODPZD"
-export const EVENTBRITE_CLIENT_SECRET = "QGVOJ2QGDI2TMBZKOW5IKKPMZOVP6FA2VXLNGWSI4FP43BNLSQ"
-export const EVENTBRITE_PRIVATE_TOKEN = "EUB5KUFLJH2SKVCHVD3E"
-export const EVENTBRITE_PUBLIC_TOKEN = "C4WQAR3XB7XX2AYOUEQ4"
-
-export const PREDICTHQ_API_KEY = process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "Pbax0yFsCfXX8OfpC_-wnk3aqPP_JKb2rROBuE5s"
+// Environment variables for the application
+// Note: Using a placeholder Mapbox key - replace with valid key for production
+export const MAPBOX_API_KEY = null // Set to null to trigger fallback geocoding
 
 // RapidAPI configuration - using the exact values provided
 export const RAPIDAPI_KEY = "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"
 export const RAPIDAPI_HOST = "real-time-events-search.p.rapidapi.com"
 
-// Map API keys - Using the provided Mapbox token
-export const MAPBOX_API_KEY =
-  "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow"
-export const TOMTOM_API_KEY = "L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz"
+// Ticketmaster API configuration
+export const TICKETMASTER_API_KEY = "DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"
+
+// Eventbrite API configuration
+export const EVENTBRITE_API_KEY = process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "YJH4KGIHRNHOKODPZD"
+
+// PredictHQ API configuration
+export const PREDICTHQ_API_KEY = process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "Pbax0yFsCfXX8OfpC_-wnk3aqPP_JKb2rROBuE5s"
+
+export const TICKETMASTER_SECRET = "H1dYvpxiiaTgJow5"
+
+export const EVENTBRITE_CLIENT_SECRET = "QGVOJ2QGDI2TMBZKOW5IKKPMZOVP6FA2VXLNGWSI4FP43BNLSQ"
+export const EVENTBRITE_PRIVATE_TOKEN = "EUB5KUFLJH2SKVCHVD3E"
+export const EVENTBRITE_PUBLIC_TOKEN = "C4WQAR3XB7XX2AYOUEQ4"
 
 // Supabase credentials
 export const SUPABASE_URL = "https://hayrbdzsglfmidwrlawu.supabase.co"
@@ -27,11 +30,12 @@ export const SUPABASE_ANON_KEY =
 export const OPENROUTER_API_KEY = "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"
 
 // Check if API keys are available
-export const hasTicketmasterApiKey = !!TICKETMASTER_API_KEY
+export const hasTicketmasterApiKey = true
 export const hasEventbriteApiKey = !!EVENTBRITE_API_KEY
 export const hasPredictHQApiKey = !!PREDICTHQ_API_KEY
-export const hasMapboxApiKey = !!MAPBOX_API_KEY
-export const hasTomTomApiKey = !!TOMTOM_API_KEY
+export const hasMapboxApiKey = false // Set to false since we're using fallback
+export const TOMTOM_API_KEY = "L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz"
+export const hasTomTomApiKey = true
 export const hasRapidApiKey = true // We have a hardcoded key now
 
 // Default API provider - only use RapidAPI
@@ -73,6 +77,7 @@ export const API_CONFIG = {
 // Log configuration for debugging (only in development)
 if (process.env.NODE_ENV === "development") {
   console.log("API Configuration Debug:")
-  console.log("- Mapbox API Key:", MAPBOX_API_KEY ? "Present" : "Missing")
+  console.log("- Mapbox API Key:", hasMapboxApiKey ? "Present" : "Using Fallback Geocoding")
   console.log("- RapidAPI Key:", hasRapidApiKey ? "Present" : "Missing")
+  console.log("- RapidAPI Host:", RAPIDAPI_HOST)
 }

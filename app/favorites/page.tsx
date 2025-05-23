@@ -2,29 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import {
-  Search,
-  Heart,
-  Trash2,
-  Calendar,
-  MapPin,
-  Clock,
-  ChevronRight,
-  ArrowLeft,
-  Music,
-  SlidersHorizontal,
-  Loader2,
-  Users,
-  HeartOff,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import Link from "next/link"
 import { EventDetailModal, type EventDetailProps } from "@/components/event-detail-modal"
+import { FavoritesHeader } from "@/components/favorites/favorites-header"
+import { FavoritesFilters } from "@/components/favorites/favorites-filters"
+import { EmptyFavorites } from "@/components/favorites/empty-favorites"
+import { FavoritesFooter } from "@/components/favorites/favorites-footer"
+import { EventCard } from "@/components/event-card"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 
 // Sample favorites data
 const initialFavorites: EventDetailProps[] = [
@@ -95,6 +79,7 @@ export default function FavoritesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
+  const [filteredFavorites, setFilteredFavorites] = useState<EventDetailProps[]>(initialFavorites)
 
   useEffect(() => {
     // Simulate loading
@@ -103,6 +88,39 @@ export default function FavoritesPage() {
     }, 800)
     return () => clearTimeout(timer)
   }, [])
+
+  // Filter favorites when search query or active tab changes
+  useEffect(() => {
+    let filtered = [...favorites]
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(
+        (event) =>
+          event.title.toLowerCase().includes(query) ||
+          event.location.toLowerCase().includes(query) ||
+          event.category.toLowerCase().includes(query),
+      )
+    }
+
+    // Filter by tab
+    if (activeTab !== "all") {
+      if (activeTab === "upcoming") {
+        // Filter for upcoming events (simple implementation)
+        const today = new Date()
+        filtered = filtered.filter((event) => {
+          const eventDate = new Date(event.date)
+          return eventDate >= today
+        })
+      } else {
+        // Filter by category
+        filtered = filtered.filter((event) => event.category.toLowerCase() === activeTab.toLowerCase())
+      }
+    }
+
+    setFilteredFavorites(filtered)
+  }, [favorites, searchQuery, activeTab])
 
   const handleViewEventDetails = (event: EventDetailProps) => {
     setSelectedEvent(event)
@@ -123,85 +141,13 @@ export default function FavoritesPage() {
     // Simulate search delay
     setTimeout(() => {
       setIsSearching(false)
-      // Filter logic would go here in a real app
     }, 800)
   }
-
-  const filteredFavorites = searchQuery
-    ? favorites.filter((event) => event.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : favorites
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0F1116] text-gray-200">
       {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        className="flex items-center justify-between p-4 border-b border-gray-800 bg-[#0F1116] z-10"
-      >
-        <div className="flex items-center">
-          <Link href="/">
-            <Button variant="ghost" className="mr-2 text-gray-400 hover:text-gray-200 p-1">
-              <ArrowLeft size={20} />
-            </Button>
-          </Link>
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-2 rounded-xl mr-2 shadow-glow-sm"
-          >
-            <Heart size={18} />
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400"
-          >
-            Your Favorites
-          </motion.h1>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-            <Input
-              className="w-full bg-[#1A1D25] border-gray-800 rounded-xl pl-10 text-sm focus-visible:ring-purple-500 transition-all duration-300"
-              placeholder="Search favorites..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <Link href="/party">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="outline"
-                      className="bg-[#0F1116] hover:bg-[#1A1D25] text-gray-400 border-gray-800 rounded-xl transition-colors duration-300"
-                    >
-                      <Music className="mr-2 h-4 w-4" />
-                      Party
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent className="bg-[#1A1D25] border-gray-800 text-gray-300">
-                  <p>Browse party and music events</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Link>
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center shadow-glow-sm cursor-pointer"
-          >
-            <span className="text-sm font-medium text-white">DA</span>
-          </motion.div>
-        </div>
-      </motion.header>
+      <FavoritesHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       {/* Main content */}
       <main className="flex-1 p-4 md:p-6">
@@ -214,219 +160,47 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <>
-            {/* Favorites header */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="mb-6"
-            >
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-100">Your Saved Events</h2>
-                <div className="flex items-center">
-                  <Button
-                    variant="outline"
-                    className="bg-[#1A1D25] hover:bg-[#22252F] text-gray-300 border-gray-800 rounded-xl transition-colors duration-300 mr-2"
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                  >
-                    {isSearching ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4 text-purple-400" />
-                        Search
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="bg-[#1A1D25] hover:bg-[#22252F] text-gray-300 border-gray-800 rounded-xl transition-colors duration-300"
-                  >
-                    <SlidersHorizontal className="mr-2 h-4 w-4 text-purple-400" />
-                    Sort
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
+            <FavoritesFilters
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isSearching={isSearching}
+              handleSearch={handleSearch}
+            />
 
-            {/* Favorites tabs */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="mb-6"
-            >
-              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="bg-[#1A1D25] p-1 rounded-xl mb-6 w-full grid grid-cols-3 sm:grid-cols-5">
-                  <TabsTrigger
-                    value="all"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    All
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="upcoming"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Upcoming
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="music"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Music
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="art"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Art
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="other"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Other
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="all" className="mt-0">
-                  {filteredFavorites.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredFavorites.map((event, i) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 * i, duration: 0.4 }}
-                          whileHover={{ y: -5 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          layout
-                        >
-                          <Card className="overflow-hidden bg-[#1A1D25] border-gray-800 rounded-xl transition-all duration-300 hover:shadow-glow-sm">
-                            <div className="h-48 bg-gradient-to-br from-purple-900/30 to-indigo-900/30 relative overflow-hidden">
-                              <motion.img
-                                whileHover={{ scale: 1.05 }}
-                                transition={{ duration: 0.5 }}
-                                src={event.image}
-                                alt={event.title}
-                                className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-500"
-                              />
-                              <motion.div
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                className="absolute top-2 right-2 bg-[#1A1D25]/80 backdrop-blur-sm rounded-full p-1.5 shadow-glow-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleRemoveFavorite(event.id)
-                                }}
-                              >
-                                <Trash2
-                                  size={16}
-                                  className="text-gray-400 hover:text-red-400 cursor-pointer transition-colors duration-300"
-                                />
-                              </motion.div>
-                              <motion.div
-                                initial={{ x: -10, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.2 + 0.1 * i, duration: 0.3 }}
-                                className="absolute bottom-2 left-2"
-                              >
-                                <Badge className="bg-[#1A1D25]/80 backdrop-blur-sm text-purple-400 hover:text-purple-300 border-0 shadow-glow-xs">
-                                  {event.category}
-                                </Badge>
-                              </motion.div>
-                            </div>
-                            <CardContent className="p-4">
-                              <h3 className="font-bold mb-1 text-gray-200">{event.title}</h3>
-                              <div className="text-sm text-gray-400 mb-2 flex items-center">
-                                <MapPin size={14} className="mr-1 text-purple-400" />
-                                {event.location}
-                              </div>
-                              <div className="text-sm text-gray-400 mb-2 flex items-center">
-                                <Calendar size={14} className="mr-1 text-purple-400" />
-                                {event.date}
-                              </div>
-                              <div className="text-sm text-gray-400 mb-3 flex items-center">
-                                <Clock size={14} className="mr-1 text-purple-400" />
-                                {event.time}
-                              </div>
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="text-sm font-medium text-gray-200">{event.price}</div>
-                                <div className="flex items-center text-sm text-gray-400">
-                                  <Users size={14} className="mr-1" />
-                                  {event.attendees} attending
-                                </div>
-                              </div>
-                              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                <Button
-                                  variant="outline"
-                                  className="w-full bg-[#22252F] hover:bg-[#2A2E38] text-purple-400 hover:text-purple-300 border-gray-800 rounded-lg group transition-all duration-300"
-                                  onClick={() => handleViewEventDetails(event)}
-                                >
-                                  View Details
-                                  <ChevronRight
-                                    size={16}
-                                    className="ml-1 transition-transform duration-300 group-hover:translate-x-1"
-                                  />
-                                </Button>
-                              </motion.div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyFavorites searchQuery={searchQuery} />
-                  )}
-                </TabsContent>
-
-                {/* Other tab contents would be similar but filtered */}
-              </Tabs>
-            </motion.div>
+            <Tabs defaultValue="all" className="mt-0">
+              <TabsContent value="all" className="mt-0">
+                {filteredFavorites.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredFavorites.map((event, i) => (
+                      <motion.div
+                        key={event.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 * i, duration: 0.4 }}
+                        whileHover={{ y: -5 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        layout
+                      >
+                        <EventCard
+                          event={event}
+                          onViewDetails={() => handleViewEventDetails(event)}
+                          onToggleFavorite={() => handleRemoveFavorite(event.id)}
+                          index={i}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyFavorites searchQuery={searchQuery} />
+                )}
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </main>
 
       {/* Footer */}
-      <motion.footer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
-        className="bg-[#0A0B0E] border-t border-gray-800 p-4 text-center text-sm text-gray-500"
-      >
-        <div className="flex justify-center space-x-4 mb-2">
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Help Center
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Privacy Policy
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Terms of Service
-            </Button>
-          </motion.div>
-        </div>
-        <p>© 2025 DateAI. All rights reserved.</p>
-      </motion.footer>
+      <FavoritesFooter />
 
       {/* Event Detail Modal */}
       <EventDetailModal
@@ -438,40 +212,5 @@ export default function FavoritesPage() {
         }}
       />
     </div>
-  )
-}
-
-// Empty state component
-function EmptyFavorites({ searchQuery }: { searchQuery: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex flex-col items-center justify-center py-16 text-center"
-    >
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="bg-[#1A1D25] p-4 rounded-full mb-4"
-      >
-        <HeartOff size={48} className="text-gray-500" />
-      </motion.div>
-      <h3 className="text-xl font-bold text-gray-300 mb-2">
-        {searchQuery ? "No matching favorites found" : "No favorites yet"}
-      </h3>
-      <p className="text-gray-500 max-w-md mb-6">
-        {searchQuery
-          ? `We couldn't find any favorites matching "${searchQuery}". Try adjusting your search or browse all events to find something you like.`
-          : "Start exploring events and save your favorites to see them here. Discover music, art, and more events happening near you."}
-      </p>
-      <Link href="/">
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg shadow-glow-sm transition-all duration-300">
-            Discover Events
-          </Button>
-        </motion.div>
-      </Link>
-    </motion.div>
   )
 }

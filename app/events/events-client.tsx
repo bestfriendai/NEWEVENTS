@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { fetchEvents } from "@/app/actions/event-actions"
+import { fetchEnhancedEvents } from "@/app/actions/event-actions"
 import { EventCard } from "@/components/event-card"
 import { EnhancedMapExplorer } from "@/components/enhanced-map-explorer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -26,6 +26,8 @@ import {
   Map,
   List,
   Locate,
+  Clock,
+  DollarSign,
 } from "lucide-react"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { EventDetailModal } from "@/components/event-detail-modal"
@@ -51,10 +53,37 @@ const POPULAR_LOCATIONS = [
   { id: "denver", label: "Denver", value: "Denver" },
 ]
 
+const DATE_FILTERS = [
+  { id: "any", label: "Any date" },
+  { id: "today", label: "Today" },
+  { id: "tomorrow", label: "Tomorrow" },
+  { id: "this-week", label: "This week" },
+  { id: "this-weekend", label: "This weekend" },
+  { id: "next-week", label: "Next week" },
+  { id: "this-month", label: "This month" },
+]
+
+const PRICE_FILTERS = [
+  { id: "any", label: "Any price" },
+  { id: "free", label: "Free" },
+  { id: "paid", label: "Paid" },
+  { id: "0-25", label: "$0-$25" },
+  { id: "25-50", label: "$25-$50" },
+  { id: "50-100", label: "$50-$100" },
+  { id: "100+", label: "$100+" },
+]
+
+const TIME_FILTERS = [
+  { id: "any", label: "Any time" },
+  { id: "morning", label: "Morning" },
+  { id: "afternoon", label: "Afternoon" },
+  { id: "evening", label: "Evening" },
+]
+
 export function EventsClient() {
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [locationQuery, setLocationQuery] = useState("")
@@ -71,6 +100,11 @@ export function EventsClient() {
   const [searchRadius, setSearchRadius] = useState(25)
   const [locationPermissionStatus, setLocationPermissionStatus] = useState<PermissionState | null>(null)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
+  const [dateFilter, setDateFilter] = useState("any")
+  const [priceFilter, setPriceFilter] = useState("any")
+  const [timeFilter, setTimeFilter] = useState("any")
+  const [dataSources, setDataSources] = useState<string[]>([])
+  const [totalEvents, setTotalEvents] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const defaultLocation = "New York"
 
@@ -78,14 +112,21 @@ export function EventsClient() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.permissions) return
 
-    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
-      setLocationPermissionStatus(result.state)
-
-      // Listen for changes to permission state
-      result.onchange = () => {
+    const checkPermission = async () => {
+      try {
+        const result = await navigator.permissions.query({ name: "geolocation" as PermissionName })
         setLocationPermissionStatus(result.state)
+
+        // Listen for changes to permission state
+        result.onchange = () => {
+          setLocationPermissionStatus(result.state)
+        }
+      } catch (error) {
+        console.error("Error checking geolocation permission:", error)
       }
-    })
+    }
+
+    checkPermission()
   }, [])
 
   // Show location modal on first load
@@ -96,59 +137,172 @@ export function EventsClient() {
     }
   }, [isFirstLoad])
 
-  const loadEvents = async (locationParam?: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const locationToUse = locationParam || location || defaultLocation
-      console.log("Loading events for location:", locationToUse)
+  // Memoized loadEvents function to prevent infinite loops
+  const loadEvents = useCallback(
+    async (locationParam?: string) => {
+      setLoading(true)
+      setError(null)
 
-      // Increase the search radius for better results
-      const result = await fetchEvents({
-        keyword: searchQuery || "events",
-        location: locationToUse,
-        radius: searchRadius,
-        size: 50,
-      })
+      try {
+        const locationToUse = locationParam || location || defaultLocation
+        console.log("Loading events for location:", locationToUse)
 
-      console.log("Fetch result:", result)
+        // Prepare date range if date filter is set
+        let startDateTime: string | undefined
+        let endDateTime: string | undefined
 
-      if (result.error) {
-        setError(result.error)
-        setEvents([])
-        setFilteredEvents([])
-      } else if (result.events && result.events.length > 0) {
-        setEvents(result.events)
-        setFilteredEvents(result.events)
-      } else {
-        // If no events found, try with a larger radius
-        console.log("No events found, trying with larger radius")
-        const largerRadiusResult = await fetchEvents({
+        if (dateFilter !== "any") {
+          const now = new Date()
+
+          switch (dateFilter) {
+            case "today":
+              startDateTime = now.toISOString().split("T")[0]
+              endDateTime = now.toISOString().split("T")[0]
+              break
+            case "tomorrow":
+              const tomorrow = new Date(now)
+              tomorrow.setDate(tomorrow.getDate() + 1)
+              startDateTime = tomorrow.toISOString().split("T")[0]
+              endDateTime = tomorrow.toISOString().split("T")[0]
+              break
+            case "this-week":
+              const endOfWeek = new Date(now)
+              endOfWeek.setDate(now.getDate() + (7 - now.getDay()))
+              startDateTime = now.toISOString().split("T")[0]
+              endDateTime = endOfWeek.toISOString().split("T")[0]
+              break
+            case "this-weekend":
+              const saturday = new Date(now)
+              saturday.setDate(now.getDate() + (6 - now.getDay()))
+              const sunday = new Date(saturday)
+              sunday.setDate(saturday.getDate() + 1)
+              startDateTime = saturday.toISOString().split("T")[0]
+              endDateTime = sunday.toISOString().split("T")[0]
+              break
+            case "next-week":
+              const nextWeekStart = new Date(now)
+              nextWeekStart.setDate(now.getDate() + (7 - now.getDay()) + 1)
+              const nextWeekEnd = new Date(nextWeekStart)
+              nextWeekEnd.setDate(nextWeekStart.getDate() + 6)
+              startDateTime = nextWeekStart.toISOString().split("T")[0]
+              endDateTime = nextWeekEnd.toISOString().split("T")[0]
+              break
+            case "this-month":
+              const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+              startDateTime = now.toISOString().split("T")[0]
+              endDateTime = lastDay.toISOString().split("T")[0]
+              break
+          }
+        }
+
+        // Prepare price range if price filter is set
+        let priceRange: { min: number; max: number } | undefined
+
+        if (priceFilter !== "any") {
+          switch (priceFilter) {
+            case "free":
+              priceRange = { min: 0, max: 0 }
+              break
+            case "0-25":
+              priceRange = { min: 0, max: 25 }
+              break
+            case "25-50":
+              priceRange = { min: 25, max: 50 }
+              break
+            case "50-100":
+              priceRange = { min: 50, max: 100 }
+              break
+            case "100+":
+              priceRange = { min: 100, max: 1000 }
+              break
+          }
+        }
+
+        // Prepare user preferences
+        const userPreferences = {
+          timePreference: timeFilter !== "any" ? timeFilter : undefined,
+          pricePreference: priceFilter === "free" ? "free" : priceFilter === "paid" ? "paid" : "any",
+          favoriteCategories: selectedCategory !== "all" ? [selectedCategory] : undefined,
+        }
+
+        // Use enhanced events API
+        const result = await fetchEnhancedEvents({
           keyword: searchQuery || "events",
           location: locationToUse,
-          radius: searchRadius * 2, // Double the radius
+          coordinates: userCoordinates || undefined,
+          radius: searchRadius,
           size: 50,
+          startDateTime,
+          endDateTime,
+          priceRange,
+          userPreferences,
         })
 
-        if (largerRadiusResult.events && largerRadiusResult.events.length > 0) {
-          setEvents(largerRadiusResult.events)
-          setFilteredEvents(largerRadiusResult.events)
-        } else {
-          setError("No events found in this area. Try a different location or search term.")
+        console.log("Fetch result:", result)
+
+        if (result.error) {
+          setError(result.error)
           setEvents([])
           setFilteredEvents([])
+          setDataSources([])
+          setTotalEvents(0)
+        } else if (result.events && result.events.length > 0) {
+          setEvents(result.events)
+          setFilteredEvents(result.events)
+          setTotalEvents(result.totalCount || 0)
+          setDataSources(result.sources || [])
+        } else {
+          // If no events found, try with a larger radius
+          console.log("No events found, trying with larger radius")
+          const largerRadiusResult = await fetchEnhancedEvents({
+            keyword: searchQuery || "events",
+            location: locationToUse,
+            coordinates: userCoordinates || undefined,
+            radius: searchRadius * 2, // Double the radius
+            size: 50,
+            startDateTime,
+            endDateTime,
+            priceRange,
+            userPreferences,
+          })
+
+          if (largerRadiusResult.events && largerRadiusResult.events.length > 0) {
+            setEvents(largerRadiusResult.events)
+            setFilteredEvents(largerRadiusResult.events)
+            setTotalEvents(largerRadiusResult.totalCount || 0)
+            setDataSources(largerRadiusResult.sources || [])
+          } else {
+            setError("No events found in this area. Try a different location or search term.")
+            setEvents([])
+            setFilteredEvents([])
+            setDataSources([])
+            setTotalEvents(0)
+          }
         }
+      } catch (err) {
+        console.error("Error loading events:", err)
+        const errorMessage = err instanceof Error ? err.message : "Failed to load events"
+        setError(errorMessage)
+        setEvents([])
+        setFilteredEvents([])
+        setDataSources([])
+        setTotalEvents(0)
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      console.error("Error loading events:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to load events"
-      setError(errorMessage)
-      setEvents([])
-      setFilteredEvents([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    [
+      location,
+      searchQuery,
+      userCoordinates,
+      searchRadius,
+      dateFilter,
+      priceFilter,
+      timeFilter,
+      selectedCategory,
+      defaultLocation,
+    ],
+  )
 
   // Filter events when category changes
   useEffect(() => {
@@ -160,69 +314,78 @@ export function EventsClient() {
     }
   }, [selectedCategory, events])
 
-  // Load events when location changes
+  // Load events when location changes (but not on first render)
   useEffect(() => {
-    if (location) {
+    if (location && !isFirstLoad) {
       loadEvents()
     }
-  }, [location])
+  }, [location, loadEvents, isFirstLoad])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    loadEvents()
-  }
+  const handleSearch = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      loadEvents()
+    },
+    [loadEvents],
+  )
 
-  const handleLocationSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (locationQuery.trim()) {
-      setLocation(locationQuery)
-      setLocationName(locationQuery)
-      setShowLocationModal(false)
-    }
-  }
+  const handleLocationSearch = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      if (locationQuery.trim()) {
+        setLocation(locationQuery)
+        setLocationName(locationQuery)
+        setShowLocationModal(false)
+      }
+    },
+    [locationQuery],
+  )
 
-  const handleViewDetails = (event: EventDetailProps) => {
+  const handleViewDetails = useCallback((event: EventDetailProps) => {
     setSelectedEvent(event)
     setShowDetailModal(true)
-  }
+  }, [])
 
-  const handleToggleFavorite = (eventId: number) => {
-    const updatedEvents = events.map((event) =>
-      event.id === eventId ? { ...event, isFavorite: !event.isFavorite } : event,
+  const handleToggleFavorite = useCallback((eventId: number) => {
+    setEvents((prevEvents) =>
+      prevEvents.map((event) => (event.id === eventId ? { ...event, isFavorite: !event.isFavorite } : event)),
     )
-    setEvents(updatedEvents)
 
-    // Also update filtered events
-    const updatedFilteredEvents = filteredEvents.map((event) =>
-      event.id === eventId ? { ...event, isFavorite: !event.isFavorite } : event,
+    setFilteredEvents((prevFilteredEvents) =>
+      prevFilteredEvents.map((event) => (event.id === eventId ? { ...event, isFavorite: !event.isFavorite } : event)),
     )
-    setFilteredEvents(updatedFilteredEvents)
-  }
+  }, [])
 
-  const handleSelectPopularLocation = (locationValue: string) => {
+  const handleSelectPopularLocation = useCallback((locationValue: string) => {
     setLocation(locationValue)
     setLocationName(locationValue)
     setLocationQuery(locationValue)
     setShowLocationModal(false)
-  }
+  }, [])
 
   const promptForLocation = useCallback(() => {
     setIsRequestingLocation(true)
     setLocationError(null)
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser. Please enter your location manually.")
+      setIsRequestingLocation(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
           const { latitude, longitude } = position.coords
           console.log("Got user coordinates:", latitude, longitude)
           setUserCoordinates({ lat: latitude, lng: longitude })
 
-          // Get location name with error handling
+          // Get location name with error handling - use fallback if API fails
           try {
             const locationName = await reverseGeocode(latitude, longitude)
             setLocationName(locationName || "Your Location")
           } catch (error) {
-            console.error("Error getting location name:", error)
+            console.warn("Reverse geocoding failed, using generic location name:", error)
             setLocationName("Your Location")
           }
 
@@ -232,39 +395,72 @@ export function EventsClient() {
           setShowLocationModal(false)
 
           // Load events with the coordinates
-          loadEvents(locationString)
+          await loadEvents(locationString)
+        } catch (error) {
+          console.error("Error processing location:", error)
+          setLocationError("Error processing your location. Please try again.")
+        } finally {
           setIsRequestingLocation(false)
-        },
-        (error) => {
-          console.error("Error getting location:", error)
-          setLocationError(
-            error.code === 1
-              ? "Location permission denied. Please enable location services or enter your location manually."
-              : "Could not get your location. Please try again or enter your location manually.",
-          )
-          setIsRequestingLocation(false)
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        },
-      )
-    } else {
-      setLocationError("Geolocation is not supported by your browser. Please enter your location manually.")
-      setIsRequestingLocation(false)
-    }
-  }, [])
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error)
+        setLocationError(
+          error.code === 1
+            ? "Location permission denied. Please enable location services or enter your location manually."
+            : "Could not get your location. Please try again or enter your location manually.",
+        )
+        setIsRequestingLocation(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    )
+  }, [loadEvents])
 
   // Handle radius change
-  const handleRadiusChange = (value: string) => {
+  const handleRadiusChange = useCallback((value: string) => {
     const radius = Number.parseInt(value, 10)
     setSearchRadius(radius)
-    // Reload events with new radius if we have a location
-    if (location) {
-      loadEvents()
-    }
-  }
+  }, [])
+
+  // Handle filter changes
+  const handleDateFilterChange = useCallback((value: string) => {
+    setDateFilter(value)
+  }, [])
+
+  const handlePriceFilterChange = useCallback((value: string) => {
+    setPriceFilter(value)
+  }, [])
+
+  const handleTimeFilterChange = useCallback((value: string) => {
+    setTimeFilter(value)
+  }, [])
+
+  // Apply all filters
+  const applyFilters = useCallback(() => {
+    loadEvents()
+  }, [loadEvents])
+
+  // Clear all filters
+  const clearFilters = useCallback(() => {
+    setDateFilter("any")
+    setPriceFilter("any")
+    setTimeFilter("any")
+    setSelectedCategory("all")
+    setSearchRadius(25)
+  }, [])
+
+  const retryLoadEvents = useCallback(() => {
+    loadEvents()
+  }, [loadEvents])
+
+  const tryLargerArea = useCallback(() => {
+    setSearchRadius(100)
+    loadEvents()
+  }, [loadEvents])
 
   return (
     <div className="min-h-screen bg-[#0F1116]">
@@ -313,7 +509,7 @@ export function EventsClient() {
             {CATEGORIES.map((category) => (
               <Badge
                 key={category.id}
-                className={`px-4 py-2 rounded-full cursor-pointer text-sm font-medium border-0 ${
+                className={`px-4 py-2 rounded-full cursor-pointer text-sm font-medium border-0 transition-colors ${
                   selectedCategory === category.id
                     ? "bg-purple-600 text-white"
                     : `${category.color} hover:bg-opacity-30`
@@ -336,7 +532,7 @@ export function EventsClient() {
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
             <Button
-              onClick={loadEvents}
+              onClick={retryLoadEvents}
               variant="outline"
               size="sm"
               className="mt-2 border-red-700 text-white hover:bg-red-800"
@@ -345,6 +541,15 @@ export function EventsClient() {
               Retry
             </Button>
           </Alert>
+        )}
+
+        {/* Data sources info */}
+        {dataSources.length > 0 && (
+          <div className="mb-4 p-3 bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/50 rounded-lg text-sm text-gray-400">
+            <p>
+              Found {totalEvents} events from {dataSources.length} sources: {dataSources.join(", ")}
+            </p>
+          </div>
         )}
 
         {/* Tabs for list/map view */}
@@ -362,7 +567,6 @@ export function EventsClient() {
                 <TabsTrigger
                   value="map"
                   className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md px-4 py-2"
-                  disabled={false} // Always allow map tab, let the map component handle errors
                 >
                   <Map className="h-4 w-4 mr-2" />
                   Map View
@@ -396,7 +600,7 @@ export function EventsClient() {
             {/* Filter panel */}
             {showFilters && (
               <div className="p-4 border-b border-gray-800/50 bg-[#22252F]/50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Date</label>
                     <div className="relative">
@@ -404,36 +608,58 @@ export function EventsClient() {
                         className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                         size={16}
                       />
-                      <Select>
+                      <Select value={dateFilter} onValueChange={handleDateFilterChange}>
                         <SelectTrigger className="pl-10 bg-[#1A1D25]/80 border-gray-800 rounded-lg text-white">
                           <SelectValue placeholder="Any date" />
                         </SelectTrigger>
                         <SelectContent className="bg-[#1A1D25] border-gray-800">
-                          <SelectItem value="today">Today</SelectItem>
-                          <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                          <SelectItem value="this-week">This week</SelectItem>
-                          <SelectItem value="this-weekend">This weekend</SelectItem>
-                          <SelectItem value="next-week">Next week</SelectItem>
-                          <SelectItem value="this-month">This month</SelectItem>
+                          {DATE_FILTERS.map((filter) => (
+                            <SelectItem key={filter.id} value={filter.id}>
+                              {filter.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Price</label>
-                    <Select>
-                      <SelectTrigger className="bg-[#1A1D25]/80 border-gray-800 rounded-lg text-white">
-                        <SelectValue placeholder="Any price" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#1A1D25] border-gray-800">
-                        <SelectItem value="free">Free</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="0-25">$0-$25</SelectItem>
-                        <SelectItem value="25-50">$25-$50</SelectItem>
-                        <SelectItem value="50-100">$50-$100</SelectItem>
-                        <SelectItem value="100+">$100+</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <DollarSign
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                        size={16}
+                      />
+                      <Select value={priceFilter} onValueChange={handlePriceFilterChange}>
+                        <SelectTrigger className="pl-10 bg-[#1A1D25]/80 border-gray-800 rounded-lg text-white">
+                          <SelectValue placeholder="Any price" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1A1D25] border-gray-800">
+                          {PRICE_FILTERS.map((filter) => (
+                            <SelectItem key={filter.id} value={filter.id}>
+                              {filter.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Time</label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
+                        <SelectTrigger className="pl-10 bg-[#1A1D25]/80 border-gray-800 rounded-lg text-white">
+                          <SelectValue placeholder="Any time" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1A1D25] border-gray-800">
+                          {TIME_FILTERS.map((filter) => (
+                            <SelectItem key={filter.id} value={filter.id}>
+                              {filter.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Search radius</label>
@@ -453,15 +679,16 @@ export function EventsClient() {
                   </div>
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button variant="outline" size="sm" className="border-gray-700 text-gray-300 hover:text-white mr-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-700 text-gray-300 hover:text-white mr-2"
+                    onClick={clearFilters}
+                  >
                     <X className="h-4 w-4 mr-2" />
                     Clear
                   </Button>
-                  <Button
-                    size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                    onClick={() => loadEvents()}
-                  >
+                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={applyFilters}>
                     Apply Filters
                   </Button>
                 </div>
@@ -511,13 +738,7 @@ export function EventsClient() {
                     more events
                   </p>
                   <div className="flex flex-wrap gap-3 justify-center">
-                    <Button
-                      onClick={() => {
-                        setSearchRadius(100) // Increase radius
-                        loadEvents()
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                    >
+                    <Button onClick={tryLargerArea} className="bg-purple-600 hover:bg-purple-700 text-white">
                       <RefreshCw className="mr-2 h-4 w-4" />
                       Try Larger Area
                     </Button>

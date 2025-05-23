@@ -2,31 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import {
-  Search,
-  MapPin,
-  Calendar,
-  Heart,
-  Music,
-  Headphones,
-  Clock,
-  ChevronRight,
-  Users,
-  ArrowLeft,
-  Loader2,
-  Filter,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Slider } from "@/components/ui/slider"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import Link from "next/link"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { EventDetailModal, type EventDetailProps } from "@/components/event-detail-modal"
+import { PartyHeader } from "@/components/party/party-header"
+import { PartyHero } from "@/components/party/party-hero"
+import { CategoryTabs } from "@/components/party/category-tabs"
+import { FeaturedArtists } from "@/components/party/featured-artists"
+import { AdvancedFilters } from "@/components/party/advanced-filters"
+import { PartyFooter } from "@/components/party/party-footer"
+import { EventCard } from "@/components/event-card"
 
 // Sample party events data
 const partyEvents: EventDetailProps[] = [
@@ -181,11 +165,13 @@ const featuredArtists = [
 export default function PartyPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
-  const [priceRange, setPriceRange] = useState([0, 100])
   const [events, setEvents] = useState(partyEvents)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>([])
   const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     // Simulate loading
@@ -194,6 +180,20 @@ export default function PartyPage() {
     }, 1000)
     return () => clearTimeout(timer)
   }, [])
+
+  // Filter events when tab changes
+  useEffect(() => {
+    if (activeTab === "all") {
+      setFilteredEvents(events)
+    } else {
+      const filtered = events.filter(
+        (event) =>
+          event.category.toLowerCase() === activeTab.toLowerCase() ||
+          event.title.toLowerCase().includes(activeTab.toLowerCase()),
+      )
+      setFilteredEvents(filtered)
+    }
+  }, [activeTab, events])
 
   const handleViewEventDetails = (event: EventDetailProps) => {
     setSelectedEvent(event)
@@ -223,72 +223,7 @@ export default function PartyPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#0F1116] text-gray-200">
       {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        className="flex items-center justify-between p-4 border-b border-gray-800 bg-[#0F1116] z-10"
-      >
-        <div className="flex items-center">
-          <Link href="/">
-            <Button variant="ghost" className="mr-2 text-gray-400 hover:text-gray-200 p-1">
-              <ArrowLeft size={20} />
-            </Button>
-          </Link>
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-2 rounded-xl mr-2 shadow-glow-sm"
-          >
-            <Music size={18} />
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400"
-          >
-            Party & Music Events
-          </motion.h1>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-            <Input
-              className="w-full bg-[#1A1D25] border-gray-800 rounded-xl pl-10 text-sm focus-visible:ring-purple-500 transition-all duration-300"
-              placeholder="Search for events..."
-            />
-          </div>
-          <Link href="/favorites">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="outline"
-                      className="bg-[#0F1116] hover:bg-[#1A1D25] text-gray-400 border-gray-800 rounded-xl transition-colors duration-300"
-                    >
-                      <Heart className="mr-2 h-4 w-4" />
-                      Favorites
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent className="bg-[#1A1D25] border-gray-800 text-gray-300">
-                  <p>View your saved events</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Link>
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center shadow-glow-sm cursor-pointer"
-          >
-            <span className="text-sm font-medium text-white">DA</span>
-          </motion.div>
-        </div>
-      </motion.header>
+      <PartyHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       {/* Main content */}
       <main className="flex-1 p-4 md:p-6">
@@ -302,508 +237,56 @@ export default function PartyPage() {
         ) : (
           <>
             {/* Hero section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="relative w-full h-64 md:h-80 rounded-2xl overflow-hidden mb-8"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-900/80 to-indigo-900/80 z-10"></div>
-              <img
-                src="/party-hero.png?height=400&width=1200&query=nightclub with dj and crowd"
-                alt="Party events"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 z-20 flex flex-col justify-center p-8">
-                <motion.h2
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                  className="text-3xl md:text-4xl font-bold text-white mb-2"
-                >
-                  Find Your Perfect Night Out
-                </motion.h2>
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.5 }}
-                  className="text-gray-200 mb-6 max-w-lg"
-                >
-                  Discover the hottest parties, clubs, and music events happening near you
-                </motion.p>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4, duration: 0.5 }}
-                  className="flex flex-wrap gap-3"
-                >
-                  <Badge className="bg-purple-600/80 hover:bg-purple-600 text-white border-0 py-1.5 px-3 text-sm cursor-pointer">
-                    Nightclubs
-                  </Badge>
-                  <Badge className="bg-indigo-600/80 hover:bg-indigo-600 text-white border-0 py-1.5 px-3 text-sm cursor-pointer">
-                    Live Music
-                  </Badge>
-                  <Badge className="bg-blue-600/80 hover:bg-blue-600 text-white border-0 py-1.5 px-3 text-sm cursor-pointer">
-                    DJ Sets
-                  </Badge>
-                  <Badge className="bg-pink-600/80 hover:bg-pink-600 text-white border-0 py-1.5 px-3 text-sm cursor-pointer">
-                    Festivals
-                  </Badge>
-                </motion.div>
-              </div>
-            </motion.div>
+            <PartyHero />
 
             {/* Filters and categories */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="mb-8"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-100">Party Events</h2>
-                <Button
-                  variant="outline"
-                  className="bg-[#1A1D25] hover:bg-[#22252F] text-gray-300 border-gray-800 rounded-xl transition-colors duration-300"
-                  onClick={() => document.getElementById("filter-section")?.scrollIntoView({ behavior: "smooth" })}
-                >
-                  <Filter className="mr-2 h-4 w-4 text-purple-400" />
-                  Filters
-                </Button>
-              </div>
+            <CategoryTabs
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              onFilterClick={() => setShowFilters(!showFilters)}
+            />
 
-              <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="bg-[#1A1D25] p-1 rounded-xl mb-6 w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
-                  <TabsTrigger
-                    value="all"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    All
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="techno"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Techno
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="house"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    House
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="hiphop"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Hip-Hop
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="dnb"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Drum & Bass
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="retro"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Retro
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="festival"
-                    className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-                  >
-                    Festivals
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="all" className="mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {events.map((event, i) => (
-                      <motion.div
-                        key={event.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 * i, duration: 0.4 }}
-                        whileHover={{ y: -5 }}
-                      >
-                        <Card className="overflow-hidden bg-[#1A1D25] border-gray-800 rounded-xl transition-all duration-300 hover:shadow-glow-sm">
-                          <div className="h-48 bg-gradient-to-br from-purple-900/30 to-indigo-900/30 relative overflow-hidden">
-                            <motion.img
-                              whileHover={{ scale: 1.05 }}
-                              transition={{ duration: 0.5 }}
-                              src={event.image}
-                              alt={event.title}
-                              className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-500"
-                            />
-                            <motion.div
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              className="absolute top-2 right-2 bg-[#1A1D25]/80 backdrop-blur-sm rounded-full p-1.5 shadow-glow-xs"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleToggleFavorite(event.id)
-                              }}
-                            >
-                              <Heart
-                                size={16}
-                                className={
-                                  event.isFavorite
-                                    ? "text-purple-400 fill-purple-400"
-                                    : "text-gray-400 hover:text-purple-400 cursor-pointer transition-colors duration-300"
-                                }
-                              />
-                            </motion.div>
-                            <motion.div
-                              initial={{ x: -10, opacity: 0 }}
-                              animate={{ x: 0, opacity: 1 }}
-                              transition={{ delay: 0.2 + 0.1 * i, duration: 0.3 }}
-                              className="absolute bottom-2 left-2"
-                            >
-                              <Badge className="bg-[#1A1D25]/80 backdrop-blur-sm text-purple-400 hover:text-purple-300 border-0 shadow-glow-xs">
-                                {event.category}
-                              </Badge>
-                            </motion.div>
-                          </div>
-                          <CardContent className="p-4">
-                            <h3 className="font-bold mb-1 text-gray-200">{event.title}</h3>
-                            <div className="text-sm text-gray-400 mb-2 flex items-center">
-                              <MapPin size={14} className="mr-1 text-purple-400" />
-                              {event.location}
-                            </div>
-                            <div className="text-sm text-gray-400 mb-2 flex items-center">
-                              <Calendar size={14} className="mr-1 text-purple-400" />
-                              {event.date}
-                            </div>
-                            <div className="text-sm text-gray-400 mb-3 flex items-center">
-                              <Clock size={14} className="mr-1 text-purple-400" />
-                              {event.time}
-                            </div>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="text-sm font-medium text-gray-200">{event.price}</div>
-                              <div className="flex items-center text-sm text-gray-400">
-                                <Users size={14} className="mr-1" />
-                                {event.attendees} attending
-                              </div>
-                            </div>
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                variant="outline"
-                                className="w-full bg-[#22252F] hover:bg-[#2A2E38] text-purple-400 hover:text-purple-300 border-gray-800 rounded-lg group transition-all duration-300"
-                                onClick={() => handleViewEventDetails(event)}
-                              >
-                                View Details
-                                <ChevronRight
-                                  size={16}
-                                  className="ml-1 transition-transform duration-300 group-hover:translate-x-1"
-                                />
-                              </Button>
-                            </motion.div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                {/* Other tab contents would be similar but filtered */}
-                <TabsContent value="techno" className="mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {events
-                      .filter((event) => event.category === "Techno")
-                      .map((event, i) => (
-                        <motion.div
-                          key={event.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 * i, duration: 0.4 }}
-                          whileHover={{ y: -5 }}
-                        >
-                          {/* Same card structure as above */}
-                          <Card className="overflow-hidden bg-[#1A1D25] border-gray-800 rounded-xl transition-all duration-300 hover:shadow-glow-sm">
-                            <div className="h-48 bg-gradient-to-br from-purple-900/30 to-indigo-900/30 relative overflow-hidden">
-                              <motion.img
-                                whileHover={{ scale: 1.05 }}
-                                transition={{ duration: 0.5 }}
-                                src={event.image}
-                                alt={event.title}
-                                className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-500"
-                              />
-                              <motion.div
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                className="absolute top-2 right-2 bg-[#1A1D25]/80 backdrop-blur-sm rounded-full p-1.5 shadow-glow-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleToggleFavorite(event.id)
-                                }}
-                              >
-                                <Heart
-                                  size={16}
-                                  className={
-                                    event.isFavorite
-                                      ? "text-purple-400 fill-purple-400"
-                                      : "text-gray-400 hover:text-purple-400 cursor-pointer transition-colors duration-300"
-                                  }
-                                />
-                              </motion.div>
-                              <motion.div
-                                initial={{ x: -10, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.2 + 0.1 * i, duration: 0.3 }}
-                                className="absolute bottom-2 left-2"
-                              >
-                                <Badge className="bg-[#1A1D25]/80 backdrop-blur-sm text-purple-400 hover:text-purple-300 border-0 shadow-glow-xs">
-                                  {event.category}
-                                </Badge>
-                              </motion.div>
-                            </div>
-                            <CardContent className="p-4">
-                              <h3 className="font-bold mb-1 text-gray-200">{event.title}</h3>
-                              <div className="text-sm text-gray-400 mb-2 flex items-center">
-                                <MapPin size={14} className="mr-1 text-purple-400" />
-                                {event.location}
-                              </div>
-                              <div className="text-sm text-gray-400 mb-2 flex items-center">
-                                <Calendar size={14} className="mr-1 text-purple-400" />
-                                {event.date}
-                              </div>
-                              <div className="text-sm text-gray-400 mb-3 flex items-center">
-                                <Clock size={14} className="mr-1 text-purple-400" />
-                                {event.time}
-                              </div>
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="text-sm font-medium text-gray-200">{event.price}</div>
-                                <div className="flex items-center text-sm text-gray-400">
-                                  <Users size={14} className="mr-1" />
-                                  {event.attendees} attending
-                                </div>
-                              </div>
-                              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                <Button
-                                  variant="outline"
-                                  className="w-full bg-[#22252F] hover:bg-[#2A2E38] text-purple-400 hover:text-purple-300 border-gray-800 rounded-lg group transition-all duration-300"
-                                  onClick={() => handleViewEventDetails(event)}
-                                >
-                                  View Details
-                                  <ChevronRight
-                                    size={16}
-                                    className="ml-1 transition-transform duration-300 group-hover:translate-x-1"
-                                  />
-                                </Button>
-                              </motion.div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
-                  </div>
-                </TabsContent>
-
-                {/* Similar structure for other tabs */}
-              </Tabs>
-            </motion.div>
+            <Tabs defaultValue="all" className="mt-0">
+              <TabsContent value="all" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredEvents.map((event, i) => (
+                    <motion.div
+                      key={event.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * i, duration: 0.4 }}
+                      whileHover={{ y: -5 }}
+                    >
+                      <EventCard
+                        event={event}
+                        onViewDetails={() => handleViewEventDetails(event)}
+                        onToggleFavorite={() => handleToggleFavorite(event.id)}
+                        index={i}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
 
             {/* Featured DJs/Artists */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="mb-8"
-            >
-              <h2 className="text-xl font-bold text-gray-100 mb-4">Featured Artists</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {featuredArtists.map((artist, i) => (
-                  <motion.div
-                    key={artist.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * i, duration: 0.4 }}
-                    whileHover={{ y: -5 }}
-                  >
-                    <Card className="bg-[#1A1D25] border-gray-800 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-glow-sm">
-                      <div className="h-48 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25] to-transparent z-10"></div>
-                        <motion.img
-                          whileHover={{ scale: 1.05 }}
-                          transition={{ duration: 0.5 }}
-                          src={artist.image}
-                          alt={artist.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-                          <h3 className="font-bold text-gray-100">{artist.name}</h3>
-                          <p className="text-sm text-gray-400">{artist.genre}</p>
-                        </div>
-                      </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <Headphones size={16} className="mr-2 text-purple-400" />
-                            <span className="text-sm text-gray-300">{artist.upcoming} upcoming events</span>
-                          </div>
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-purple-400 hover:text-purple-300 hover:bg-[#22252F] rounded-lg p-1 h-8 w-8"
-                            >
-                              <ChevronRight size={18} />
-                            </Button>
-                          </motion.div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
+            <FeaturedArtists artists={featuredArtists} />
 
             {/* Advanced filters section */}
-            <motion.div
-              id="filter-section"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.4 }}
-              className="mb-8"
-            >
-              <Card className="bg-[#1A1D25] border-gray-800 rounded-xl overflow-hidden">
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-bold text-gray-100 mb-4">Advanced Filters</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-300 mb-3">Date Range</h3>
-                      <div className="flex space-x-2">
-                        <Input
-                          type="date"
-                          className="bg-[#22252F] border-gray-800 rounded-lg text-gray-300 text-sm focus-visible:ring-purple-500"
-                        />
-                        <Input
-                          type="date"
-                          className="bg-[#22252F] border-gray-800 rounded-lg text-gray-300 text-sm focus-visible:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-300 mb-3">Price Range</h3>
-                      <div className="px-2">
-                        <Slider
-                          defaultValue={[0, 100]}
-                          max={200}
-                          step={5}
-                          value={priceRange}
-                          onValueChange={setPriceRange}
-                          className="mb-2"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400">
-                          <span>${priceRange[0]}</span>
-                          <span>${priceRange[1]}+</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-300 mb-3">Event Type</h3>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-0 cursor-pointer">
-                          Nightclub
-                        </Badge>
-                        <Badge className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-0 cursor-pointer">
-                          Festival
-                        </Badge>
-                        <Badge className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-0 cursor-pointer">
-                          Concert
-                        </Badge>
-                        <Badge className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-0 cursor-pointer">
-                          Warehouse
-                        </Badge>
-                        <Badge className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-0 cursor-pointer">
-                          Rooftop
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="my-6 bg-gray-800" />
-
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      className="bg-[#22252F] hover:bg-[#2A2E38] text-gray-300 border-gray-800 rounded-lg mr-2"
-                    >
-                      Reset
-                    </Button>
-                    <Button
-                      className={cn(
-                        "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg shadow-glow-sm transition-all duration-300",
-                        isFiltering && "opacity-90",
-                      )}
-                      onClick={handleFilter}
-                      disabled={isFiltering}
-                    >
-                      {isFiltering ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Applying...
-                        </>
-                      ) : (
-                        <>
-                          <Filter className="mr-2 h-4 w-4" />
-                          Apply Filters
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            {showFilters && <AdvancedFilters isFiltering={isFiltering} handleFilter={handleFilter} />}
           </>
         )}
       </main>
 
       {/* Footer */}
-      <motion.footer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
-        className="bg-[#0A0B0E] border-t border-gray-800 p-4 text-center text-sm text-gray-500"
-      >
-        <div className="flex justify-center space-x-4 mb-2">
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Help Center
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Privacy Policy
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
-            <Button
-              variant="link"
-              className="text-gray-500 hover:text-purple-400 p-0 h-auto transition-colors duration-300"
-            >
-              Terms of Service
-            </Button>
-          </motion.div>
-        </div>
-        <p>© 2025 DateAI. All rights reserved.</p>
-      </motion.footer>
+      <PartyFooter />
 
-      {/* Event Detail Modal */}
+      {/* Event detail modal */}
       <EventDetailModal
         event={selectedEvent}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onFavorite={handleToggleFavorite}
+        onToggleFavorite={handleToggleFavorite}
       />
     </div>
   )
