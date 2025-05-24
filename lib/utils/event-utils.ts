@@ -125,7 +125,7 @@ export function generateMockEventsAroundLocation(
     const formattedTime = `${hours}:${minutes.toString().padStart(2, "0")} ${period}`
 
     // Generate random category
-    const category = categories[Math.floor(Math.random() * categories.length)]
+    const category = categories[Math.floor(Math.random() * categories.length)] || 'Event'
 
     // Generate random location
     const location = locations[Math.floor(Math.random() * locations.length)]

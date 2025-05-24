@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import createGlobe from "cobe"
+import { logger } from "@/lib/utils/logger"
 
 export default function SimpleCobeGlobe() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -50,7 +51,11 @@ export default function SimpleCobeGlobe() {
         },
       })
     } catch (error) {
-      console.warn("Error creating COBE globe:", error)
+      logger.warn("Error creating COBE globe", {
+        component: "SimpleCobeGlobe",
+        action: "globe_creation_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
       setHasError(true)
     }
 
@@ -60,7 +65,11 @@ export default function SimpleCobeGlobe() {
           globeRef.current.destroy()
         }
       } catch (error) {
-        console.warn("Error destroying COBE globe:", error)
+        logger.warn("Error destroying COBE globe", {
+          component: "SimpleCobeGlobe",
+          action: "globe_destroy_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
   }, [])

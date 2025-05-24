@@ -7,11 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { searchTicketmasterEvents, getTicketmasterEventDetails } from "@/lib/api/ticketmaster-api"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 export default function TicketmasterApiTest() {
-  const [searchResults, setSearchResults] = useState<EventDetailProps[]>([])
-  const [eventDetails, setEventDetails] = useState<EventDetailProps | null>(null)
+  const [searchResults, setSearchResults] = useState<EventDetail[]>([])
+  const [eventDetails, setEventDetails] = useState<EventDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,7 +32,7 @@ export default function TicketmasterApiTest() {
       const result = await searchTicketmasterEvents({
         keyword,
         location,
-        radius: Number.parseInt(radius),
+        radius: Number.parseInt(radius, 10),
         size: 10,
       })
 

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { logger } from '@/lib/utils/logger'
 
 export default function Error({
   error,
@@ -12,7 +13,10 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error(error)
+    logger.error("Application error occurred", {
+      component: "ErrorPage",
+      action: "error_boundary_triggered"
+    }, error)
   }, [error])
 
   return (

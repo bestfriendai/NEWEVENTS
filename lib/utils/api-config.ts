@@ -170,7 +170,7 @@ class ApiConfigManager {
 
     try {
       let isValid = false
-      let error: string | undefined
+      let _error: string | undefined
 
       switch (provider) {
         case 'ticketmaster':

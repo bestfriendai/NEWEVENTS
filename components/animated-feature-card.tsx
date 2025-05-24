@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import type { LucideIcon } from "lucide-react"
+import { logger } from "@/lib/utils/logger"
 
 interface AnimatedFeatureCardProps {
   icon: LucideIcon
@@ -22,7 +23,11 @@ export function AnimatedFeatureCard({ icon: Icon, title, description, index }: A
     try {
       gsap.registerPlugin(ScrollTrigger)
     } catch (error) {
-      console.warn("Failed to register ScrollTrigger:", error)
+      logger.warn("Failed to register ScrollTrigger", {
+        component: "AnimatedFeatureCard",
+        action: "scroll_trigger_register_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
       return
     }
 
@@ -50,14 +55,22 @@ export function AnimatedFeatureCard({ icon: Icon, title, description, index }: A
         },
       )
     } catch (error) {
-      console.warn("Error creating GSAP animation:", error)
+      logger.warn("Error creating GSAP animation", {
+        component: "AnimatedFeatureCard",
+        action: "gsap_animation_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
 
     return () => {
       try {
         ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
       } catch (error) {
-        console.warn("Error cleaning up ScrollTrigger:", error)
+        logger.warn("Error cleaning up ScrollTrigger", {
+          component: "AnimatedFeatureCard",
+          action: "scroll_trigger_cleanup_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
   }, [index])

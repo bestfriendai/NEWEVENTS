@@ -1,35 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, MapPin, Users, Heart, ExternalLink } from "lucide-react"
 import { EventMap } from "@/components/event-map"
 
-export interface EventDetailProps {
-  id: number
-  title: string
-  description: string
-  category: string
-  date: string
-  time: string
-  location: string
-  address: string
-  price: string
-  image: string
-  organizer: {
-    name: string
-    avatar: string
-  }
-  attendees: number
-  isFavorite: boolean
-  coordinates?: { lat: number; lng: number }
-  ticketLinks?: { source: string; link: string }[]
-}
+import type { EventDetail } from "@/types/event.types";
 
 interface EventDetailModalProps {
-  event: EventDetailProps | null
+  event: EventDetail | null
   isOpen: boolean
   onClose: () => void
   onFavorite: (id: number) => void
@@ -58,7 +40,13 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
         <div className="relative h-48 overflow-hidden">
-          <img src={event.image || "/placeholder.svg"} alt={event.title} className="w-full h-full object-cover" />
+          <Image
+            src={event.image || "/placeholder.svg"}
+            alt={event.title}
+            fill
+            style={{ objectFit: 'cover' }}
+            sizes="(max-width: 600px) 100vw, 600px"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
           <Button
             variant="ghost"

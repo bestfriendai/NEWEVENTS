@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { logger } from "@/lib/utils/logger"
 
 interface StatsCounterProps {
   value: number
@@ -23,7 +24,11 @@ export function StatsCounter({ value, label, suffix = "", delay = 0 }: StatsCoun
     try {
       gsap.registerPlugin(ScrollTrigger)
     } catch (error) {
-      console.warn("Failed to register ScrollTrigger:", error)
+      logger.warn("Failed to register ScrollTrigger", {
+        component: "StatsCounter",
+        action: "scroll_trigger_register_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
       return
     }
 
@@ -62,7 +67,11 @@ export function StatsCounter({ value, label, suffix = "", delay = 0 }: StatsCoun
           },
         )
       } catch (error) {
-        console.warn("Error creating GSAP animation:", error)
+        logger.warn("Error creating GSAP animation", {
+          component: "StatsCounter",
+          action: "gsap_animation_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
 
@@ -73,14 +82,22 @@ export function StatsCounter({ value, label, suffix = "", delay = 0 }: StatsCoun
         onEnter: triggerAnimation,
       })
     } catch (error) {
-      console.warn("Error creating ScrollTrigger:", error)
+      logger.warn("Error creating ScrollTrigger", {
+        component: "StatsCounter",
+        action: "scroll_trigger_create_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
 
     return () => {
       try {
         ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
       } catch (error) {
-        console.warn("Error cleaning up ScrollTrigger:", error)
+        logger.warn("Error cleaning up ScrollTrigger", {
+          component: "StatsCounter",
+          action: "scroll_trigger_cleanup_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
   }, [value, delay])

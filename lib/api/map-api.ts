@@ -1,4 +1,4 @@
-import { MAPBOX_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 
 // Interface for location data
 export interface LocationData {
@@ -11,7 +11,7 @@ export interface LocationData {
 // Function to geocode an address using Mapbox
 export async function geocodeAddress(address: string): Promise<LocationData | null> {
   try {
-    if (!MAPBOX_API_KEY) {
+    if (!env.MAPBOX_API_KEY) {
       console.warn("Mapbox API key is not defined, using fallback geocoding")
       return await fallbackGeocode(address)
     }
@@ -22,7 +22,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
     }
 
     const encodedAddress = encodeURIComponent(address.trim())
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${MAPBOX_API_KEY}`
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${env.MAPBOX_API_KEY}`
 
     // console.log("Geocoding address:", address)
 
@@ -66,7 +66,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
 // Function to reverse geocode coordinates using Mapbox
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    if (!MAPBOX_API_KEY) {
+    if (!env.MAPBOX_API_KEY) {
       console.warn("Mapbox API key is not defined, using fallback reverse geocoding")
       return fallbackReverseGeocode(lat, lng)
     }
@@ -76,7 +76,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       return "Unknown location"
     }
 
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_API_KEY}`
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${env.MAPBOX_API_KEY}`
 
     // console.log("Reverse geocoding coordinates:", { lat, lng })
 
@@ -127,7 +127,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 // Function to get nearby places using Mapbox
 export async function getNearbyPlaces(lat: number, lng: number, category: string, limit = 10): Promise<LocationData[]> {
   try {
-    if (!MAPBOX_API_KEY) {
+    if (!env.MAPBOX_API_KEY) {
       console.warn("Mapbox API key is not defined, returning empty results")
       return []
     }
@@ -138,7 +138,7 @@ export async function getNearbyPlaces(lat: number, lng: number, category: string
     }
 
     const encodedCategory = encodeURIComponent(category)
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedCategory}.json?proximity=${lng},${lat}&limit=${limit}&access_token=${MAPBOX_API_KEY}`
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedCategory}.json?proximity=${lng},${lat}&limit=${limit}&access_token=${env.MAPBOX_API_KEY}`
 
     const response = await fetch(url, {
       method: "GET",

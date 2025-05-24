@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Loader2, AlertCircle, MapPin, Calendar, Clock, ExternalLink, Search, Info } from "lucide-react"
 import { searchEvents, getEventDetails } from "@/lib/api/events-api"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
+import { logger } from "@/lib/utils/logger"
 
 export function EnhancedRapidApiTest() {
   const [searchKeyword, setSearchKeyword] = useState("concerts")
@@ -18,8 +20,8 @@ export function EnhancedRapidApiTest() {
   const [eventId, setEventId] = useState(
     "L2F1dGhvcml0eS9ob3Jpem9uL2NsdXN0ZXJlZF9ldmVudC8yMDI0LTA2LTE0fDEwNDI0MTY1NDYxNzYzMzMzNTg4",
   )
-  const [searchResults, setSearchResults] = useState<EventDetailProps[]>([])
-  const [eventDetail, setEventDetail] = useState<EventDetailProps | null>(null)
+  const [searchResults, setSearchResults] = useState<EventDetail[]>([])
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [isFetchingDetail, setIsFetchingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +42,11 @@ export function EnhancedRapidApiTest() {
         size: 10,
       })
 
-      console.log("Search results:", result)
+      logger.info("Search results received", {
+        component: "EnhancedRapidApiTest",
+        action: "search_events_success",
+        metadata: { eventCount: result.events.length }
+      })
       setSearchResults(result.events)
 
       // Store the raw API response for debugging
@@ -56,7 +62,10 @@ export function EnhancedRapidApiTest() {
         setError("No events found. Try different search terms.")
       }
     } catch (err) {
-      console.error("Error searching events:", err)
+      logger.error("Error searching events", {
+        component: "EnhancedRapidApiTest",
+        action: "search_events_error"
+      }, err instanceof Error ? err : new Error(String(err)))
       setError(`Error searching events: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsSearching(false)
@@ -76,7 +85,11 @@ export function EnhancedRapidApiTest() {
 
     try {
       const result = await getEventDetails(eventId)
-      console.log("Event detail:", result)
+      logger.info("Event detail received", {
+        component: "EnhancedRapidApiTest",
+        action: "get_event_detail_success",
+        metadata: { eventId }
+      })
 
       if (result) {
         setEventDetail(result)
@@ -84,7 +97,11 @@ export function EnhancedRapidApiTest() {
         setDetailError("Event not found or error retrieving event details")
       }
     } catch (err) {
-      console.error("Error getting event detail:", err)
+      logger.error("Error getting event detail", {
+        component: "EnhancedRapidApiTest",
+        action: "get_event_detail_error",
+        metadata: { eventId }
+      }, err instanceof Error ? err : new Error(String(err)))
       setDetailError(`Error getting event detail: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsFetchingDetail(false)
@@ -118,7 +135,11 @@ export function EnhancedRapidApiTest() {
       queryParams.append("start", "0")
 
       const url = `${baseUrl}?${queryParams.toString()}`
-      console.log("Direct API call URL:", url)
+      logger.info("Making direct API call", {
+        component: "EnhancedRapidApiTest",
+        action: "direct_api_call",
+        metadata: { url }
+      })
 
       // Make the API call with the exact headers you provided
       const response = await fetch(url, {
@@ -134,13 +155,21 @@ export function EnhancedRapidApiTest() {
       }
 
       const data = await response.json()
-      console.log("Direct API response:", data)
+      logger.info("Direct API response received", {
+        component: "EnhancedRapidApiTest",
+        action: "direct_api_response_success",
+        metadata: { status: response.status }
+      })
       setApiResponse(data)
 
       // Process the events if available
       if (data.status === "OK" && data.data) {
         const events = Array.isArray(data.data) ? data.data : [data.data]
-        console.log("Found events:", events.length)
+        logger.info("Events found in direct API response", {
+          component: "EnhancedRapidApiTest",
+          action: "direct_api_events_found",
+          metadata: { eventCount: events.length }
+        })
 
         // Transform events to our format for display
         const transformedEvents = events.map((event: any) => ({
@@ -175,7 +204,10 @@ export function EnhancedRapidApiTest() {
         setError("No events found or invalid API response format")
       }
     } catch (err) {
-      console.error("Error making direct API call:", err)
+      logger.error("Error making direct API call", {
+        component: "EnhancedRapidApiTest",
+        action: "direct_api_call_error"
+      }, err instanceof Error ? err : new Error(String(err)))
       setError(`Error making direct API call: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsSearching(false)
@@ -231,7 +263,7 @@ export function EnhancedRapidApiTest() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Example searches: "concerts in san-francisco", "festivals in new-york", "theater in chicago"
+                  Example searches: &quot;concerts in san-francisco&quot;, &quot;festivals in new-york&quot;, &quot;theater in chicago&quot;
                 </p>
               </div>
             </CardContent>
@@ -270,11 +302,13 @@ export function EnhancedRapidApiTest() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {searchResults.map((event, index) => (
                   <Card key={index} className="overflow-hidden">
-                    <div className="h-48 overflow-hidden">
-                      <img
+                    <div className="h-48 overflow-hidden relative">
+                      <Image
                         src={event.image || "/community-event.png"}
                         alt={event.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
                     </div>
                     <CardHeader className="p-4">
@@ -397,11 +431,14 @@ export function EnhancedRapidApiTest() {
             <div className="mt-8">
               <Card>
                 <div className="md:flex">
-                  <div className="md:w-1/3">
-                    <img
+                  <div className="md:w-1/3 relative">
+                    <Image
                       src={eventDetail.image || "/community-event.png"}
                       alt={eventDetail.title}
-                      className="w-full h-64 object-cover"
+                      width={400}
+                      height={256}
+                      style={{ objectFit: 'cover' }}
+                      className="w-full h-64"
                     />
                   </div>
                   <div className="md:w-2/3 p-6">
@@ -433,10 +470,12 @@ export function EnhancedRapidApiTest() {
                         <div className="space-y-2">
                           <div className="text-sm font-medium">Organizer:</div>
                           <div className="flex items-center">
-                            <img
+                            <Image
                               src={eventDetail.organizer.avatar || "/placeholder.svg"}
                               alt={eventDetail.organizer.name}
-                              className="w-6 h-6 rounded-full mr-2"
+                              width={24}
+                              height={24}
+                              className="rounded-full mr-2"
                             />
                             <span className="text-sm">{eventDetail.organizer.name}</span>
                           </div>

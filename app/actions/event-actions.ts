@@ -3,17 +3,11 @@
 import { z } from "zod"
 import { unstable_cache } from "next/cache"
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import { RAPIDAPI_KEY, RAPIDAPI_HOST } from "@/lib/env"
+import type { EventSearchParams } from "@/types";
+import { env } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 
-export interface EventSearchParams {
-  location?: string
-  keyword?: string
-  size?: number
-  startDate?: string
-  endDate?: string
-  radius?: number
-}
+// Original EventSearchParams interface (lines 9-16) removed
 
 export interface EventSearchError {
   message: string
@@ -116,7 +110,7 @@ export async function fetchEvents(params: EventSearchParams): Promise<EventSearc
 
 // Core API fetching logic (separated for caching)
 async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSearchResult> {
-  if (!RAPIDAPI_KEY) {
+  if (!env.RAPIDAPI_KEY) {
     throw new Error("RapidAPI key not configured")
   }
 
@@ -149,14 +143,14 @@ async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSear
   logger.debug("Making RapidAPI request", {
     component: "event-actions",
     action: "api_request",
-    metadata: { url: url.replace(RAPIDAPI_KEY, '[REDACTED]') }
+    metadata: { url: url.replace(env.RAPIDAPI_KEY, '[REDACTED]') }
   })
 
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "x-rapidapi-key": RAPIDAPI_KEY,
-      "x-rapidapi-host": RAPIDAPI_HOST,
+      "x-rapidapi-key": env.RAPIDAPI_KEY,
+      "x-rapidapi-host": env.RAPIDAPI_HOST,
     },
     signal: AbortSignal.timeout(15000), // 15 second timeout
   })

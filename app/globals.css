@@ -15,7 +15,7 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   }
   
   /* CSS Custom Properties for shadcn/ui theming */
@@ -28,8 +28,41 @@
     --popover-foreground: 0 0% 3.9%;
     --primary: 0 0% 9%;
     --primary-foreground: 0 0% 98%;
+--primary-50: 200 100% 97%;
+    --primary-100: 200 98% 94%;
+    --primary-200: 200 97% 86%;
+    --primary-300: 200 97% 74%;
+    --primary-400: 200 92% 60%;
+    --primary-500: 200 93% 48%;
+    --primary-600: 200 97% 39%;
+    --primary-700: 200 95% 32%;
+    --primary-800: 200 90% 28%;
+    --primary-900: 200 80% 24%;
+    --primary-950: 200 76% 16%;
     --secondary: 0 0% 96.1%;
+--accent-50: 200 100% 97%;
+    --accent-100: 200 98% 94%;
+    --accent-200: 200 97% 86%;
+    --accent-300: 200 97% 74%;
+    --accent-400: 200 92% 60%;
+    --accent-500: 200 93% 48%;
+    --accent-600: 200 97% 39%;
+    --accent-700: 200 95% 32%;
+    --accent-800: 200 90% 28%;
+    --accent-900: 200 80% 24%;
+    --accent-950: 200 76% 16%;
     --secondary-foreground: 0 0% 9%;
+--secondary-50: 270 100% 98%;
+    --secondary-100: 276 100% 95%;
+    --secondary-200: 276 100% 91%;
+    --secondary-300: 277 98% 85%;
+    --secondary-400: 278 96% 75%;
+    --secondary-500: 279 93% 65%;
+    --secondary-600: 280 83% 56%;
+    --secondary-700: 269 84% 58%;
+    --secondary-800: 282 65% 39%;
+    --secondary-900: 283 65% 32%;
+    --secondary-950: 284 87% 21%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
     --accent: 0 0% 96.1%;
@@ -128,246 +161,11 @@
 
 /* Component styles */
 @layer components {
-  /* Enhanced button styles */
-  .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105;
-  }
-  
-  .btn-secondary {
-    @apply bg-gradient-to-r from-secondary-600 to-secondary-700 hover:from-secondary-700 hover:to-secondary-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105;
-  }
-  
-  .btn-ghost {
-    @apply bg-transparent hover:bg-muted text-foreground border border-border hover:border-primary-500/50 transition-all duration-200;
-  }
-  
-  /* Enhanced card styles */
-  .card-elevated {
-    @apply bg-card border border-border rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02];
-  }
-  
-  .card-glass {
-    @apply glass rounded-xl border border-white/20 backdrop-blur-md;
-  }
-  
-  /* Enhanced input styles */
-  .input-enhanced {
-    @apply bg-input border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
-  }
-  
-  /* Loading animations */
-  .loading-pulse {
-    @apply animate-pulse bg-muted rounded;
-  }
-  
-  .loading-spin {
-    @apply animate-spin rounded-full border-2 border-muted border-t-primary-500;
-  }
-  
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary-600 via-secondary-600 to-accent-600 bg-clip-text text-transparent;
-  }
-  
   /* Shadow effects */
-  .shadow-glow {
-    box-shadow: 0 0 20px rgba(var(--color-primary-500), 0.3);
-  }
-  
   .shadow-glow-sm {
     box-shadow: 0 0 10px rgba(var(--color-primary-500), 0.2);
   }
   
-  .shadow-glow-lg {
-    box-shadow: 0 0 40px rgba(var(--color-primary-500), 0.4);
-  }
-  
-  /* Glass morphism effect */
-  .glass {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  
-  .glass-dark {
-    background: rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
-  /* Animated background gradients */
-  .bg-gradient-animated {
-    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
-  }
-  
-  @keyframes gradientShift {
-    0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
-    }
-  }
-  
-  /* Floating animation */
-  .float {
-    animation: float 6s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0% {
-      transform: translatey(0px);
-    }
-    50% {
-      transform: translatey(-20px);
-    }
-    100% {
-      transform: translatey(0px);
-    }
-  }
-  
-  /* Pulse animation */
-  .pulse-slow {
-    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  /* Typing effect */
-  .typing-effect {
-    overflow: hidden;
-    border-right: 0.15em solid orange;
-    white-space: nowrap;
-    animation: typing 3.5s steps(40, end), blink-caret 0.75s step-end infinite;
-  }
-  
-  @keyframes typing {
-    from {
-      width: 0;
-    }
-    to {
-      width: 100%;
-    }
-  }
-  
-  @keyframes blink-caret {
-    from,
-    to {
-      border-color: transparent;
-    }
-    50% {
-      border-color: orange;
-    }
-  }
-  
-  /* Slide in animations */
-  .slide-in-left {
-    animation: slideInLeft 0.5s ease-out;
-  }
-  
-  .slide-in-right {
-    animation: slideInRight 0.5s ease-out;
-  }
-  
-  .slide-in-up {
-    animation: slideInUp 0.5s ease-out;
-  }
-  
-  .slide-in-down {
-    animation: slideInDown 0.5s ease-out;
-  }
-  
-  @keyframes slideInLeft {
-    from {
-      opacity: 0;
-      transform: translateX(-100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-  
-  @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-  
-  @keyframes slideInUp {
-    from {
-      opacity: 0;
-      transform: translateY(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  @keyframes slideInDown {
-    from {
-      opacity: 0;
-      transform: translateY(-100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Scale animations */
-  .scale-in {
-    animation: scaleIn 0.3s ease-out;
-  }
-  
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.5);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  
   /* Fade animations */
-  .fade-in {
-    animation: fadeIn 0.5s ease-in;
-  }
-  
-  .fade-in-up {
-    animation: fadeInUp 0.6s ease-out;
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translate3d(0, 40px, 0);
-    }
-    to {
-      opacity: 1;
-      transform: translate3d(0, 0, 0);
-    }
-  }
+  /* Removed duplicate fadeIn, it's imported from design-system.css and will be moved to tailwind.config.ts */
 }

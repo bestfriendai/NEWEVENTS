@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useRef } from "react"
 import { gsap } from "gsap"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { logger } from "@/lib/utils/logger"
 
 interface AnimatedTextProps {
   children: React.ReactNode
@@ -58,7 +59,11 @@ export function AnimatedText({ children, className = "", delay = 0 }: AnimatedTe
         },
       )
     } catch (error) {
-      console.warn("Error creating GSAP animation:", error)
+      logger.warn("Error creating GSAP animation", {
+        component: "AnimatedText",
+        action: "gsap_animation_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }, [delay, isMobile])
 

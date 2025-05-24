@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { EventDetailModal, type EventDetailProps } from "@/components/event-detail-modal"
+import { EventDetailModal } from "@/components/event-detail-modal";
+import type { EventDetail } from "@/types/event.types";
 import { FavoritesHeader } from "@/components/favorites/favorites-header"
 import { FavoritesFilters } from "@/components/favorites/favorites-filters"
 import { EmptyFavorites } from "@/components/favorites/empty-favorites"
@@ -11,7 +12,7 @@ import { EventCard } from "@/components/event-card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 
 // Sample favorites data
-const initialFavorites: EventDetailProps[] = [
+const initialFavorites: EventDetail[] = [
   {
     id: 102,
     title: "Underground Techno Night",
@@ -74,12 +75,12 @@ const initialFavorites: EventDetailProps[] = [
 export default function FavoritesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
-  const [favorites, setFavorites] = useState<EventDetailProps[]>(initialFavorites)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [favorites, setFavorites] = useState<EventDetail[]>(initialFavorites)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
-  const [filteredFavorites, setFilteredFavorites] = useState<EventDetailProps[]>(initialFavorites)
+  const [filteredFavorites, setFilteredFavorites] = useState<EventDetail[]>(initialFavorites)
 
   useEffect(() => {
     // Simulate loading
@@ -122,7 +123,7 @@ export default function FavoritesPage() {
     setFilteredFavorites(filtered)
   }, [favorites, searchQuery, activeTab])
 
-  const handleViewEventDetails = (event: EventDetailProps) => {
+  const handleViewEventDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
   }

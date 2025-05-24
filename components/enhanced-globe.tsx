@@ -13,16 +13,17 @@ export default function EnhancedGlobe() {
   const isDarkTheme = theme === "dark"
 
   useEffect(() => {
-    if (!canvasRef.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
 
     let phi = 0
     let width = 0
 
     const onResize = () => {
-      if (canvasRef.current) {
-        width = canvasRef.current.offsetWidth
-        canvasRef.current.width = width * 2
-        canvasRef.current.height = width * 2
+      if (canvas) {
+        width = canvas.offsetWidth
+        canvas.width = width * 2
+        canvas.height = width * 2
       }
     }
 
@@ -32,7 +33,7 @@ export default function EnhancedGlobe() {
     // Set loading to false after a short delay
     const loadingTimeout = setTimeout(() => setIsLoading(false), 200)
 
-    const globe = createGlobe(canvasRef.current, {
+    const globe = createGlobe(canvas, {
       devicePixelRatio: 2,
       width: width * 2,
       height: width * 2,
@@ -68,22 +69,22 @@ export default function EnhancedGlobe() {
 
     const onPointerDown = (e: PointerEvent) => {
       pointerInteracting.current = e.clientX - pointerInteractionMovement.current
-      if (canvasRef.current) {
-        canvasRef.current.style.cursor = "grabbing"
+      if (canvas) {
+        canvas.style.cursor = "grabbing"
       }
     }
 
     const onPointerUp = () => {
       pointerInteracting.current = null
-      if (canvasRef.current) {
-        canvasRef.current.style.cursor = "grab"
+      if (canvas) {
+        canvas.style.cursor = "grab"
       }
     }
 
     const onPointerOut = () => {
       pointerInteracting.current = null
-      if (canvasRef.current) {
-        canvasRef.current.style.cursor = "grab"
+      if (canvas) {
+        canvas.style.cursor = "grab"
       }
     }
 
@@ -95,24 +96,20 @@ export default function EnhancedGlobe() {
     }
 
     // Add event listeners for interaction
-    if (canvasRef.current) {
-      canvasRef.current.addEventListener("pointerdown", onPointerDown)
-      canvasRef.current.addEventListener("pointerup", onPointerUp)
-      canvasRef.current.addEventListener("pointerout", onPointerOut)
-      canvasRef.current.addEventListener("mousemove", onMouseMove)
-      canvasRef.current.style.cursor = "grab"
-    }
+    canvas.addEventListener("pointerdown", onPointerDown)
+    canvas.addEventListener("pointerup", onPointerUp)
+    canvas.addEventListener("pointerout", onPointerOut)
+    canvas.addEventListener("mousemove", onMouseMove)
+    canvas.style.cursor = "grab"
 
     return () => {
       globe.destroy()
       clearTimeout(loadingTimeout)
       window.removeEventListener("resize", onResize)
-      if (canvasRef.current) {
-        canvasRef.current.removeEventListener("pointerdown", onPointerDown)
-        canvasRef.current.removeEventListener("pointerup", onPointerUp)
-        canvasRef.current.removeEventListener("pointerout", onPointerOut)
-        canvasRef.current.removeEventListener("mousemove", onMouseMove)
-      }
+      canvas.removeEventListener("pointerdown", onPointerDown)
+      canvas.removeEventListener("pointerup", onPointerUp)
+      canvas.removeEventListener("pointerout", onPointerOut)
+      canvas.removeEventListener("mousemove", onMouseMove)
     }
   }, [isDarkTheme])
 

@@ -1,5 +1,6 @@
-import { TICKETMASTER_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { TicketmasterEvent } from "@/types"
 
 export interface TicketmasterSearchParams {
   keyword?: string
@@ -24,7 +25,7 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
     // console.log("Searching Ticketmaster events with params:", params)
 
     const queryParams = new URLSearchParams()
-    queryParams.append("apikey", TICKETMASTER_API_KEY || "")
+    queryParams.append("apikey", env.TICKETMASTER_API_KEY || "")
 
     // Location handling
     if (params.coordinates) {
@@ -101,68 +102,73 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
   }
 }
 
-function getBestImage(images: unknown[]): string {
+interface TicketmasterImage {
+  url: string
+  ratio: 'large' | 'medium' | 'small'
+  width: number
+  height: number
+}
+
+function getBestImage(images: TicketmasterImage[]): string {
   if (!images || images.length === 0) return "/community-event.png"
 
   // Sort images by size preference: large > medium > small
-  const sortedImages = images.sort((a: any, b: any) => {
+  const sortedImages = images.sort((a, b) => {
     const sizeOrder = { large: 3, medium: 2, small: 1 }
-    const aSize = sizeOrder[a.ratio as keyof typeof sizeOrder] || 0
-    const bSize = sizeOrder[b.ratio as keyof typeof sizeOrder] || 0
+    const aSize = sizeOrder[a.ratio] || 0
+    const bSize = sizeOrder[b.ratio] || 0
     return bSize - aSize
   })
 
   // Return the best quality image
-  return (sortedImages[0] as any)?.url || "/community-event.png"
+  return sortedImages[0]?.url || "/community-event.png"
 }
 
-function extractTicketLinks(event: unknown): Array<{ source: string; link: string }> {
-  const links = []
-  const eventData = event as any
+function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; link: string }> {
+  const links: Array<{ source: string; link: string }> = []
 
   // Primary Ticketmaster link
-  if (eventData.url) {
+  if (event.url) {
     links.push({
       source: "Ticketmaster",
-      link: eventData.url,
+      link: event.url,
     })
   }
 
   // Additional sales links
-  if (eventData.sales && eventData.sales.public && eventData.sales.public.startDateTime) {
+  if (event.sales?.public?.startDateTime) {
     // Check if tickets are on sale
-    const saleStart = new Date(eventData.sales.public.startDateTime)
+    const saleStart = new Date(event.sales.public.startDateTime)
     const now = new Date()
 
-    if (now >= saleStart && eventData.url) {
+    if (now >= saleStart && event.url) {
       links.push({
         source: "Buy Tickets",
-        link: eventData.url,
+        link: event.url,
       })
     }
   }
 
   // Presale links
-  if (eventData.sales && eventData.sales.presales) {
-    eventData.sales.presales.forEach((presale: unknown) => {
-      const presaleData = presale as any
-      if (presaleData.url) {
+  if (event.sales?.presales) {
+    event.sales.presales.forEach((presale) => {
+      if (presale.url) {
         links.push({
-          source: `${presaleData.name || "Presale"}`,
-          link: presaleData.url,
+          source: `${presale.name || "Presale"}`,
+          link: presale.url,
         })
       }
     })
   }
 
   // Venue box office link if available
-  if (eventData._embedded && eventData._embedded.venues && eventData._embedded.venues[0]) {
-    const venue = eventData._embedded.venues[0]
-    if (venue.boxOfficeInfo && venue.boxOfficeInfo.phoneNumberDetail) {
+  if (event._embedded?.venues?.[0]) {
+    const venue = event._embedded.venues[0]
+    if (venue.address?.line1) {
       // Add venue contact info as a "link"
       links.push({
         source: "Box Office",
-        link: `tel:${venue.boxOfficeInfo.phoneNumberDetail}`,
+        link: `#venue-${venue.name}`,
       })
     }
   }
@@ -171,13 +177,13 @@ function extractTicketLinks(event: unknown): Array<{ source: string; link: strin
 }
 
 function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
-  const eventData = apiEvent as any
+  const eventData = apiEvent as TicketmasterEvent
   
   // Extract venue information
-  const venue = eventData._embedded?.venues?.[0] || {}
-  const coordinates = venue.location
-    ? { lat: Number.parseFloat(venue.location.latitude), lng: Number.parseFloat(venue.location.longitude) }
-    : undefined
+  const venue = eventData._embedded?.venues?.[0]
+  const coordinates = venue?.location
+    ? { lat: Number.parseFloat(venue.location.latitude || "0"), lng: Number.parseFloat(venue.location.longitude || "0") }
+    : { lat: 0, lng: 0 }
 
   // Extract price information
   const priceRanges = eventData.priceRanges || []
@@ -281,7 +287,7 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
 export async function getTicketmasterEventDetails(eventId: string): Promise<EventDetailProps | null> {
   try {
     const queryParams = new URLSearchParams()
-    queryParams.append("apikey", TICKETMASTER_API_KEY || "")
+    queryParams.append("apikey", env.TICKETMASTER_API_KEY || "")
 
     const response = await fetch(
       `https://app.ticketmaster.com/discovery/v2/events/${eventId}.json?${queryParams.toString()}`,

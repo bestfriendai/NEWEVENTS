@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
 import SimpleCobeGlobe from "@/components/simple-cobe-globe"
@@ -59,8 +60,9 @@ export default function Home() {
     }
 
     // Animate globe container
-    if (globeRef.current) {
-      createFadeIn(globeRef.current, {
+    const globeContainer = globeRef.current
+    if (globeContainer) {
+      createFadeIn(globeContainer, {
         y: 20,
         duration: 1,
         delay: 0.3,
@@ -258,9 +260,9 @@ export default function Home() {
             <div className="mt-12 md:mt-16 flex flex-col md:flex-row items-center justify-center gap-6 animate-in">
               <div className="flex items-center">
                 <div className="flex -space-x-2">
-                  <img src="/avatar-1.png" alt="User" className="w-8 h-8 rounded-full border-2 border-[#0A0B10]" />
-                  <img src="/avatar-2.png" alt="User" className="w-8 h-8 rounded-full border-2 border-[#0A0B10]" />
-                  <img src="/avatar-3.png" alt="User" className="w-8 h-8 rounded-full border-2 border-[#0A0B10]" />
+                  <Image src="/avatar-1.png" alt="User" width={32} height={32} className="rounded-full border-2 border-[#0A0B10]" />
+                  <Image src="/avatar-2.png" alt="User" width={32} height={32} className="rounded-full border-2 border-[#0A0B10]" />
+                  <Image src="/avatar-3.png" alt="User" width={32} height={32} className="rounded-full border-2 border-[#0A0B10]" />
                 </div>
                 <div className="ml-4">
                   <div className="flex items-center">
@@ -276,20 +278,26 @@ export default function Home() {
               </div>
               <div className="h-8 border-l border-gray-700 hidden md:block"></div>
               <div className="flex items-center gap-6">
-                <img
+                <Image
                   src="/logo-1.png"
                   alt="Company logo"
-                  className="h-5 opacity-70 grayscale hover:opacity-100 transition-opacity"
+                  width={80}
+                  height={20}
+                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
                 />
-                <img
+                <Image
                   src="/logo-2.png"
                   alt="Company logo"
-                  className="h-5 opacity-70 grayscale hover:opacity-100 transition-opacity"
+                  width={80}
+                  height={20}
+                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
                 />
-                <img
+                <Image
                   src="/logo-3.png"
                   alt="Company logo"
-                  className="h-5 opacity-70 grayscale hover:opacity-100 transition-opacity"
+                  width={80}
+                  height={20}
+                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
                 />
               </div>
             </div>
@@ -504,10 +512,12 @@ export default function Home() {
                   </div>
                   <p className="text-gray-300 mb-6">&quot;{testimonial.quote}&quot;</p>
                   <div className="flex items-center">
-                    <img
+                    <Image
                       src={testimonial.avatar || "/placeholder.svg"}
                       alt={testimonial.author}
-                      className="w-10 h-10 rounded-full mr-4"
+                      width={40}
+                      height={40}
+                      className="rounded-full mr-4"
                     />
                     <div>
                       <h4 className="text-white font-medium">{testimonial.author}</h4>
@@ -592,11 +602,14 @@ interface EventCardProps {
 function EventCard({ title, date, location, image, category }: EventCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
-      <div className="aspect-[3/2] w-full">
-        <img
+      <div className="aspect-[3/2] w-full relative">
+        <Image
           src={image || "/placeholder.svg"}
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          fill
+          style={{ objectFit: 'cover' }}
+          className="transition-transform duration-500 group-hover:scale-110"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B10] via-[#0A0B10]/70 to-transparent"></div>

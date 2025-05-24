@@ -6,7 +6,7 @@ import { Heart, Calendar, MapPin, Clock, Users, ChevronRight } from "lucide-reac
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
-import type { EventDetailProps } from "./event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface EventCardProps {
   id?: number
@@ -18,7 +18,7 @@ interface EventCardProps {
   category?: string
   isFeatured?: boolean
   index?: number
-  event?: EventDetailProps
+  event?: EventDetail
   onViewDetails?: () => void
   onToggleFavorite?: () => void
   variant?: "default" | "compact" | "featured"

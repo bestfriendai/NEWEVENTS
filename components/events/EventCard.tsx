@@ -1,13 +1,14 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { Calendar, Clock, MapPin, Users, Heart, Zap, Music, Palette, Trophy, Coffee, Briefcase } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useFavoriteToggle } from "@/contexts/FavoritesContext"
 import { cn } from "@/lib/utils"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 import { logger } from "@/lib/utils/logger"
 
 const CATEGORY_ICONS = {
@@ -20,7 +21,7 @@ const CATEGORY_ICONS = {
 }
 
 interface EventCardProps {
-  event: EventDetailProps
+  event: EventDetail
   onSelect: () => void
   className?: string
 }
@@ -70,11 +71,13 @@ export function EventCard({ event, onSelect, className }: EventCardProps) {
       onClick={handleCardClick}
     >
       <div className="aspect-video relative overflow-hidden">
-        <img
+        <Image
           src={event.image || "/placeholder.svg?height=200&width=300&text=" + encodeURIComponent(event.title)}
           alt={event.title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
+          fill
+          style={{ objectFit: 'cover' }}
+          className="transition-transform duration-300 group-hover:scale-105"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
@@ -165,8 +168,8 @@ export function EventCardGrid({
   onEventSelect, 
   className 
 }: { 
-  events: EventDetailProps[]
-  onEventSelect: (event: EventDetailProps) => void
+  events: EventDetail[]
+  onEventSelect: (event: EventDetail) => void
   className?: string 
 }) {
   return (

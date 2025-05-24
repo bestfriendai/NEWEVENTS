@@ -130,7 +130,10 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
 
       // Show user-friendly error notification
       // TODO: Integrate with toast system
-      console.error("Failed to update favorite:", errorMessage)
+      logger.error("Failed to update favorite", {
+        component: "FavoritesContext",
+        action: "toggle_favorite_final_error"
+      }, new Error(errorMessage))
     }
   }
 

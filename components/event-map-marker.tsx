@@ -3,16 +3,17 @@
 import type React from "react"
 
 import { useState } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence, type MotionStyle } from "framer-motion"
 import { Heart, Calendar, MapPin, Clock, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
-import type { EventDetailProps } from "./event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface EventMapMarkerProps {
-  event: EventDetailProps
+  event: EventDetail
   onClick: () => void
   onViewDetails: () => void
   onToggleFavorite: () => void
@@ -147,7 +148,13 @@ export function EventMapMarker({
             <div className="bg-[#1A1D25]/95 backdrop-blur-md rounded-xl overflow-hidden shadow-xl border border-gray-800">
               {/* Event image */}
               <div className="h-32 relative">
-                <img src={event.image || "/placeholder.svg"} alt={event.title} className="w-full h-full object-cover" />
+                <Image
+                  src={event.image || "/placeholder.svg"}
+                  alt={event.title}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  sizes="(max-width: 288px) 100vw, 288px"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25] via-transparent to-transparent opacity-70"></div>
 
                 {/* Category badge */}

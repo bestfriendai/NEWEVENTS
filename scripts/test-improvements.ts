@@ -6,11 +6,11 @@
  */
 
 import { logger } from '../lib/utils/logger'
-import { memoryCache, persistentCache } from '../lib/utils/cache'
+import { memoryCache } from '../lib/utils/cache'
 import { geocodeAddress, calculateDistance } from '../lib/utils/geocoding'
 import { apiValidators, sanitizers } from '../lib/utils/validation'
 import { withRetry, debounce, formatErrorMessage } from '../lib/utils'
-import { runAllTests, mockData, assert } from '../lib/utils/test-helpers'
+import { runAllTests, mockData } from '../lib/utils/test-helpers'
 import { getProviderStatus } from '../lib/utils/api-config'
 
 async function demonstrateLogging() {

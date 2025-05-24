@@ -283,7 +283,7 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <div className="flex gap-2">
                     <Select
                       value={localFilters.sortBy}
-                      onValueChange={(sortBy: any) => updateFilters({ sortBy })}
+                      onValueChange={(sortBy: 'date' | 'popularity' | 'price' | 'distance') => updateFilters({ sortBy })}
                     >
                       <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                         <SelectValue />
@@ -298,7 +298,7 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                     </Select>
                     <Select
                       value={localFilters.sortOrder}
-                      onValueChange={(sortOrder: any) => updateFilters({ sortOrder })}
+                      onValueChange={(sortOrder: 'asc' | 'desc') => updateFilters({ sortOrder })}
                     >
                       <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-24">
                         <SelectValue />

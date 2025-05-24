@@ -13,8 +13,9 @@ export interface RetryOptions {
   backoffFactor?: number
 }
 
-export async function withRetry<T>(
-  fn: () => Promise<T>,
+export async function withRetry<T, C>(
+  context: C,
+  fn: (this: C) => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {
   const {
@@ -22,18 +23,18 @@ export async function withRetry<T>(
     baseDelay = 1000,
     maxDelay = 10000,
     backoffFactor = 2,
-  } = options
+  } = options;
 
-  let lastError: Error
+  let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fn()
+      return await fn.call(context);
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
+      lastError = error instanceof Error ? error : new Error(String(error));
 
       if (attempt === maxAttempts) {
-        throw lastError
+        throw lastError;
       }
 
       // Calculate delay with exponential backoff

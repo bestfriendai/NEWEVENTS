@@ -7,7 +7,7 @@
   --color-primary-200: #bae6fd;
   --color-primary-300: #7dd3fc;
   --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
+  --color-primary-500: 14 165 233;
   --color-primary-600: #0284c7;
   --color-primary-700: #0369a1;
   --color-primary-800: #075985;
@@ -205,49 +205,10 @@
 }
 
 /* Utility Classes */
-.animate-fade-in {
-  animation: fadeIn var(--transition-normal) ease-out;
-}
-
-.animate-slide-up {
-  animation: slideUp var(--transition-normal) ease-out;
-}
-
-.animate-scale-in {
-  animation: scaleIn var(--transition-normal) ease-out;
-}
+/* Animations moved to tailwind.config.ts */
 
 /* Keyframes */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(var(--space-4));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
+/* Animations moved to tailwind.config.ts */
 
 /* Focus styles */
 .focus-ring {

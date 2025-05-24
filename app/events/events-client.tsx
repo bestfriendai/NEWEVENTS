@@ -9,7 +9,8 @@ import { EventsMap } from "@/components/events/EventsMap"
 import { EventFilters, type EventFilters as EventFiltersType } from "@/components/events/EventFilters"
 import { EventCardGridSkeleton } from "@/components/ui/event-skeleton"
 import { EventDetailModal } from "@/components/event-detail-modal"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
+import type { EventSearchParams } from "@/types"
 import { logger } from "@/lib/utils/logger"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,10 +18,10 @@ import { Badge } from "@/components/ui/badge"
 
 export function EventsClient() {
   const { userLocation, searchLocation } = useLocationContext()
-  const [events, setEvents] = useState<EventDetailProps[]>([])
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>([])
+  const [events, setEvents] = useState<EventDetail[]>([])
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -46,10 +47,10 @@ export function EventsClient() {
         metadata: { location: userLocation }
       })
 
-      const searchParams: any = {
+      const searchParams: EventSearchParams = {
         location: `${userLocation.lat},${userLocation.lng}`,
         radius: filters.distance,
-        size: 50, // Load more events for better map display
+        limit: 50, // Load more events for better map display
       }
 
       // Only include optional properties if they have values
@@ -154,7 +155,7 @@ export function EventsClient() {
       // Extract price from string like "$50" or "$25 - $100"
       const priceMatch = event.price.match(/\$(\d+)/)
       if (priceMatch && priceMatch[1]) {
-        const price = parseInt(priceMatch[1])
+        const price = parseInt(priceMatch[1], 10)
         return price >= filters.priceRange.min && price <= filters.priceRange.max
       }
       return true // Include events with unclear pricing
@@ -188,8 +189,8 @@ export function EventsClient() {
           break
         case 'price':
           // Basic price comparison
-          const priceA = a.price === "Free" ? 0 : parseInt(a.price.match(/\$(\d+)/)?.[1] || "0")
-          const priceB = b.price === "Free" ? 0 : parseInt(b.price.match(/\$(\d+)/)?.[1] || "0")
+          const priceA = a.price === "Free" ? 0 : parseInt(a.price.match(/\$(\d+)/)?.[1] || "0", 10)
+          const priceB = b.price === "Free" ? 0 : parseInt(b.price.match(/\$(\d+)/)?.[1] || "0", 10)
           comparison = priceA - priceB
           break
       }
@@ -224,7 +225,7 @@ export function EventsClient() {
     }
   }
 
-  const handleEventSelect = useCallback((event: EventDetailProps) => {
+  const handleEventSelect = useCallback((event: EventDetail) => {
     setSelectedEvent(event)
     setShowModal(true)
 
@@ -235,7 +236,7 @@ export function EventsClient() {
     })
   }, [])
 
-  const handleFiltersChange = (newFilters: EventFiltersType) => {
+  const handleFiltersChange = useCallback((newFilters: EventFiltersType) => {
     setFilters(newFilters)
 
     // If location-based filters changed, reload events
@@ -244,7 +245,7 @@ export function EventsClient() {
         newFilters.searchQuery !== filters.searchQuery) {
       loadEventsNearLocation()
     }
-  }
+  }, [filters.distance, filters.dateRange, filters.searchQuery, loadEventsNearLocation])
 
   return (
     <div className="h-screen bg-[#0F1116] flex overflow-hidden">

@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { geocodeAddress } from "@/lib/api/map-api"
 import { createMap, createMarker, createPopup, cleanupMap } from "@/lib/mapbox-utils"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface EventMapProps {
-  event: EventDetailProps | null
+  event: EventDetail | null
 }
 
 export function EventMap({ event }: EventMapProps) {

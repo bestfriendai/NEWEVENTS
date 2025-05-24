@@ -3,23 +3,24 @@
 import type React from "react"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Search, MapPin, Calendar, Users, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { EventDetailModal } from "@/components/event-detail-modal"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface SimpleMapFallbackProps {
-  events: EventDetailProps[]
-  onViewDetails: (event: EventDetailProps) => void
+  events: EventDetail[]
+  onViewDetails: (event: EventDetail) => void
   onToggleFavorite: (eventId: number) => void
 }
 
 export function SimpleMapFallback({ events, onViewDetails: _onViewDetails, onToggleFavorite }: SimpleMapFallbackProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredEvents, setFilteredEvents] = useState(events)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
   // Handle search
@@ -42,7 +43,7 @@ export function SimpleMapFallback({ events, onViewDetails: _onViewDetails, onTog
   }
 
   // View event details
-  const handleViewDetails = (event: EventDetailProps) => {
+  const handleViewDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setShowDetailModal(true)
   }
@@ -88,11 +89,13 @@ export function SimpleMapFallback({ events, onViewDetails: _onViewDetails, onTog
                 onClick={() => handleViewDetails(event)}
               >
                 <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                    <img
+                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 relative">
+                    <Image
                       src={event.image || "/community-event.png"}
                       alt={event.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      sizes="64px"
                     />
                   </div>
                   <div className="flex-1 min-w-0">

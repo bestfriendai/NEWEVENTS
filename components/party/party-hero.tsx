@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 
 export function PartyHero() {
@@ -12,10 +13,13 @@ export function PartyHero() {
       className="relative w-full h-64 md:h-80 rounded-2xl overflow-hidden mb-8"
     >
       <div className="absolute inset-0 bg-gradient-to-r from-purple-900/80 to-indigo-900/80 z-10"></div>
-      <img
+      <Image
         src="/party-hero.png?height=400&width=1200&query=nightclub with dj and crowd"
         alt="Party events"
-        className="w-full h-full object-cover"
+        fill
+        style={{ objectFit: 'cover' }}
+        sizes="100vw"
+        priority
       />
       <div className="absolute inset-0 z-20 flex flex-col justify-center p-8">
         <motion.h2

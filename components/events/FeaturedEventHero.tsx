@@ -1,14 +1,15 @@
 "use client"
 
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { Calendar, Clock, MapPin, Users, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface FeaturedEventHeroProps {
-  event: EventDetailProps
+  event: EventDetail
   onExplore: () => void
 }
 
@@ -17,10 +18,13 @@ export function FeaturedEventHero({ event, onExplore }: FeaturedEventHeroProps) 
     <div className="relative h-[60vh] min-h-[500px] overflow-hidden rounded-2xl">
       {/* Background Image */}
       <div className="absolute inset-0">
-        <img 
-          src={event.image || "/placeholder.svg"} 
-          alt={event.title} 
-          className="w-full h-full object-cover" 
+        <Image
+          src={event.image || "/placeholder.svg"}
+          alt={event.title}
+          fill
+          style={{ objectFit: 'cover' }}
+          sizes="100vw"
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

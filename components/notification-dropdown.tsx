@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { logger } from "@/lib/utils/logger"
 
 // Notification type definition
 interface Notification {
@@ -111,7 +112,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       const maxId = Math.max(...notifications.map((n) => n.id))
       return maxId + 1
     } catch (error) {
-      console.error("Error getting next ID:", error)
+      logger.error("Error getting next ID", {
+        component: "NotificationDropdown",
+        action: "get_next_id_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       return Date.now() // Fallback to timestamp
     }
   }, [notifications])
@@ -125,7 +129,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
           setIsOpen(false)
         }
       } catch (error) {
-        console.error("Error in click outside handler:", error)
+        logger.error("Error in click outside handler", {
+          component: "NotificationDropdown",
+          action: "click_outside_error"
+        }, error instanceof Error ? error : new Error(String(error)))
         setError("Failed to handle click outside")
       }
     }
@@ -166,7 +173,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         }
       }
     } catch (error) {
-      console.error("Error setting up notification timer:", error)
+      logger.error("Error setting up notification timer", {
+        component: "NotificationDropdown",
+        action: "timer_setup_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to set up notifications")
       return undefined
     }
@@ -175,13 +185,19 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
   // Global error handlers
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error("Unhandled promise rejection in NotificationDropdown:", event.reason)
+      logger.error("Unhandled promise rejection in NotificationDropdown", {
+        component: "NotificationDropdown",
+        action: "unhandled_rejection"
+      }, event.reason instanceof Error ? event.reason : new Error(String(event.reason)))
       setError("An unexpected error occurred")
       event.preventDefault() // Prevent the default browser behavior
     }
 
     const handleError = (event: ErrorEvent) => {
-      console.error("Runtime error in NotificationDropdown:", event.error)
+      logger.error("Runtime error in NotificationDropdown", {
+        component: "NotificationDropdown",
+        action: "runtime_error"
+      }, event.error instanceof Error ? event.error : new Error(String(event.error)))
       setError("A runtime error occurred")
     }
 
@@ -218,7 +234,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       }
       setError(null) // Clear any previous errors
     } catch (error) {
-      console.error("Error toggling dropdown:", error)
+      logger.error("Error toggling dropdown", {
+        component: "NotificationDropdown",
+        action: "toggle_dropdown_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to toggle dropdown")
     }
   }, [isOpen, hasNewNotifications])
@@ -227,7 +246,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     try {
       setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
     } catch (error) {
-      console.error("Error marking all notifications as read:", error)
+      logger.error("Error marking all notifications as read", {
+        component: "NotificationDropdown",
+        action: "mark_all_read_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to mark all notifications as read")
     }
   }, [])
@@ -236,7 +258,11 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     try {
       setNotifications((prev) => prev.filter((notification) => notification.id !== id))
     } catch (error) {
-      console.error("Error removing notification:", error)
+      logger.error("Error removing notification", {
+        component: "NotificationDropdown",
+        action: "remove_notification_error",
+        metadata: { notificationId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to remove notification")
     }
   }, [])
@@ -253,7 +279,11 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         ),
       )
     } catch (error) {
-      console.error("Error handling notification action:", error)
+      logger.error("Error handling notification action", {
+        component: "NotificationDropdown",
+        action: "notification_action_error",
+        metadata: { notificationId: id, actionType: action }
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to handle notification action")
     }
   }, [])
@@ -279,7 +309,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       const validNotifications = notifications.filter(validateNotification)
 
       if (validNotifications.length !== notifications.length) {
-        console.warn("Some notifications failed validation and were filtered out")
+        logger.warn("Some notifications failed validation and were filtered out", {
+          component: "NotificationDropdown",
+          action: "notification_validation_warning",
+          metadata: {
+            originalCount: notifications.length,
+            validCount: validNotifications.length
+          }
+        })
       }
 
       const filtered = validNotifications.filter((notification) => {
@@ -291,7 +328,10 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       setIsLoading(false)
       return filtered
     } catch (error) {
-      console.error("Error filtering notifications:", error)
+      logger.error("Error filtering notifications", {
+        component: "NotificationDropdown",
+        action: "filter_notifications_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setError("Failed to filter notifications")
       setIsLoading(false)
       return []
@@ -317,7 +357,11 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
           return <Bell className="h-4 w-4 text-purple-400" />
       }
     } catch (error) {
-      console.error("Error getting notification icon:", error)
+      logger.error("Error getting notification icon", {
+        component: "NotificationDropdown",
+        action: "get_icon_error",
+        metadata: { notificationType: type }
+      }, error instanceof Error ? error : new Error(String(error)))
       return <Bell className="h-4 w-4 text-purple-400" />
     }
   }, [])
@@ -456,10 +500,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                   <AvatarImage
                                     src={notification.image || "/placeholder.svg"}
                                     alt={notification.title}
-                                    onError={(e) => {
-                                      console.warn("Failed to load notification image:", notification.image)
+                                    onError={(_e) => {
+                                      logger.warn("Failed to load notification image", {
+                                        component: "NotificationDropdown",
+                                        action: "image_load_error",
+                                        metadata: { imageUrl: notification.image }
+                                      })
                                       // Fallback to placeholder or remove src to show fallback
-                                      e.currentTarget.src = "/placeholder.svg"
+                                      ;(e as React.SyntheticEvent<HTMLImageElement>).currentTarget.src = "/placeholder.svg"
                                     }}
                                   />
                                   <AvatarFallback className="bg-purple-900 text-purple-200">

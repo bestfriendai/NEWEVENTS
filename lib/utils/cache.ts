@@ -3,7 +3,8 @@
  */
 
 import { logger } from '@/lib/utils/logger'
-import { generateId } from '@/lib/utils'
+
+const IS_BROWSER = typeof window !== 'undefined';
 
 export interface CacheEntry<T> {
   data: T
@@ -74,18 +75,53 @@ class MemoryCache<T> extends CacheBackend<T> {
  * LocalStorage cache backend
  */
 class LocalStorageCache<T> extends CacheBackend<T> {
+  private _managedKeys: Set<string>;
+  private readonly MANAGED_KEYS_STORAGE_KEY: string;
+
   constructor(private namespace: string = 'cache') {
     super()
+    this.MANAGED_KEYS_STORAGE_KEY = `${this.namespace}:__managed_keys__`;
+    this._managedKeys = this.loadManagedKeys();
   }
 
   private getStorageKey(key: string): string {
     return `${this.namespace}:${key}`
   }
 
+  private loadManagedKeys(): Set<string> {
+    if (!IS_BROWSER) return new Set();
+    try {
+      const storedKeys = localStorage.getItem(this.MANAGED_KEYS_STORAGE_KEY);
+      return storedKeys ? new Set(JSON.parse(storedKeys)) : new Set();
+    } catch (error) {
+      logger.warn(`Failed to load managed keys from localStorage: ${error instanceof Error ? error.message : String(error)}`, {
+        component: 'cache',
+        action: 'load_managed_keys_error',
+        metadata: { namespace: this.namespace }
+      });
+      return new Set();
+    }
+  }
+
+  private saveManagedKeys(): void {
+    if (!IS_BROWSER) return;
+    try {
+      localStorage.setItem(this.MANAGED_KEYS_STORAGE_KEY, JSON.stringify(Array.from(this._managedKeys)));
+    } catch (error) {
+      logger.warn(`Failed to save managed keys to localStorage: ${error instanceof Error ? error.message : String(error)}`, {
+        component: 'cache',
+        action: 'save_managed_keys_error',
+        metadata: { namespace: this.namespace }
+      });
+    }
+  }
+
   get(key: string): CacheEntry<T> | null {
-    if (typeof window === 'undefined') return null
+    if (!IS_BROWSER) return null
 
     try {
+      // Ensure key is managed before attempting to get, though direct access is fine
+      // if (!this._managedKeys.has(key)) return null;
       const item = localStorage.getItem(this.getStorageKey(key))
       return item ? JSON.parse(item) : null
     } catch {
@@ -94,10 +130,14 @@ class LocalStorageCache<T> extends CacheBackend<T> {
   }
 
   set(key: string, entry: CacheEntry<T>): void {
-    if (typeof window === 'undefined') return
+    if (!IS_BROWSER) return
 
     try {
       localStorage.setItem(this.getStorageKey(key), JSON.stringify(entry))
+      if (!this._managedKeys.has(key)) {
+        this._managedKeys.add(key);
+        this.saveManagedKeys();
+      }
     } catch (error) {
       logger.warn(`Failed to save to localStorage: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
@@ -108,10 +148,14 @@ class LocalStorageCache<T> extends CacheBackend<T> {
   }
 
   delete(key: string): boolean {
-    if (typeof window === 'undefined') return false
+    if (!IS_BROWSER) return false
 
     try {
       localStorage.removeItem(this.getStorageKey(key))
+      if (this._managedKeys.has(key)) {
+        this._managedKeys.delete(key);
+        this.saveManagedKeys();
+      }
       return true
     } catch {
       return false
@@ -119,11 +163,18 @@ class LocalStorageCache<T> extends CacheBackend<T> {
   }
 
   clear(): void {
-    if (typeof window === 'undefined') return
+    if (!IS_BROWSER) return
 
     try {
-      const keys = this.keys()
-      keys.forEach(key => this.delete(key))
+      // Iterate over a copy of the keys, as `delete` modifies the set
+      const currentKeys = Array.from(this._managedKeys);
+      currentKeys.forEach(key => {
+        // Use the internal delete which also removes from localStorage
+        localStorage.removeItem(this.getStorageKey(key));
+      });
+      this._managedKeys.clear();
+      localStorage.removeItem(this.MANAGED_KEYS_STORAGE_KEY); // Remove the managed keys list itself
+      // No need to call this.saveManagedKeys() here as we just cleared and removed it.
     } catch (error) {
       logger.warn(`Failed to clear localStorage cache: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
@@ -133,24 +184,14 @@ class LocalStorageCache<T> extends CacheBackend<T> {
   }
 
   keys(): string[] {
-    if (typeof window === 'undefined') return []
-
-    try {
-      const keys: string[] = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith(`${this.namespace}:`)) {
-          keys.push(key.replace(`${this.namespace}:`, ''))
-        }
-      }
-      return keys
-    } catch {
-      return []
-    }
+    if (!IS_BROWSER) return []
+    // Return keys from the managed set
+    return Array.from(this._managedKeys)
   }
 
   size(): number {
-    return this.keys().length
+    // Size is now directly from the managed set
+    return this._managedKeys.size
   }
 }
 
@@ -158,18 +199,53 @@ class LocalStorageCache<T> extends CacheBackend<T> {
  * SessionStorage cache backend
  */
 class SessionStorageCache<T> extends CacheBackend<T> {
+  private _managedKeys: Set<string>;
+  private readonly MANAGED_KEYS_STORAGE_KEY: string;
+
   constructor(private namespace: string = 'cache') {
     super()
+    this.MANAGED_KEYS_STORAGE_KEY = `${this.namespace}:__managed_keys__`;
+    this._managedKeys = this.loadManagedKeys();
   }
 
   private getStorageKey(key: string): string {
     return `${this.namespace}:${key}`
   }
 
+  private loadManagedKeys(): Set<string> {
+    if (!IS_BROWSER) return new Set();
+    try {
+      const storedKeys = sessionStorage.getItem(this.MANAGED_KEYS_STORAGE_KEY);
+      return storedKeys ? new Set(JSON.parse(storedKeys)) : new Set();
+    } catch (error) {
+      logger.warn(`Failed to load managed keys from sessionStorage: ${error instanceof Error ? error.message : String(error)}`, {
+        component: 'cache',
+        action: 'load_managed_keys_error',
+        metadata: { namespace: this.namespace }
+      });
+      return new Set();
+    }
+  }
+
+  private saveManagedKeys(): void {
+    if (!IS_BROWSER) return;
+    try {
+      sessionStorage.setItem(this.MANAGED_KEYS_STORAGE_KEY, JSON.stringify(Array.from(this._managedKeys)));
+    } catch (error) {
+      logger.warn(`Failed to save managed keys to sessionStorage: ${error instanceof Error ? error.message : String(error)}`, {
+        component: 'cache',
+        action: 'save_managed_keys_error',
+        metadata: { namespace: this.namespace }
+      });
+    }
+  }
+
   get(key: string): CacheEntry<T> | null {
-    if (typeof window === 'undefined') return null
+    if (!IS_BROWSER) return null
 
     try {
+      // Ensure key is managed before attempting to get, though direct access is fine
+      // if (!this._managedKeys.has(key)) return null;
       const item = sessionStorage.getItem(this.getStorageKey(key))
       return item ? JSON.parse(item) : null
     } catch {
@@ -178,10 +254,14 @@ class SessionStorageCache<T> extends CacheBackend<T> {
   }
 
   set(key: string, entry: CacheEntry<T>): void {
-    if (typeof window === 'undefined') return
+    if (!IS_BROWSER) return
 
     try {
       sessionStorage.setItem(this.getStorageKey(key), JSON.stringify(entry))
+      if (!this._managedKeys.has(key)) {
+        this._managedKeys.add(key);
+        this.saveManagedKeys();
+      }
     } catch (error) {
       logger.warn(`Failed to save to sessionStorage: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
@@ -192,10 +272,14 @@ class SessionStorageCache<T> extends CacheBackend<T> {
   }
 
   delete(key: string): boolean {
-    if (typeof window === 'undefined') return false
+    if (!IS_BROWSER) return false
 
     try {
       sessionStorage.removeItem(this.getStorageKey(key))
+      if (this._managedKeys.has(key)) {
+        this._managedKeys.delete(key);
+        this.saveManagedKeys();
+      }
       return true
     } catch {
       return false
@@ -203,11 +287,18 @@ class SessionStorageCache<T> extends CacheBackend<T> {
   }
 
   clear(): void {
-    if (typeof window === 'undefined') return
+    if (!IS_BROWSER) return
 
     try {
-      const keys = this.keys()
-      keys.forEach(key => this.delete(key))
+      // Iterate over a copy of the keys, as `delete` modifies the set
+      const currentKeys = Array.from(this._managedKeys);
+      currentKeys.forEach(key => {
+        // Use the internal delete which also removes from sessionStorage
+        sessionStorage.removeItem(this.getStorageKey(key));
+      });
+      this._managedKeys.clear();
+      sessionStorage.removeItem(this.MANAGED_KEYS_STORAGE_KEY); // Remove the managed keys list itself
+      // No need to call this.saveManagedKeys() here as we just cleared and removed it.
     } catch (error) {
       logger.warn(`Failed to clear sessionStorage cache: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
@@ -217,24 +308,14 @@ class SessionStorageCache<T> extends CacheBackend<T> {
   }
 
   keys(): string[] {
-    if (typeof window === 'undefined') return []
-
-    try {
-      const keys: string[] = []
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i)
-        if (key && key.startsWith(`${this.namespace}:`)) {
-          keys.push(key.replace(`${this.namespace}:`, ''))
-        }
-      }
-      return keys
-    } catch {
-      return []
-    }
+    if (!IS_BROWSER) return []
+    // Return keys from the managed set
+    return Array.from(this._managedKeys)
   }
 
   size(): number {
-    return this.keys().length
+    // Size is now directly from the managed set
+    return this._managedKeys.size
   }
 }
 
@@ -400,25 +481,86 @@ export class CacheManager<T> {
    * Evict least recently used entries
    */
   private evictLeastUsed(): void {
-    const keys = this.backend.keys()
-    const entries = keys
-      .map(key => this.backend.get(key))
-      .filter((entry): entry is CacheEntry<T> => entry !== null)
-      .sort((a, b) => a.hits - b.hits)
-
-    // Remove the least used entry
-    if (entries.length > 0) {
-      this.backend.delete(entries[0].key)
-      logger.debug('Cache eviction', {
-        component: 'cache',
-        action: 'cache_evict',
-        metadata: {
-          key: entries[0].key,
-          namespace: this.options.namespace,
-          hits: entries[0].hits
-        }
-      })
+    const allKeys = this.backend.keys();
+    if (allKeys.length === 0) {
+        return;
     }
+
+    let candidateEntries: CacheEntry<T>[] = [];
+    // Number of entries to consider for eviction.
+    // A small fixed sample size helps keep eviction fast for large caches.
+    const SAMPLE_SIZE = 20;
+
+    if (allKeys.length <= SAMPLE_SIZE) {
+        // For small caches or when the cache size is less than/equal to sample size,
+        // examine all entries to find the least used.
+        // This is O(N) rather than O(N log N) from sorting all entries.
+        candidateEntries = allKeys
+            .map(key => this.backend.get(key))
+            .filter((entry): entry is CacheEntry<T> => entry !== null);
+    } else {
+        // For larger caches, randomly sample entries to find a candidate for eviction.
+        // This avoids iterating or sorting all entries.
+        const selectedKeys: string[] = [];
+        const availableKeys = [...allKeys]; // Create a copy for modification
+
+        // Ensure we don't try to sample more keys than available
+        const numToSample = Math.min(SAMPLE_SIZE, availableKeys.length);
+
+        for (let i = 0; i < numToSample; i++) {
+            const randomIndex = Math.floor(Math.random() * availableKeys.length);
+            // Remove the key from availableKeys and add to selectedKeys to ensure uniqueness
+            selectedKeys.push(availableKeys.splice(randomIndex, 1)[0]);
+        }
+
+        candidateEntries = selectedKeys
+            .map(key => this.backend.get(key))
+            .filter((entry): entry is CacheEntry<T> => entry !== null);
+    }
+
+    if (candidateEntries.length === 0) {
+        // No valid entries found among candidates (e.g. if backend.get() returned null for all sampled keys)
+        // This should be rare if allKeys is not empty and backend is consistent.
+        logger.warn('Cache eviction: No candidate entries found to evict.', {
+            component: 'cache',
+            action: 'cache_evict_no_candidates',
+            metadata: {
+                namespace: this.options.namespace,
+                totalCacheSize: allKeys.length,
+                sampled: allKeys.length > SAMPLE_SIZE,
+                attemptedSampleSize: SAMPLE_SIZE
+            }
+        });
+        return;
+    }
+
+    // Find the entry with the minimum hits. Tie-break with the oldest timestamp.
+    let entryToEvict = candidateEntries[0];
+    for (let i = 1; i < candidateEntries.length; i++) {
+        const currentEntry = candidateEntries[i];
+        if (currentEntry.hits < entryToEvict.hits) {
+            entryToEvict = currentEntry;
+        } else if (currentEntry.hits === entryToEvict.hits && currentEntry.timestamp < entryToEvict.timestamp) {
+            entryToEvict = currentEntry;
+        }
+    }
+
+    // Remove the chosen entry
+    this.backend.delete(entryToEvict.key);
+    logger.debug('Cache eviction (sampled LFU)', {
+        component: 'cache',
+        action: 'cache_evict_sampled_lfu',
+        metadata: {
+            key: entryToEvict.key,
+            namespace: this.options.namespace,
+            hits: entryToEvict.hits,
+            timestamp: entryToEvict.timestamp,
+            sampled: allKeys.length > SAMPLE_SIZE,
+            // Number of entries actually considered in the eviction decision pool
+            samplePoolSize: candidateEntries.length,
+            totalCacheSizeBeforeEviction: allKeys.length,
+        }
+    });
   }
 
   /**
@@ -452,7 +594,7 @@ export class CacheManager<T> {
   private startCleanupInterval(): void {
     // Only run cleanup in browser environment
     if (typeof window !== 'undefined') {
-      setInterval(() => this.cleanup(), 60000) // Every minute
+      setInterval(() => this.cleanup(), 300000) // Every 5 minutes
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { searchEnhancedEvents, type EnhancedEventSearchParams } from "@/lib/api/enhanced-events-api"
-import { RAPIDAPI_KEY, RAPIDAPI_HOST } from "@/lib/env"
+import { env } from "@/lib/env"
 import { withRetry, formatErrorMessage } from "@/lib/utils"
 import { logger, measurePerformance } from "@/lib/utils/logger"
 import { checkRateLimit } from "@/lib/utils/api-config"
@@ -39,9 +39,9 @@ export async function searchEvents(params: EventSearchParams): Promise<{
         ...params,
         size: params.size || 50, // Increased default size
         userPreferences: {
-          favoriteCategories: params.categories,
-          pricePreference: "any",
-          timePreference: "any",
+          favoriteCategories: params.categories || [],
+          pricePreference: "any" as const,
+          timePreference: "any" as const,
         },
       }
 
@@ -110,8 +110,8 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
               {
                 method: "GET",
                 headers: {
-                  "x-rapidapi-key": RAPIDAPI_KEY || "",
-                  "x-rapidapi-host": RAPIDAPI_HOST,
+                  "x-rapidapi-key": env.RAPIDAPI_KEY || "",
+                  "x-rapidapi-host": env.RAPIDAPI_HOST,
                 },
               },
             ),
@@ -170,9 +170,9 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
 
             if (event.ticket_links) {
               ticketLinks.push(
-                ...event.ticket_links.map((link: any) => ({
+                ...event.ticket_links.map((link: { source?: string; link?: string }) => ({
                   source: link.source || "Ticket Provider",
-                  link: link.link,
+                  link: link.link || "#",
                 })),
               )
             }
@@ -180,9 +180,9 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
             // Add info links if no ticket links
             if (ticketLinks.length === 0 && event.info_links) {
               ticketLinks.push(
-                ...event.info_links.slice(0, 3).map((link: any) => ({
+                ...event.info_links.slice(0, 3).map((link: { source?: string; link?: string }) => ({
                   source: link.source || "Event Info",
-                  link: link.link,
+                  link: link.link || "#",
                 })),
               )
             }
@@ -309,8 +309,8 @@ export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]>
       size: limit,
       userPreferences: {
         favoriteCategories: ["music", "arts", "sports"],
-        pricePreference: "any",
-        timePreference: "any",
+        pricePreference: "any" as const,
+        timePreference: "any" as const,
       },
     })
 
@@ -333,8 +333,8 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
       categories: [category.toLowerCase()],
       userPreferences: {
         favoriteCategories: [category.toLowerCase()],
-        pricePreference: "any",
-        timePreference: "any",
+        pricePreference: "any" as const,
+        timePreference: "any" as const,
       },
     })
 
@@ -392,7 +392,11 @@ export async function getPersonalizedEvents(
       coordinates,
       radius,
       size: limit,
-      userPreferences,
+      userPreferences: userPreferences || {
+        favoriteCategories: [],
+        pricePreference: "any" as const,
+        timePreference: "any" as const,
+      },
       keyword: userPreferences?.favoriteCategories?.join(" ") || "events",
     })
 
@@ -417,8 +421,8 @@ export async function testRapidApiConnection(): Promise<boolean> {
       {
         method: "GET",
         headers: {
-          "x-rapidapi-key": RAPIDAPI_KEY || "",
-          "x-rapidapi-host": RAPIDAPI_HOST,
+          "x-rapidapi-key": env.RAPIDAPI_KEY || "",
+          "x-rapidapi-host": env.RAPIDAPI_HOST,
         },
       },
     )

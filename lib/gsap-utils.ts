@@ -177,7 +177,7 @@ export function createScaleAnimation(
  * Create a counter animation with error handling
  */
 export function createCounterAnimation(
-  element: HTMLElement,
+  _element: HTMLElement,
   targetValue: number,
   onUpdate: (value: number) => void,
   options: {

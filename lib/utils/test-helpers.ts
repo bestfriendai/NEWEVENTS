@@ -261,7 +261,7 @@ export const assert = {
     try {
       await fn()
       throw new Error(message || "Expected function to throw an error")
-    } catch (error) {
+    } catch (_error) {
       // Expected behavior
     }
   },

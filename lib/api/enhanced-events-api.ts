@@ -1,5 +1,5 @@
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import { RAPIDAPI_KEY, RAPIDAPI_HOST, TICKETMASTER_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 import { withRetry, formatErrorMessage } from "@/lib/utils"
 import { logger, measurePerformance } from "@/lib/utils/logger"
 import { checkRateLimit } from "@/lib/utils/api-config"
@@ -79,7 +79,7 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
       let allEvents: EventDetailProps[] = []
 
       // Try RapidAPI first
-      if (RAPIDAPI_KEY) {
+      if (env.RAPIDAPI_KEY) {
         try {
           const rapidEvents = await searchRapidAPIEvents(params)
           if (rapidEvents.length > 0) {
@@ -96,7 +96,7 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
       }
 
       // Try Ticketmaster as fallback
-      if (TICKETMASTER_API_KEY && allEvents.length < 10) {
+      if (env.TICKETMASTER_API_KEY && allEvents.length < 10) {
         try {
           const ticketmasterEvents = await searchTicketmasterEvents(params)
           if (ticketmasterEvents.length > 0) {
@@ -187,8 +187,8 @@ async function searchRapidAPIEvents(params: EnhancedEventSearchParams): Promise<
         {
           method: "GET",
           headers: {
-            "x-rapidapi-key": RAPIDAPI_KEY || "",
-            "x-rapidapi-host": RAPIDAPI_HOST,
+            "x-rapidapi-key": env.RAPIDAPI_KEY || "",
+            "x-rapidapi-host": env.RAPIDAPI_HOST,
           },
           signal: AbortSignal.timeout(10000), // 10 second timeout
         },
@@ -209,14 +209,14 @@ async function searchRapidAPIEvents(params: EnhancedEventSearchParams): Promise<
   return transformRapidAPIEvents(data.data.events)
 }
 
-async function searchTicketmasterEvents(params: EnhancedEventSearchParams): Promise<EventDetailProps[]> {
+async function searchTicketmasterEvents(_params: EnhancedEventSearchParams): Promise<EventDetailProps[]> {
   // Implement Ticketmaster API search
   // This is a placeholder - implement based on Ticketmaster API docs
   return []
 }
 
-function transformRapidAPIEvents(events: any[]): EventDetailProps[] {
-  return events.slice(0, 20).map((event, index) => {
+function transformRapidAPIEvents(events: unknown[]): EventDetailProps[] {
+  return events.slice(0, 20).map((event: any, index) => {
     const venue = event.venue || {}
     const startDate = event.start_time ? new Date(event.start_time) : new Date()
 
@@ -251,7 +251,7 @@ function transformRapidAPIEvents(events: any[]): EventDetailProps[] {
       attendees: Math.floor(Math.random() * 1000) + 50,
       isFavorite: false,
       coordinates:
-        venue.latitude && venue.longitude ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : undefined,
+        venue.latitude && venue.longitude ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : { lat: 0, lng: 0 },
     }
   })
 }
@@ -282,7 +282,7 @@ function extractCategory(tags: string[]): string {
     }
   }
 
-  return tags[0].charAt(0).toUpperCase() + tags[0].slice(1)
+  return tags[0] ? tags[0].charAt(0).toUpperCase() + tags[0].slice(1) : "Event"
 }
 
 function deduplicateEvents(events: EventDetailProps[]): EventDetailProps[] {

@@ -1,16 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { searchEvents, getEventDetails } from "@/lib/api/events-api"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 export function RapidApiTest() {
-  const [events, setEvents] = useState<EventDetailProps[]>([])
+  const [events, setEvents] = useState<EventDetail[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [eventDetail, setEventDetail] = useState<EventDetailProps | null>(null)
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null)
 
   const fetchEvents = async () => {
     setLoading(true)
@@ -63,11 +64,13 @@ export function RapidApiTest() {
                 <div className="grid gap-4 md:grid-cols-2">
                   {events.map((event) => (
                     <Card key={event.id} className="overflow-hidden">
-                      <div className="h-48 overflow-hidden">
-                        <img
+                      <div className="h-48 overflow-hidden relative">
+                        <Image
                           src={event.image || "/placeholder.svg"}
                           alt={event.title}
-                          className="w-full h-full object-cover"
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="(max-width: 768px) 100vw, 50vw"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement
                             target.src = "/community-event.png"

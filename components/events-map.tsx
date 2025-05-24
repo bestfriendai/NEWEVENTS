@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Search, MapPin, List, MapIcon, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,15 +10,15 @@ import { EventCard } from "@/components/event-card"
 import { EventDetailModal } from "@/components/event-detail-modal"
 import { API_CONFIG } from "@/lib/env"
 import { cn } from "@/lib/utils"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface EventsMapProps {
-  initialEvents?: EventDetailProps[]
+  initialEvents?: EventDetail[]
   className?: string
 }
 
 // Mock events data
-const MOCK_EVENTS: EventDetailProps[] = [
+const MOCK_EVENTS: EventDetail[] = [
   {
     id: 1001,
     title: "Summer Music Festival",
@@ -263,11 +264,11 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
   const mapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [events, setEvents] = useState<EventDetailProps[]>(initialEvents.length > 0 ? initialEvents : MOCK_EVENTS)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>(
+  const [events, setEvents] = useState<EventDetail[]>(initialEvents.length > 0 ? initialEvents : MOCK_EVENTS)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(
     initialEvents.length > 0 ? initialEvents : MOCK_EVENTS,
   )
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [mapView, setMapView] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -526,7 +527,7 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
   }
 
   // View event details
-  const handleViewDetails = (event: EventDetailProps) => {
+  const handleViewDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setShowDetailModal(true)
   }
@@ -631,11 +632,13 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
 
                     <div className="p-4">
                       <div className="flex gap-4">
-                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
+                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <Image
                             src={selectedEvent.image || "/community-event.png"}
                             alt={selectedEvent.title}
-                            className="w-full h-full object-cover"
+                            fill
+                            style={{ objectFit: 'cover' }}
+                            sizes="80px"
                           />
                         </div>
                         <div className="flex-1">

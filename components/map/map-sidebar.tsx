@@ -3,13 +3,13 @@
 import { motion } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Search, MapPin, Heart, Calendar, Clock } from "lucide-react"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface MapSidebarProps {
-  events: EventDetailProps[]
-  selectedEvent: EventDetailProps | null
-  handleEventSelect: (event: EventDetailProps) => void
-  handleViewDetails: (event: EventDetailProps) => void
+  events: EventDetail[]
+  selectedEvent: EventDetail | null
+  handleEventSelect: (event: EventDetail) => void
+  handleViewDetails: (event: EventDetail) => void
   handleToggleFavorite: (id: number) => void
   searchQuery: string
   setSearchQuery: (query: string) => void

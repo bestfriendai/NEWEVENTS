@@ -1,8 +1,10 @@
 "use client"
 
 import { useRef, useEffect } from "react"
+import Image from "next/image"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { logger } from "@/lib/utils/logger"
 
 interface TestimonialCardProps {
   avatar: string
@@ -22,7 +24,11 @@ export function TestimonialCard({ avatar, name, location, quote, index }: Testim
     try {
       gsap.registerPlugin(ScrollTrigger)
     } catch (error) {
-      console.warn("Failed to register ScrollTrigger:", error)
+      logger.warn("Failed to register ScrollTrigger", {
+        component: "TestimonialCard",
+        action: "scroll_trigger_register_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
       return
     }
 
@@ -50,14 +56,22 @@ export function TestimonialCard({ avatar, name, location, quote, index }: Testim
         },
       )
     } catch (error) {
-      console.warn("Error creating GSAP animation:", error)
+      logger.warn("Error creating GSAP animation", {
+        component: "TestimonialCard",
+        action: "gsap_animation_error",
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
 
     return () => {
       try {
         ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
       } catch (error) {
-        console.warn("Error cleaning up ScrollTrigger:", error)
+        logger.warn("Error cleaning up ScrollTrigger", {
+          component: "TestimonialCard",
+          action: "scroll_trigger_cleanup_error",
+          error: error instanceof Error ? error.message : String(error)
+        })
       }
     }
   }, [index])
@@ -68,7 +82,7 @@ export function TestimonialCard({ avatar, name, location, quote, index }: Testim
       className="bg-[#1A1D25]/80 backdrop-blur-md rounded-xl p-6 border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:shadow-glow-sm"
     >
       <div className="flex items-center mb-4">
-        <img src={avatar || "/placeholder.svg"} alt={name} className="w-12 h-12 rounded-full mr-4" />
+        <Image src={avatar || "/placeholder.svg"} alt={name} width={48} height={48} className="rounded-full mr-4" />
         <div>
           <h4 className="text-white font-medium">{name}</h4>
           <p className="text-gray-400 text-sm">{location}</p>

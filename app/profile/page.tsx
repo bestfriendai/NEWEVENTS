@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
+import Image from "next/image"
 import {
   User,
   Settings,
@@ -27,7 +28,8 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { AppLayout } from "@/components/app-layout"
 import { EventCard } from "@/components/event-card"
-import { EventDetailModal, type EventDetailProps } from "@/components/event-detail-modal"
+import { EventDetailModal } from "@/components/event-detail-modal";
+import type { EventDetail } from "@/types/event.types";
 
 // Sample user data
 const userData = {
@@ -54,7 +56,7 @@ const userData = {
 }
 
 // Sample events data (reusing from other pages)
-const sampleEvents: EventDetailProps[] = [
+const sampleEvents: EventDetail[] = [
   {
     id: 1,
     title: "Neon Nights Music Festival",
@@ -116,7 +118,7 @@ const sampleEvents: EventDetailProps[] = [
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [events, setEvents] = useState(sampleEvents)
 
@@ -128,7 +130,7 @@ export default function ProfilePage() {
     return () => clearTimeout(timer)
   }, [])
 
-  const handleViewEventDetails = (event: EventDetailProps) => {
+  const handleViewEventDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
   }
@@ -156,7 +158,14 @@ export default function ProfilePage() {
         >
           {/* Cover Photo */}
           <div className="h-64 rounded-xl overflow-hidden relative">
-            <img src={userData.coverPhoto || "/placeholder.svg"} alt="Cover" className="w-full h-full object-cover" />
+            <Image
+              src={userData.coverPhoto || "/placeholder.svg"}
+              alt="Cover"
+              fill
+              style={{ objectFit: 'cover' }}
+              sizes="100vw"
+              priority
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B10] to-transparent"></div>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="absolute top-4 right-4">
               <Button

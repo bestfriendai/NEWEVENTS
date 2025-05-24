@@ -2,8 +2,9 @@
  * Enhanced API client with retry logic, error handling, and logging
  */
 
-import { withRetry, formatErrorMessage, isNetworkError } from '@/lib/utils'
-import { logger, logApiCall, logApiResponse, logError } from '@/lib/utils/logger'
+import { withRetry, isNetworkError } from '@/lib/utils'
+import { logApiCall, logApiResponse, logError } from '@/lib/utils/logger'
+import type { ApiResponse } from '../../types/api.types' // Use 'type' import for interfaces
 
 export interface ApiClientConfig {
   baseUrl?: string
@@ -13,12 +14,7 @@ export interface ApiClientConfig {
   headers?: Record<string, string>
 }
 
-export interface ApiResponse<T = any> {
-  data: T
-  status: number
-  statusText: string
-  headers: Headers
-}
+// Removed local ApiResponse definition, will use the one from types/api.types.ts
 
 export interface ApiError extends Error {
   status?: number
@@ -44,6 +40,29 @@ class ApiClient {
     }
   }
 
+  private sanitizeHeaderString(str: string): string {
+    // Remove any characters that are not a-z, A-Z, 0-9, or typical header separators like -_.
+    // Specifically, remove newline characters \r and \n to prevent header injection.
+    return str.replace(/[^\w\s._~-]/g, '').replace(/[\r\n]+/g, '');
+  }
+
+  private sanitizeHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+    if (!headers) {
+      return {};
+    }
+    const sanitized: Record<string, string> = {};
+    for (const key in headers) {
+      if (Object.prototype.hasOwnProperty.call(headers, key)) {
+        const sanitizedKey = this.sanitizeHeaderString(key);
+        const sanitizedValue = this.sanitizeHeaderString(headers[key]);
+        if (sanitizedKey && sanitizedValue) { // Only add if both key and value are non-empty after sanitization
+          sanitized[sanitizedKey] = sanitizedValue;
+        }
+      }
+    }
+    return sanitized;
+  }
+ 
   private createUrl(endpoint: string): string {
     if (endpoint.startsWith('http')) {
       return endpoint
@@ -65,16 +84,17 @@ class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout)
 
     try {
+      const sanitizedOptionHeaders = this.sanitizeHeaders(options.headers as Record<string, string> | undefined);
       const response = await fetch(url, {
         method,
         headers: {
           ...this.config.headers,
-          ...options.headers,
+          ...sanitizedOptionHeaders,
         },
         signal: controller.signal,
         ...options,
       })
-
+ 
       clearTimeout(timeoutId)
       const duration = performance.now() - startTime
 
@@ -94,8 +114,6 @@ class ApiClient {
       }
     } catch (error) {
       clearTimeout(timeoutId)
-      const duration = performance.now() - startTime
-
       if (error instanceof Error && error.name === 'AbortError') {
         const timeoutError = new Error(`Request timeout after ${this.config.timeout}ms`) as ApiError
         timeoutError.isNetworkError = true
@@ -117,28 +135,73 @@ class ApiClient {
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
-    const contentType = response.headers.get('content-type')
-    
-    if (contentType?.includes('application/json')) {
-      return await response.json()
+    const contentType = response.headers.get('content-type')?.toLowerCase();
+    const url = response.url;
+
+    // 1. Attempt to parse as JSON
+    try {
+      // Clone the response because its body can only be consumed once.
+      // This allows us to attempt text parsing if JSON parsing fails.
+      const clonedResponseForJson = response.clone();
+      const jsonData = await clonedResponseForJson.json();
+      return jsonData;
+    } catch (jsonError) {
+      logError(
+        `JSON parsing failed for ${url}. Status: ${response.status}, Content-Type: ${contentType}. Error: ${(jsonError as Error).message}`,
+        jsonError,
+        { component: 'ApiClient', responseStatus: response.status, contentType }
+      );
+
+      // 2. If JSON parsing fails, attempt to parse as text
+      try {
+        // Use the original response for text parsing. Its body is still available
+        // because .json() was called on a clone.
+        const textData = await response.text();
+        
+        // If original Content-Type was JSON, this textData is a fallback (e.g., an error message).
+        return textData as unknown as T;
+      } catch (textError) {
+        logError(
+          `Text parsing failed for ${url} after JSON attempt. Status: ${response.status}, Content-Type: ${contentType}. Error: ${(textError as Error).message}`,
+          textError,
+          { component: 'ApiClient', responseStatus: response.status, contentType }
+        );
+        
+        // 3. If both JSON and text parsing fail
+        const message = `Failed to parse response from ${url}. Status: ${response.status}, Content-Type: '${contentType}'. ` +
+                        `JSON parse error: ${(jsonError as Error).message}. Text parse error: ${(textError as Error).message}.`;
+        
+        const parsingError = new Error(message) as ApiError;
+        parsingError.status = response.status;
+        parsingError.statusText = response.statusText;
+        parsingError.response = response; // Original response, body likely consumed or in error state
+        parsingError.isNetworkError = false; // This is a parsing error
+        parsingError.isRetryable = this.isRetryableStatus(response.status); // Or consider false if parsing errors for 2xx are not typically retryable
+        throw parsingError;
+      }
     }
-    
-    if (contentType?.includes('text/')) {
-      return (await response.text()) as unknown as T
-    }
-    
-    return (await response.blob()) as unknown as T
   }
 
   private async createApiError(response: Response, method: string, url: string): Promise<ApiError> {
     let message = `${method} ${url} failed with status ${response.status}`
     
     try {
-      const errorData = await response.json()
-      if (errorData.message) {
-        message = errorData.message
-      } else if (errorData.error) {
-        message = errorData.error
+      const errorData: unknown = await response.json()
+      if (
+        typeof errorData === 'object' &&
+        errorData !== null
+      ) {
+        if (
+          'message' in errorData &&
+          typeof (errorData as { message: unknown }).message === 'string'
+        ) {
+          message = (errorData as { message: string }).message
+        } else if (
+          'error' in errorData &&
+          typeof (errorData as { error: unknown }).error === 'string'
+        ) {
+          message = (errorData as { error: string }).error
+        }
       }
     } catch {
       // If we can't parse the error response, use the default message
@@ -174,58 +237,63 @@ class ApiClient {
   // Public methods
   async get<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     return withRetry(
-      () => this.makeRequest<T>('GET', endpoint, options),
+      this,
+      function() { return this.makeRequest<T>('GET', endpoint, options); },
       {
         maxAttempts: this.config.retryAttempts,
         baseDelay: this.config.retryDelay,
       }
-    )
+    );
   }
 
-  async post<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const body = data ? JSON.stringify(data) : undefined
+  async post<T>(endpoint: string, data?: unknown, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const body = data ? JSON.stringify(data) : null
     
     return withRetry(
-      () => this.makeRequest<T>('POST', endpoint, { ...options, body }),
+      this,
+      function() { return this.makeRequest<T>('POST', endpoint, { ...options, body }); },
       {
         maxAttempts: this.config.retryAttempts,
         baseDelay: this.config.retryDelay,
       }
-    )
+    );
   }
 
-  async put<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const body = data ? JSON.stringify(data) : undefined
+  async put<T>(endpoint: string, data?: unknown, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const body = data ? JSON.stringify(data) : null
     
     return withRetry(
-      () => this.makeRequest<T>('PUT', endpoint, { ...options, body }),
+      this,
+      function() { return this.makeRequest<T>('PUT', endpoint, { ...options, body }); },
       {
         maxAttempts: this.config.retryAttempts,
         baseDelay: this.config.retryDelay,
       }
-    )
+    );
   }
 
-  async patch<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const body = data ? JSON.stringify(data) : undefined
+  async patch<T>(endpoint: string, data?: unknown, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const body = data ? JSON.stringify(data) : null
     
     return withRetry(
-      () => this.makeRequest<T>('PATCH', endpoint, { ...options, body }),
+      this,
+      function() { return this.makeRequest<T>('PATCH', endpoint, { ...options, body }); },
       {
         maxAttempts: this.config.retryAttempts,
         baseDelay: this.config.retryDelay,
       }
-    )
+    );
   }
 
   async delete<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     return withRetry(
-      () => this.makeRequest<T>('DELETE', endpoint, options),
+      this,
+      function() { return this.makeRequest<T>('DELETE', endpoint, options); },
       {
         maxAttempts: this.config.retryAttempts,
         baseDelay: this.config.retryDelay,
       }
-    )
+    );
   }
 
   // Create a new client with different configuration

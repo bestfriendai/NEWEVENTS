@@ -1,5 +1,7 @@
 import { Suspense } from "react"
 import { EventsClient } from "./events-client"
+import { LocationProvider } from "@/contexts/LocationContext"
+import { FavoritesProvider } from "@/contexts/FavoritesContext"
 
 export default function EventsPage() {
   return (
@@ -14,7 +16,11 @@ export default function EventsPage() {
           </div>
         }
       >
-        <EventsClient />
+        <LocationProvider>
+          <FavoritesProvider>
+            <EventsClient />
+          </FavoritesProvider>
+        </LocationProvider>
       </Suspense>
     </div>
   )

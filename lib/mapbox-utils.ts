@@ -1,6 +1,6 @@
 "use client"
 
-import { MAPBOX_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 
 // Track if Mapbox has been loaded
 let mapboxLoaded = false
@@ -20,15 +20,15 @@ export function loadMapbox(): Promise<any> {
   }
 
   // Return mapbox if already loaded
-  if (mapboxLoaded && (window as any).mapboxgl) {
-    return Promise.resolve((window as any).mapboxgl)
+  if (mapboxLoaded && window.mapboxgl) {
+    return Promise.resolve(window.mapboxgl)
   }
 
   mapboxLoadPromise = new Promise((resolve, reject) => {
     // Check if already loaded
-    if ((window as any).mapboxgl) {
+    if (window.mapboxgl) {
       mapboxLoaded = true
-      resolve((window as any).mapboxgl)
+      resolve(window.mapboxgl)
       return
     }
 
@@ -47,8 +47,8 @@ export function loadMapbox(): Promise<any> {
       if ((window as any).mapboxgl) {
         mapboxLoaded = true
         // Set the access token
-        if (MAPBOX_API_KEY) {
-          (window as any).mapboxgl.accessToken = MAPBOX_API_KEY
+        if (env.MAPBOX_API_KEY) {
+          (window as any).mapboxgl.accessToken = env.MAPBOX_API_KEY
         }
         resolve((window as any).mapboxgl)
       } else {
@@ -70,7 +70,7 @@ export function loadMapbox(): Promise<any> {
  * Check if Mapbox is available
  */
 export function isMapboxAvailable(): boolean {
-  return typeof window !== "undefined" && mapboxLoaded && !!(window as any).mapboxgl
+  return typeof window !== "undefined" && mapboxLoaded && !!window.mapboxgl
 }
 
 /**
@@ -80,7 +80,7 @@ export function getMapbox(): any | null {
   if (typeof window === "undefined" || !mapboxLoaded) {
     return null
   }
-  return (window as any).mapboxgl || null
+  return window.mapboxgl || null
 }
 
 /**

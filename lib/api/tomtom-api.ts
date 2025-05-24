@@ -1,4 +1,4 @@
-import { TOMTOM_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 
 export interface TomTomSearchResult {
   id: string
@@ -27,7 +27,7 @@ export interface TomTomSearchResult {
 export async function geocodeWithTomTom(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const queryParams = new URLSearchParams()
-    queryParams.append("key", TOMTOM_API_KEY || "")
+    queryParams.append("key", env.TOMTOM_API_KEY || "")
     queryParams.append("query", address)
     queryParams.append("limit", "1")
 
@@ -51,7 +51,7 @@ export async function geocodeWithTomTom(address: string): Promise<{ lat: number;
     }
 
     return null
-  } catch (error) {
+  } catch (_error) {
     // console.error("TomTom geocoding error:", error)
     return null
   }
@@ -60,7 +60,7 @@ export async function geocodeWithTomTom(address: string): Promise<{ lat: number;
 export async function reverseGeocodeWithTomTom(lat: number, lng: number): Promise<string | null> {
   try {
     const queryParams = new URLSearchParams()
-    queryParams.append("key", TOMTOM_API_KEY || "")
+    queryParams.append("key", env.TOMTOM_API_KEY || "")
 
     const response = await fetch(
       `https://api.tomtom.com/search/2/reverseGeocode/${lat},${lng}.json?${queryParams.toString()}`,
@@ -78,7 +78,7 @@ export async function reverseGeocodeWithTomTom(lat: number, lng: number): Promis
     }
 
     return null
-  } catch (error) {
+  } catch (_error) {
     // console.error("TomTom reverse geocoding error:", error)
     return null
   }
@@ -90,7 +90,7 @@ export async function searchPlacesWithTomTom(
 ): Promise<TomTomSearchResult[]> {
   try {
     const queryParams = new URLSearchParams()
-    queryParams.append("key", TOMTOM_API_KEY || "")
+    queryParams.append("key", env.TOMTOM_API_KEY || "")
     queryParams.append("query", query)
     queryParams.append("limit", "10")
 
@@ -111,7 +111,7 @@ export async function searchPlacesWithTomTom(
 
     const data = await response.json()
     return data.results || []
-  } catch (error) {
+  } catch (_error) {
     // console.error("TomTom search error:", error)
     return []
   }

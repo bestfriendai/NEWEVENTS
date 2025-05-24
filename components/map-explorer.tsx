@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Search, MapPin, X, Loader2, Filter, ChevronLeft, ChevronRight, Calendar, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,10 +13,10 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { API_CONFIG } from "@/lib/env"
 import { cn } from "@/lib/utils"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 // Mock events data
-const MOCK_EVENTS: EventDetailProps[] = [
+const MOCK_EVENTS: EventDetail[] = [
   {
     id: 1001,
     title: "Summer Music Festival",
@@ -261,9 +262,9 @@ export function MapExplorer() {
   const mapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [events, setEvents] = useState<EventDetailProps[]>(MOCK_EVENTS)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>(MOCK_EVENTS)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [events, setEvents] = useState<EventDetail[]>(MOCK_EVENTS)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(MOCK_EVENTS)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -523,13 +524,13 @@ export function MapExplorer() {
   }
 
   // View event details
-  const handleViewDetails = (event: EventDetailProps) => {
+  const handleViewDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setShowDetailModal(true)
   }
 
   // Handle event selection
-  const handleEventSelect = (event: EventDetailProps) => {
+  const handleEventSelect = (event: EventDetail) => {
     setSelectedEvent(event)
 
     // Fly to the event location
@@ -584,11 +585,13 @@ export function MapExplorer() {
 
                 <div className="p-4">
                   <div className="flex gap-4">
-                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                      <img
+                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                      <Image
                         src={selectedEvent.image || "/community-event.png"}
                         alt={selectedEvent.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        sizes="80px"
                       />
                     </div>
                     <div className="flex-1">
@@ -807,7 +810,7 @@ export function MapExplorer() {
 
 // Event list item component
 interface EventListItemProps {
-  event: EventDetailProps
+  event: EventDetail
   isSelected: boolean
   onSelect: () => void
   onViewDetails: () => void
@@ -828,8 +831,8 @@ function EventListItem({ event, isSelected, onSelect, onViewDetails, onToggleFav
     >
       <div className="p-3">
         <div className="flex gap-3">
-          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-            <img src={event.image || "/community-event.png"} alt={event.title} className="w-full h-full object-cover" />
+          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 relative">
+            <Image src={event.image || "/community-event.png"} alt={event.title} fill style={{ objectFit: 'cover' }} sizes="64px" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">

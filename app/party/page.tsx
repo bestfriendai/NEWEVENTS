@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { EventDetailModal, type EventDetailProps } from "@/components/event-detail-modal"
+import { EventDetailModal } from "@/components/event-detail-modal";
+import type { EventDetail } from "@/types/event.types";
 import { PartyHeader } from "@/components/party/party-header"
 import { PartyHero } from "@/components/party/party-hero"
 import { CategoryTabs } from "@/components/party/category-tabs"
@@ -13,7 +14,7 @@ import { PartyFooter } from "@/components/party/party-footer"
 import { EventCard } from "@/components/event-card"
 
 // Sample party events data
-const partyEvents: EventDetailProps[] = [
+const partyEvents: EventDetail[] = [
   {
     id: 101,
     title: "Neon Nights: Electronic Music Festival",
@@ -166,8 +167,8 @@ export default function PartyPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
   const [events, setEvents] = useState(partyEvents)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isFiltering, setIsFiltering] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -195,7 +196,7 @@ export default function PartyPage() {
     }
   }, [activeTab, events])
 
-  const handleViewEventDetails = (event: EventDetailProps) => {
+  const handleViewEventDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
   }

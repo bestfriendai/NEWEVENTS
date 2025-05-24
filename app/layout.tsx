@@ -4,9 +4,6 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ErrorBoundary } from "@/components/ui/error-boundary"
-import { LocationProvider } from "@/contexts/LocationContext"
-import { FavoritesProvider } from "@/contexts/FavoritesContext"
-
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
@@ -25,41 +22,9 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-            <LocationProvider>
-              <FavoritesProvider>
-                {children}
-              </FavoritesProvider>
-            </LocationProvider>
+            {children}
           </ThemeProvider>
         </ErrorBoundary>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Suppress clipboard errors and other non-critical errors
-              const originalConsoleError = console.error;
-              console.error = function(...args) {
-                const message = typeof args[0] === 'string' ? args[0] : '';
-                if (message.includes('Copy to clipboard is not supported') ||
-                    message.includes('clipboard') ||
-                    message.includes('ResizeObserver loop limit exceeded')) {
-                  return; // Suppress these errors
-                }
-                originalConsoleError.apply(console, args);
-              };
-
-              // Suppress hydration warnings for known issues
-              const originalConsoleWarn = console.warn;
-              console.warn = function(...args) {
-                const message = typeof args[0] === 'string' ? args[0] : '';
-                if (message.includes('Hydration failed') &&
-                    (message.includes('Math.random') || message.includes('Date.now'))) {
-                  return; // Suppress hydration warnings for random values
-                }
-                originalConsoleWarn.apply(console, args);
-              };
-            `
-          }}
-        />
       </body>
     </html>
   )

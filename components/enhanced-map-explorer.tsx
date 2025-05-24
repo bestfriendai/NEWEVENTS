@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MapPin,
@@ -15,11 +16,13 @@ import { Button } from "@/components/ui/button"
 import { EventDetailModal } from "@/components/event-detail-modal"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MAPBOX_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 import { cn } from "@/lib/utils"
+import { logger } from "@/lib/utils/logger"
 import { fetchEvents } from "@/app/actions/event-actions"
 import { reverseGeocode } from "@/lib/api/map-api"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
+import type { MapboxMap, MapboxMarker, MapboxPopup, MapboxGeoJSONSource, MapboxEvent } from "@/types"
 import { SimpleMapFallback } from "@/components/simple-map-fallback"
 
 // Categories for filtering (removed unused constant)
@@ -34,7 +37,7 @@ const DEFAULT_LOCATIONS = [
 ]
 
 interface EnhancedMapExplorerProps {
-  events?: EventDetailProps[]
+  events?: EventDetail[]
   initialLocation?: { lat: number; lng: number }
   initialLocationName?: string
 }
@@ -45,19 +48,19 @@ export function EnhancedMapExplorer({
   initialLocationName,
 }: EnhancedMapExplorerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
+  const mapRef = useRef<MapboxMap | null>(null)
   const clusterLayerRef = useRef<string | null>(null)
-  const geoJsonSourceRef = useRef<any>(null)
-  const userMarkerRef = useRef<any>(null)
-  const popupRef = useRef<any>(null)
+  const geoJsonSourceRef = useRef<MapboxGeoJSONSource | null>(null)
+  const userMarkerRef = useRef<MapboxMarker | null>(null)
+  const popupRef = useRef<MapboxPopup | null>(null)
   const mapInitializedRef = useRef<boolean>(false)
   const styleLoadedRef = useRef<boolean>(false)
   const eventsLoadedRef = useRef<boolean>(false)
 
   const [isLoading, setIsLoading] = useState(true)
-  const [events, setEvents] = useState<EventDetailProps[]>(initialEvents)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>(initialEvents)
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [events, setEvents] = useState<EventDetail[]>(initialEvents)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(initialEvents)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [mapboxLoaded, setMapboxLoaded] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
@@ -112,7 +115,10 @@ export function EnhancedMapExplorer({
     }
 
     script.onerror = () => {
-      console.error("Failed to load Mapbox GL JS")
+      logger.error("Failed to load Mapbox GL JS", {
+        component: "EnhancedMapExplorer",
+        action: "mapbox_script_load_error"
+      })
       setMapError("Failed to load map library. Please try again later.")
       setIsLoading(false)
     }
@@ -151,16 +157,23 @@ export function EnhancedMapExplorer({
     try {
       const mapboxgl = (window as any).mapboxgl
       if (!mapboxgl) {
-        console.error("Mapbox GL JS not loaded")
+        logger.error("Mapbox GL JS not loaded", {
+          component: "EnhancedMapExplorer",
+          action: "mapbox_not_loaded"
+        })
         setMapError("Mapbox GL JS failed to load. Please refresh the page.")
         setIsLoading(false)
         return
       }
 
       // Set the access token directly
-      mapboxgl.accessToken = MAPBOX_API_KEY
+      mapboxgl.accessToken = env.MAPBOX_API_KEY
+logger.info("Initializing map", {
+  component: "EnhancedMapExplorer",
+  action: "map_init_start",
+  metadata: { hasToken: !!env.MAPBOX_API_KEY }
+})
 
-      console.log("Initializing map with token:", MAPBOX_API_KEY)
 
       // Initialize map
       mapRef.current = new mapboxgl.Map({
@@ -171,7 +184,7 @@ export function EnhancedMapExplorer({
         pitch: 45,
         bearing: 0,
         antialias: true,
-      })
+      }) as MapboxMap
 
       // Mark map as initialized
       mapInitializedRef.current = true
@@ -192,8 +205,12 @@ export function EnhancedMapExplorer({
       mapRef.current.addControl(geolocateControl, "top-right")
 
       // Handle map load error - specifically handle 401 errors
-      mapRef.current.on("error", (e: any) => {
-        console.error("Map error:", e)
+      mapRef.current.on("error", (e: { error?: { status?: number } }) => {
+        logger.error("Map error occurred", {
+          component: "EnhancedMapExplorer",
+          action: "map_error",
+          metadata: { status: e.error?.status }
+        })
         if (e.error && e.error.status === 401) {
           setMapError("Invalid Mapbox API key. Please check your configuration or contact support.")
         } else {
@@ -203,13 +220,20 @@ export function EnhancedMapExplorer({
       })
 
       // Handle style load errors
-      mapRef.current.on("styleimagemissing", (e: any) => {
-        console.warn("Style image missing:", e.id)
+      mapRef.current.on("styleimagemissing", (e: { id: string }) => {
+        logger.warn("Style image missing", {
+          component: "EnhancedMapExplorer",
+          action: "style_image_missing",
+          metadata: { imageId: e.id }
+        })
       })
 
       // Add event markers when map loads
       mapRef.current.on("load", () => {
-        console.log("Map loaded successfully")
+        logger.info("Map loaded successfully", {
+          component: "EnhancedMapExplorer",
+          action: "map_load_success"
+        })
         styleLoadedRef.current = true
         setIsLoading(false)
 
@@ -238,7 +262,10 @@ export function EnhancedMapExplorer({
 
       // Handle style load event
       mapRef.current.on("style.load", () => {
-        console.log("Style loaded")
+        logger.info("Style loaded", {
+          component: "EnhancedMapExplorer",
+          action: "style_load_success"
+        })
         styleLoadedRef.current = true
 
         // Re-initialize map layers when style changes
@@ -250,7 +277,10 @@ export function EnhancedMapExplorer({
         }
       })
     } catch (err) {
-      console.error("Error initializing map:", err)
+      logger.error("Error initializing map", {
+        component: "EnhancedMapExplorer",
+        action: "map_init_error"
+      }, err instanceof Error ? err : new Error(String(err)))
       const error = err as Error
       if (error.message && error.message.includes("401")) {
         setMapError("Invalid Mapbox API key. Please check your configuration.")
@@ -281,12 +311,18 @@ export function EnhancedMapExplorer({
   // Initialize map layers and sources
   const initializeMapLayers = useCallback(() => {
     if (!mapRef.current || !styleLoadedRef.current) {
-      console.log("Map or style not loaded yet, skipping layer initialization")
+      logger.debug("Map or style not loaded yet, skipping layer initialization", {
+        component: "EnhancedMapExplorer",
+        action: "layer_init_skip"
+      })
       return
     }
+try {
+  logger.info("Initializing map layers", {
+    component: "EnhancedMapExplorer",
+    action: "layer_init_start"
+  })
 
-    try {
-      console.log("Initializing map layers")
 
       // Add terrain if enabled
       if (showTerrain) {
@@ -441,29 +477,29 @@ export function EnhancedMapExplorer({
       })
 
       // Add click event for clusters
-      mapRef.current.on("click", "clusters", (e: any) => {
-        const features = mapRef.current.queryRenderedFeatures(e.point, {
+      mapRef.current.on("click", "clusters", (e: MapboxEvent) => {
+        const features = mapRef.current!.queryRenderedFeatures(e.point, {
           layers: ["clusters"],
         })
         const clusterId = features[0].properties.cluster_id
-        geoJsonSourceRef.current.getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
+        geoJsonSourceRef.current!.getClusterExpansionZoom(clusterId, (err: Error | null, zoom: number) => {
           if (err) return
 
-          mapRef.current.easeTo({
-            center: features[0].geometry.coordinates,
+          mapRef.current!.flyTo({
+            center: features[0].geometry.coordinates as [number, number],
             zoom: zoom,
           })
         })
       })
 
       // Add click event for unclustered points
-      mapRef.current.on("click", "unclustered-point", (e: any) => {
-        const coordinates = e.features[0].geometry.coordinates.slice()
+      mapRef.current.on("click", "unclustered-point", (e: MapboxEvent) => {
+        const coordinates = e.features[0].geometry.coordinates.slice() as [number, number]
         const properties = e.features[0].properties
         const eventId = properties.id
 
         // Find the event in our state
-        const event = events.find((e) => e.id === Number(eventId))
+        const event = events.find((event) => event.id === Number(eventId))
         if (event) {
           setSelectedEvent(event)
         }
@@ -486,7 +522,9 @@ export function EnhancedMapExplorer({
           className: "event-popup",
           maxWidth: "300px",
           offset: 15,
-        })
+        }) as MapboxPopup
+        
+        popupRef.current
           .setLngLat(coordinates)
           .setHTML(
             `
@@ -497,7 +535,7 @@ export function EnhancedMapExplorer({
             </div>
           `,
           )
-          .addTo(mapRef.current)
+          .addTo(mapRef.current!)
       })
 
       // Change cursor on hover
@@ -517,9 +555,15 @@ export function EnhancedMapExplorer({
       // Update GeoJSON data
       updateGeoJsonSource()
 
-      console.log("Map layers initialized successfully")
+      logger.info("Map layers initialized successfully", {
+        component: "EnhancedMapExplorer",
+        action: "layer_init_success"
+      })
     } catch (error) {
-      console.error("Error initializing map layers:", error)
+      logger.error("Error initializing map layers", {
+        component: "EnhancedMapExplorer",
+        action: "layer_init_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setMapError("Error setting up map features. Please refresh the page.")
     }
   }, [events, showClusters, showTerrain, show3DBuildings])
@@ -536,7 +580,10 @@ export function EnhancedMapExplorer({
 
       // Check if the source layer exists
       if (!mapRef.current.getSource("composite")) {
-        console.log("Composite source not available, skipping 3D buildings")
+        logger.debug("Composite source not available, skipping 3D buildings", {
+          component: "EnhancedMapExplorer",
+          action: "3d_buildings_skip"
+        })
         return
       }
 
@@ -559,7 +606,10 @@ export function EnhancedMapExplorer({
         "waterway-label",
       )
     } catch (error) {
-      console.error("Error adding 3D buildings:", error)
+      logger.error("Error adding 3D buildings", {
+        component: "EnhancedMapExplorer",
+        action: "3d_buildings_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -572,7 +622,10 @@ export function EnhancedMapExplorer({
         mapRef.current.removeLayer("3d-buildings")
       }
     } catch (error) {
-      console.error("Error removing 3D buildings:", error)
+      logger.error("Error removing 3D buildings", {
+        component: "EnhancedMapExplorer",
+        action: "3d_buildings_remove_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -608,7 +661,10 @@ export function EnhancedMapExplorer({
         },
       })
     } catch (error) {
-      console.error("Error adding terrain:", error)
+      logger.error("Error adding terrain", {
+        component: "EnhancedMapExplorer",
+        action: "terrain_add_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -630,7 +686,10 @@ export function EnhancedMapExplorer({
         mapRef.current.removeSource("mapbox-dem")
       }
     } catch (error) {
-      console.error("Error removing terrain:", error)
+      logger.error("Error removing terrain", {
+        component: "EnhancedMapExplorer",
+        action: "terrain_remove_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -663,7 +722,10 @@ export function EnhancedMapExplorer({
 
       clusterLayerRef.current = "clusters"
     } catch (error) {
-      console.error("Error adding cluster layers:", error)
+      logger.error("Error adding cluster layers", {
+        component: "EnhancedMapExplorer",
+        action: "cluster_layers_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [])
 
@@ -675,7 +737,10 @@ export function EnhancedMapExplorer({
       mapRef.current.setStyle(`mapbox://styles/mapbox/${mapStyle}`)
       styleLoadedRef.current = false // Reset style loaded flag
     } catch (error) {
-      console.error("Error updating map style:", error)
+      logger.error("Error updating map style", {
+        component: "EnhancedMapExplorer",
+        action: "style_update_error"
+      }, error instanceof Error ? error : new Error(String(error)))
       setMapError("Error updating map style. Please refresh the page.")
     }
   }, [mapStyle, mapboxLoaded])
@@ -691,7 +756,10 @@ export function EnhancedMapExplorer({
         remove3DBuildingsFromMap()
       }
     } catch (error) {
-      console.error("Error toggling 3D buildings:", error)
+      logger.error("Error toggling 3D buildings", {
+        component: "EnhancedMapExplorer",
+        action: "3d_buildings_toggle_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [show3DBuildings, mapboxLoaded, add3DBuildingsToMap, remove3DBuildingsFromMap])
 
@@ -706,7 +774,10 @@ export function EnhancedMapExplorer({
         removeTerrainFromMap()
       }
     } catch (error) {
-      console.error("Error toggling terrain:", error)
+      logger.error("Error toggling terrain", {
+        component: "EnhancedMapExplorer",
+        action: "terrain_toggle_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [showTerrain, mapboxLoaded, addTerrainToMap, removeTerrainFromMap])
 
@@ -721,16 +792,23 @@ export function EnhancedMapExplorer({
       // Force refresh by updating the data
       updateGeoJsonSource()
     } catch (error) {
-      console.error("Error toggling clustering:", error)
+      logger.error("Error toggling clustering", {
+        component: "EnhancedMapExplorer",
+        action: "clustering_toggle_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [showClusters, mapboxLoaded])
 
   // Update GeoJSON source with events data
   const updateGeoJsonSource = useCallback(() => {
     if (!mapRef.current || !geoJsonSourceRef.current || !styleLoadedRef.current) return
+try {
+  logger.info("Updating GeoJSON source", {
+    component: "EnhancedMapExplorer",
+    action: "geojson_update_start",
+    metadata: { eventCount: filteredEvents.length }
+  })
 
-    try {
-      console.log("Updating GeoJSON source with", filteredEvents.length, "events")
 
       // Convert events to GeoJSON features
       const features = filteredEvents
@@ -758,8 +836,12 @@ export function EnhancedMapExplorer({
           }
         })
         .filter(Boolean)
+logger.info("Generated GeoJSON features", {
+  component: "EnhancedMapExplorer",
+  action: "geojson_features_generated",
+  metadata: { featureCount: features.length }
+})
 
-      console.log("Generated", features.length, "GeoJSON features")
 
       // Update GeoJSON source
       geoJsonSourceRef.current.setData({
@@ -767,7 +849,10 @@ export function EnhancedMapExplorer({
         features,
       })
     } catch (error) {
-      console.error("Error updating GeoJSON source:", error)
+      logger.error("Error updating GeoJSON source", {
+        component: "EnhancedMapExplorer",
+        action: "geojson_update_error"
+      }, error instanceof Error ? error : new Error(String(error)))
     }
   }, [filteredEvents])
 
@@ -794,7 +879,10 @@ export function EnhancedMapExplorer({
             const locationName = await reverseGeocode(latitude, longitude)
             setDefaultLocation({ name: locationName, lat: latitude, lng: longitude })
           } catch (error) {
-            console.error("Error getting location name:", error)
+            logger.error("Error getting location name", {
+              component: "EnhancedMapExplorer",
+              action: "location_name_error"
+            }, error instanceof Error ? error : new Error(String(error)))
             setDefaultLocation({ name: "Your Location", lat: latitude, lng: longitude })
           }
 
@@ -837,9 +925,8 @@ export function EnhancedMapExplorer({
             userMarkerRef.current = new (window as any).mapboxgl.Marker({
               element: el,
               anchor: "center",
-            })
-              .setLngLat([longitude, latitude])
-              .addTo(mapRef.current)
+            }) as MapboxMarker
+            userMarkerRef.current.setLngLat([longitude, latitude]).addTo(mapRef.current!)
           }
 
           // Load events near user location
@@ -848,7 +935,10 @@ export function EnhancedMapExplorer({
           // Location request completed
         },
         (error) => {
-          console.error("Error getting location:", error)
+          logger.error("Error getting location", {
+            component: "EnhancedMapExplorer",
+            action: "geolocation_error"
+          }, error instanceof Error ? error : new Error(String(error)))
           setMapError(
             error.code === 1
               ? "Location permission denied. Please enable location services to see events near you."
@@ -877,9 +967,13 @@ export function EnhancedMapExplorer({
   // Load events near a location
   const loadEventsNearLocation = useCallback(async (lat: number, lng: number, radius: number) => {
     setIsLoading(true)
+try {
+  logger.info("Loading events near location", {
+    component: "EnhancedMapExplorer",
+    action: "load_events_start",
+    metadata: { lat, lng, radius }
+  })
 
-    try {
-      console.log("Loading events near", lat, lng, "with radius", radius)
 
       // Call the server action to fetch events
       const result = await fetchEvents({
@@ -887,8 +981,12 @@ export function EnhancedMapExplorer({
         radius,
         size: 50,
       })
+logger.info("Events fetched", {
+  component: "EnhancedMapExplorer",
+  action: "events_fetched",
+  metadata: { eventCount: result.events?.length || 0 }
+})
 
-      console.log("Fetched events:", result)
 
       // Add coordinates to events if they don't have them
       const eventsWithCoordinates = result.events.map((event) => {
@@ -905,12 +1003,19 @@ export function EnhancedMapExplorer({
         }
         return event
       })
+logger.info("Events processed with coordinates", {
+  component: "EnhancedMapExplorer",
+  action: "events_processed",
+  metadata: { eventCount: eventsWithCoordinates.length }
+})
 
-      console.log("Events with coordinates:", eventsWithCoordinates)
 
       if (eventsWithCoordinates.length === 0) {
         // If no events were returned, generate mock events
-        console.log("No events returned, generating mock events")
+        logger.info("No events returned, generating mock events", {
+          component: "EnhancedMapExplorer",
+          action: "generate_mock_events"
+        })
         const mockEvents = generateMockEventsAroundLocation(lat, lng, radius, 20)
         setEvents(mockEvents)
         setFilteredEvents(mockEvents)
@@ -919,9 +1024,16 @@ export function EnhancedMapExplorer({
         setFilteredEvents(eventsWithCoordinates)
       }
     } catch (error) {
-      console.error("Error loading events:", error)
+      logger.error("Error loading events", {
+        component: "EnhancedMapExplorer",
+        action: "load_events_error",
+        metadata: { lat, lng, radius }
+      }, error instanceof Error ? error : new Error(String(error)))
       // Generate mock events around the location
-      console.log("Error loading events, generating mock events")
+      logger.info("Error loading events, generating mock events", {
+        component: "EnhancedMapExplorer",
+        action: "fallback_mock_events"
+      })
       const mockEvents = generateMockEventsAroundLocation(lat, lng, radius, 20)
       setEvents(mockEvents)
       setFilteredEvents(mockEvents)
@@ -936,8 +1048,8 @@ export function EnhancedMapExplorer({
     lng: number,
     radius: number,
     count: number,
-  ): EventDetailProps[] => {
-    const events: EventDetailProps[] = []
+  ): EventDetail[] => {
+    const events: EventDetail[] = []
     const categories = ["Music", "Arts", "Sports", "Food", "Business"]
     const locations = [
       "Park",
@@ -1106,7 +1218,7 @@ export function EnhancedMapExplorer({
   }
 
   // View event details
-  const handleViewDetails = (event: EventDetailProps) => {
+  const handleViewDetails = (event: EventDetail) => {
     setSelectedEvent(event)
     setShowDetailModal(true)
   }
@@ -1388,11 +1500,13 @@ export function EnhancedMapExplorer({
 
                 <div className="p-4">
                   <div className="flex gap-4">
-                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                      <img
+                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                      <Image
                         src={selectedEvent.image || "/community-event.png"}
                         alt={selectedEvent.title}
-                        className="w-full h-full object-cover"
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        sizes="80px"
                       />
                     </div>
                     <div className="flex-1">

@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { MAPBOX_API_KEY } from "@/lib/env"
+import { env } from "@/lib/env"
 import { SimpleMapFallback } from "@/components/simple-map-fallback"
 import { MapSkeleton } from "@/components/ui/event-skeleton"
 import { logger } from "@/lib/utils/logger"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface UserLocation {
   lat: number
@@ -15,8 +15,8 @@ interface UserLocation {
 
 interface EventsMapProps {
   userLocation: UserLocation | null
-  events: EventDetailProps[]
-  onEventSelect: (event: EventDetailProps) => void
+  events: EventDetail[]
+  onEventSelect: (event: EventDetail) => void
   className?: string
 }
 
@@ -49,7 +49,7 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
 
           try {
             const mapboxgl = (window as any).mapboxgl
-            mapboxgl.accessToken = MAPBOX_API_KEY
+            mapboxgl.accessToken = env.MAPBOX_API_KEY
 
             mapRef.current = new mapboxgl.Map({
               container: mapContainerRef.current,
