@@ -9,12 +9,12 @@ import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap } from
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { useGSAP } from "@/lib/gsap-utils"
-import { ErrorBoundary } from "@/components/error-boundary"
+import { ErrorBoundary } from "@/components/ui/error-boundary"
 
 export default function Home() {
-  const heroRef = useRef(null)
-  const globeRef = useRef(null)
-  const ctaButtonRef = useRef(null)
+  const heroRef = useRef<HTMLElement>(null)
+  const globeRef = useRef<HTMLDivElement>(null)
+  const ctaButtonRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState("concerts")
   const [isClient, setIsClient] = useState(false)
@@ -502,7 +502,7 @@ export default function Home() {
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                   </div>
-                  <p className="text-gray-300 mb-6">"{testimonial.quote}"</p>
+                  <p className="text-gray-300 mb-6">&quot;{testimonial.quote}&quot;</p>
                   <div className="flex items-center">
                     <img
                       src={testimonial.avatar || "/placeholder.svg"}
@@ -560,7 +560,13 @@ export default function Home() {
 }
 
 // Floating Card Component
-function FloatingCard({ icon, title, subtitle }) {
+interface FloatingCardProps {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+}
+
+function FloatingCard({ icon, title, subtitle }: FloatingCardProps) {
   return (
     <div className="bg-[#12141D]/90 backdrop-blur-md rounded-xl p-3 border border-gray-800 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
       <div className="flex items-center gap-3">
@@ -575,7 +581,15 @@ function FloatingCard({ icon, title, subtitle }) {
 }
 
 // Event Card Component
-function EventCard({ title, date, location, image, category }) {
+interface EventCardProps {
+  title: string
+  date: string
+  location: string
+  image: string
+  category: string
+}
+
+function EventCard({ title, date, location, image, category }: EventCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
       <div className="aspect-[3/2] w-full">

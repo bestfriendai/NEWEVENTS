@@ -38,16 +38,18 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     try {
       // TODO: Implement Supabase integration
       // For now, load from localStorage as fallback
-      const stored = localStorage.getItem('favoriteEvents')
-      if (stored) {
-        const favoriteIds = JSON.parse(stored) as number[]
-        setFavoriteEventIds(new Set(favoriteIds))
-        
-        logger.info("Loaded favorites from localStorage", {
-          component: "FavoritesContext",
-          action: "load_favorites_localStorage",
-          metadata: { count: favoriteIds.length }
-        })
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem('favoriteEvents')
+        if (stored) {
+          const favoriteIds = JSON.parse(stored) as number[]
+          setFavoriteEventIds(new Set(favoriteIds))
+
+          logger.info("Loaded favorites from localStorage", {
+            component: "FavoritesContext",
+            action: "load_favorites_localStorage",
+            metadata: { count: favoriteIds.length }
+          })
+        }
       }
 
       // TODO: Replace with actual Supabase call
@@ -55,18 +57,18 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
       //   .from('favorites')
       //   .select('eventId')
       //   .eq('userId', user.id)
-      // 
+      //
       // if (error) throw error
       // setFavoriteEventIds(new Set(data.map(f => f.eventId)))
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load favorites"
       setError(errorMessage)
-      
-      logger.error("Failed to load favorites", {
+
+      logger.error(`Failed to load favorites: ${errorMessage}`, {
         component: "FavoritesContext",
         action: "load_favorites_error"
-      }, err instanceof Error ? err : new Error(errorMessage))
+      })
     } finally {
       setIsLoading(false)
     }
@@ -74,7 +76,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
 
   const toggleFavorite = async (eventId: number): Promise<void> => {
     const wasAlreadyFavorite = favoriteEventIds.has(eventId)
-    
+
     // Optimistic update
     const newFavorites = new Set(favoriteEventIds)
     if (wasAlreadyFavorite) {
@@ -86,7 +88,9 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Update localStorage immediately
-      localStorage.setItem('favoriteEvents', JSON.stringify(Array.from(newFavorites)))
+      if (typeof window !== "undefined") {
+        localStorage.setItem('favoriteEvents', JSON.stringify(Array.from(newFavorites)))
+      }
 
       // TODO: Implement Supabase backend call
       // if (wasAlreadyFavorite) {
@@ -95,13 +99,13 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
       //     .delete()
       //     .eq('userId', user.id)
       //     .eq('eventId', eventId)
-      //   
+      //
       //   if (error) throw error
       // } else {
       //   const { error } = await supabase
       //     .from('favorites')
       //     .insert({ userId: user.id, eventId })
-      //   
+      //
       //   if (error) throw error
       // }
 
@@ -114,15 +118,15 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       // Revert optimistic update on error
       setFavoriteEventIds(favoriteEventIds)
-      
+
       const errorMessage = err instanceof Error ? err.message : "Failed to update favorite"
       setError(errorMessage)
-      
-      logger.error("Failed to toggle favorite", {
+
+      logger.error(`Failed to toggle favorite: ${errorMessage}`, {
         component: "FavoritesContext",
         action: "toggle_favorite_error",
         metadata: { eventId, wasAlreadyFavorite }
-      }, err instanceof Error ? err : new Error(errorMessage))
+      })
 
       // Show user-friendly error notification
       // TODO: Integrate with toast system
@@ -161,7 +165,7 @@ export const useFavoritesContext = () => {
 // Hook for easy favorite management in components
 export const useFavoriteToggle = (eventId: number) => {
   const { toggleFavorite, isFavorite, isLoading } = useFavoritesContext()
-  
+
   return {
     isFavorite: isFavorite(eventId),
     toggleFavorite: () => toggleFavorite(eventId),

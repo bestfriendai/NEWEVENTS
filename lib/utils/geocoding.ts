@@ -329,13 +329,12 @@ class GeocodingManager {
         }
       } catch (error) {
         logger.warn(
-          `Geocoding failed with ${provider.name}`,
+          `Geocoding failed with ${provider.name}: ${formatErrorMessage(error)}`,
           {
             component: "geocoding",
             action: "provider_failed",
             metadata: { address, provider: provider.name },
-          },
-          error instanceof Error ? error : new Error(formatErrorMessage(error)),
+          }
         )
       }
     }
@@ -373,13 +372,12 @@ class GeocodingManager {
         }
       } catch (error) {
         logger.warn(
-          `Reverse geocoding failed with ${provider.name}`,
+          `Reverse geocoding failed with ${provider.name}: ${formatErrorMessage(error)}`,
           {
             component: "geocoding",
             action: "reverse_provider_failed",
             metadata: { lat, lng, provider: provider.name },
-          },
-          error instanceof Error ? error : new Error(formatErrorMessage(error)),
+          }
         )
       }
     }

@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Calendar, Loader2, Search, Filter, MapPin, X, Menu } from "lucide-react"
+import { motion } from "framer-motion"
+import { Calendar, Search, Filter, MapPin, X, Menu } from "lucide-react"
 import { fetchEvents } from "@/app/actions/event-actions"
 import { useLocationContext } from "@/contexts/LocationContext"
 import { EventsMap } from "@/components/events/EventsMap"
-import { EventCardGrid } from "@/components/events/EventCard"
 import { EventFilters, type EventFilters as EventFiltersType } from "@/components/events/EventFilters"
 import { EventCardGridSkeleton } from "@/components/ui/event-skeleton"
 import { EventDetailModal } from "@/components/event-detail-modal"
@@ -17,7 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 
 export function EventsClient() {
-  const { userLocation, searchLocation, setUserLocation } = useLocationContext()
+  const { userLocation, searchLocation } = useLocationContext()
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>([])
   const [loading, setLoading] = useState(false)
@@ -58,7 +57,7 @@ export function EventsClient() {
 
       if (result.events) {
         // Add coordinates to events if they don't have them
-        const eventsWithCoords = result.events.map((event, index) => {
+        const eventsWithCoords = result.events.map((event) => {
           if (!event.coordinates) {
             // Generate deterministic coordinates near the user location
             const seed = event.id.toString()
@@ -66,27 +65,27 @@ export function EventsClient() {
               a = ((a << 5) - a) + b.charCodeAt(0)
               return a & a
             }, 0)
-            
+
             const latOffset = ((hash % 1000) / 1000 - 0.5) * 0.1 // ~5km radius
             const lngOffset = (((hash >> 10) % 1000) / 1000 - 0.5) * 0.1
-            
+
             return {
               ...event,
-              coordinates: { 
-                lat: userLocation.lat + latOffset, 
-                lng: userLocation.lng + lngOffset 
+              coordinates: {
+                lat: userLocation.lat + latOffset,
+                lng: userLocation.lng + lngOffset
               },
             }
           }
           return event
         })
-        
+
         setEvents(eventsWithCoords)
-        
+
         logger.info("Events loaded successfully", {
           component: "EventsClient",
           action: "load_events_success",
-          metadata: { 
+          metadata: {
             eventCount: eventsWithCoords.length,
             source: result.source,
             hasError: !!result.error
@@ -117,7 +116,7 @@ export function EventsClient() {
     if (userLocation) {
       loadEventsNearLocation()
     }
-  }, [loadEventsNearLocation])
+  }, [userLocation, loadEventsNearLocation])
 
   // Apply filters to events
   useEffect(() => {
@@ -154,24 +153,24 @@ export function EventsClient() {
     // Sort events
     filtered.sort((a, b) => {
       let comparison = 0
-      
+
       switch (filters.sortBy) {
         case 'date':
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
           break
         case 'popularity':
-          comparison = (typeof a.attendees === 'number' ? a.attendees : 0) - 
+          comparison = (typeof a.attendees === 'number' ? a.attendees : 0) -
                       (typeof b.attendees === 'number' ? b.attendees : 0)
           break
         case 'distance':
           // Calculate distance from user location if available
           if (userLocation && a.coordinates && b.coordinates) {
             const distA = Math.sqrt(
-              Math.pow(a.coordinates.lat - userLocation.lat, 2) + 
+              Math.pow(a.coordinates.lat - userLocation.lat, 2) +
               Math.pow(a.coordinates.lng - userLocation.lng, 2)
             )
             const distB = Math.sqrt(
-              Math.pow(b.coordinates.lat - userLocation.lat, 2) + 
+              Math.pow(b.coordinates.lat - userLocation.lat, 2) +
               Math.pow(b.coordinates.lng - userLocation.lng, 2)
             )
             comparison = distA - distB
@@ -193,7 +192,7 @@ export function EventsClient() {
     logger.debug("Events filtered", {
       component: "EventsClient",
       action: "events_filtered",
-      metadata: { 
+      metadata: {
         originalCount: events.length,
         filteredCount: filtered.length,
         filters
@@ -203,7 +202,7 @@ export function EventsClient() {
 
   const handleLocationSearch = async () => {
     if (!locationQuery.trim()) return
-    
+
     try {
       await searchLocation(locationQuery)
       setLocationQuery("")
@@ -218,7 +217,7 @@ export function EventsClient() {
   const handleEventSelect = useCallback((event: EventDetailProps) => {
     setSelectedEvent(event)
     setShowModal(true)
-    
+
     logger.info("Event selected", {
       component: "EventsClient",
       action: "event_select",
@@ -228,9 +227,9 @@ export function EventsClient() {
 
   const handleFiltersChange = (newFilters: EventFiltersType) => {
     setFilters(newFilters)
-    
+
     // If location-based filters changed, reload events
-    if (newFilters.distance !== filters.distance || 
+    if (newFilters.distance !== filters.distance ||
         newFilters.dateRange !== filters.dateRange ||
         newFilters.searchQuery !== filters.searchQuery) {
       loadEventsNearLocation()
@@ -254,7 +253,7 @@ export function EventsClient() {
               <X className="h-4 w-4" />
             </Button>
           </div>
-          
+
           {/* Location Search */}
           <div className="space-y-3">
             <div className="flex gap-2">
@@ -264,7 +263,7 @@ export function EventsClient() {
                   placeholder="Search for a location..."
                   value={locationQuery}
                   onChange={(e) => setLocationQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
                   className="pl-10 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                 />
               </div>
@@ -272,7 +271,7 @@ export function EventsClient() {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             {userLocation && (
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <MapPin className="h-3 w-3" />
@@ -303,7 +302,7 @@ export function EventsClient() {
               <Filter className="h-4 w-4" />
             </Button>
           </div>
-          
+
           {/* Active Filters */}
           {(filters.categories.length > 0 || filters.searchQuery) && (
             <div className="flex flex-wrap gap-1 mb-3">
@@ -314,7 +313,7 @@ export function EventsClient() {
               ))}
               {filters.searchQuery && (
                 <Badge variant="secondary" className="text-xs">
-                  "{filters.searchQuery}"
+                  &quot;{filters.searchQuery}&quot;
                 </Badge>
               )}
             </div>
@@ -358,10 +357,11 @@ export function EventsClient() {
                   >
                     <div className="flex gap-3">
                       {event.image && (
-                        <img
-                          src={event.image}
-                          alt={event.title}
-                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                        <div
+                          className="w-16 h-16 rounded-lg bg-cover bg-center flex-shrink-0"
+                          style={{ backgroundImage: `url(${event.image})` }}
+                          role="img"
+                          aria-label={event.title}
                         />
                       )}
                       <div className="flex-1 min-w-0">
@@ -430,9 +430,9 @@ export function EventsClient() {
 
         {/* Map */}
         {userLocation ? (
-          <EventsMap 
-            userLocation={userLocation} 
-            events={filteredEvents} 
+          <EventsMap
+            userLocation={userLocation}
+            events={filteredEvents}
             onEventSelect={handleEventSelect}
             className="h-full w-full"
           />

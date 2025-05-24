@@ -109,13 +109,11 @@ export const logPerformance = (operation: string, duration: number, context?: Lo
 }
 
 // Performance measurement utility
-export const measurePerformance = async <T>(\
+export const measurePerformance = async <T>(
   operation: string,
   fn: () => Promise<T>,
   context?: LogContext
-)
-: Promise<T> =>
-{
+): Promise<T> => {
   const start = performance.now()
   try {
     const result = await fn()

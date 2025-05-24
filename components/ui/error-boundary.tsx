@@ -1,10 +1,7 @@
 "use client"
 
 import React from "react"
-import { AlertTriangle, RefreshCw, Home, Bug } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertTriangle, RefreshCw, Home } from "lucide-react"
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -90,87 +87,92 @@ function DefaultErrorFallback({ error, resetError, showDetails = false }: ErrorF
 
   return (
     <div className="min-h-[400px] flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
+      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="text-center p-6">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
           </div>
-          <CardTitle className="text-xl">Something went wrong</CardTitle>
-          <CardDescription>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Something went wrong</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
             We encountered an unexpected error. Please try refreshing the page or contact support if the problem persists.
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
 
-        <CardContent className="space-y-4">
+        <div className="px-6 pb-4">
           {(showDetails || isDevelopment) && error && (
-            <Alert variant="destructive">
-              <Bug className="h-4 w-4" />
-              <AlertDescription className="font-mono text-sm">
-                <details className="mt-2">
-                  <summary className="cursor-pointer font-sans font-medium">
-                    Error Details (Click to expand)
-                  </summary>
-                  <div className="mt-2 whitespace-pre-wrap break-all">
-                    <strong>Error:</strong> {error.message}
-                    {error.stack && (
-                      <>
-                        <br />
-                        <strong>Stack:</strong>
-                        <br />
-                        {error.stack}
-                      </>
-                    )}
-                  </div>
-                </details>
-              </AlertDescription>
-            </Alert>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+              <details className="text-sm">
+                <summary className="cursor-pointer font-medium text-red-800 dark:text-red-200 mb-2">
+                  Error Details (Click to expand)
+                </summary>
+                <div className="mt-2 whitespace-pre-wrap break-all text-red-700 dark:text-red-300 font-mono text-xs">
+                  <strong>Error:</strong> {error.message}
+                  {error.stack && (
+                    <>
+                      <br />
+                      <strong>Stack:</strong>
+                      <br />
+                      {error.stack}
+                    </>
+                  )}
+                </div>
+              </details>
+            </div>
           )}
-        </CardContent>
+        </div>
 
-        <CardFooter className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={resetError} className="w-full sm:w-auto">
+        <div className="flex flex-col gap-2 sm:flex-row p-6 pt-0">
+          <button
+            onClick={resetError}
+            className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             Try Again
-          </Button>
-          <Button
-            variant="outline"
+          </button>
+          <button
             onClick={() => window.location.href = '/'}
-            className="w-full sm:w-auto"
+            className="flex items-center justify-center w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <Home className="mr-2 h-4 w-4" />
             Go Home
-          </Button>
-        </CardFooter>
-      </Card>
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 // Compact error fallback for smaller components
-function CompactErrorFallback({ error, resetError }: ErrorFallbackProps) {
+function CompactErrorFallback({ resetError }: ErrorFallbackProps) {
   return (
-    <div className="flex items-center justify-center p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+    <div className="flex items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
       <div className="text-center space-y-2">
-        <AlertTriangle className="h-5 w-5 text-destructive mx-auto" />
-        <p className="text-sm text-destructive">Something went wrong</p>
-        <Button size="sm" variant="outline" onClick={resetError}>
+        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mx-auto" />
+        <p className="text-sm text-red-700 dark:text-red-300">Something went wrong</p>
+        <button
+          onClick={resetError}
+          className="inline-flex items-center px-3 py-1 text-sm border border-red-300 dark:border-red-600 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800 rounded transition-colors"
+        >
           <RefreshCw className="mr-1 h-3 w-3" />
           Retry
-        </Button>
+        </button>
       </div>
     </div>
   )
 }
 
 // Inline error fallback for form fields or small components
-function InlineErrorFallback({ error, resetError }: ErrorFallbackProps) {
+function InlineErrorFallback({ resetError }: ErrorFallbackProps) {
   return (
-    <div className="flex items-center gap-2 p-2 bg-destructive/5 border border-destructive/20 rounded text-sm">
-      <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
-      <span className="text-destructive flex-1">Error loading content</span>
-      <Button size="sm" variant="ghost" onClick={resetError} className="h-6 px-2">
+    <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
+      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+      <span className="text-red-700 dark:text-red-300 flex-1">Error loading content</span>
+      <button
+        onClick={resetError}
+        className="h-6 px-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-800 rounded transition-colors"
+      >
         <RefreshCw className="h-3 w-3" />
-      </Button>
+      </button>
     </div>
   )
 }

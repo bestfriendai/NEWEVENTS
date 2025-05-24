@@ -84,7 +84,7 @@ class LocalStorageCache<T> extends CacheBackend<T> {
 
   get(key: string): CacheEntry<T> | null {
     if (typeof window === 'undefined') return null
-    
+
     try {
       const item = localStorage.getItem(this.getStorageKey(key))
       return item ? JSON.parse(item) : null
@@ -95,21 +95,21 @@ class LocalStorageCache<T> extends CacheBackend<T> {
 
   set(key: string, entry: CacheEntry<T>): void {
     if (typeof window === 'undefined') return
-    
+
     try {
       localStorage.setItem(this.getStorageKey(key), JSON.stringify(entry))
     } catch (error) {
-      logger.warn('Failed to save to localStorage', {
+      logger.warn(`Failed to save to localStorage: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
         action: 'localStorage_error',
         metadata: { key }
-      }, error instanceof Error ? error : new Error('Unknown error'))
+      })
     }
   }
 
   delete(key: string): boolean {
     if (typeof window === 'undefined') return false
-    
+
     try {
       localStorage.removeItem(this.getStorageKey(key))
       return true
@@ -120,21 +120,21 @@ class LocalStorageCache<T> extends CacheBackend<T> {
 
   clear(): void {
     if (typeof window === 'undefined') return
-    
+
     try {
       const keys = this.keys()
       keys.forEach(key => this.delete(key))
     } catch (error) {
-      logger.warn('Failed to clear localStorage cache', {
+      logger.warn(`Failed to clear localStorage cache: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
         action: 'clear_error'
-      }, error instanceof Error ? error : new Error('Unknown error'))
+      })
     }
   }
 
   keys(): string[] {
     if (typeof window === 'undefined') return []
-    
+
     try {
       const keys: string[] = []
       for (let i = 0; i < localStorage.length; i++) {
@@ -168,7 +168,7 @@ class SessionStorageCache<T> extends CacheBackend<T> {
 
   get(key: string): CacheEntry<T> | null {
     if (typeof window === 'undefined') return null
-    
+
     try {
       const item = sessionStorage.getItem(this.getStorageKey(key))
       return item ? JSON.parse(item) : null
@@ -179,21 +179,21 @@ class SessionStorageCache<T> extends CacheBackend<T> {
 
   set(key: string, entry: CacheEntry<T>): void {
     if (typeof window === 'undefined') return
-    
+
     try {
       sessionStorage.setItem(this.getStorageKey(key), JSON.stringify(entry))
     } catch (error) {
-      logger.warn('Failed to save to sessionStorage', {
+      logger.warn(`Failed to save to sessionStorage: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
         action: 'sessionStorage_error',
         metadata: { key }
-      }, error instanceof Error ? error : new Error('Unknown error'))
+      })
     }
   }
 
   delete(key: string): boolean {
     if (typeof window === 'undefined') return false
-    
+
     try {
       sessionStorage.removeItem(this.getStorageKey(key))
       return true
@@ -204,21 +204,21 @@ class SessionStorageCache<T> extends CacheBackend<T> {
 
   clear(): void {
     if (typeof window === 'undefined') return
-    
+
     try {
       const keys = this.keys()
       keys.forEach(key => this.delete(key))
     } catch (error) {
-      logger.warn('Failed to clear sessionStorage cache', {
+      logger.warn(`Failed to clear sessionStorage cache: ${error instanceof Error ? error.message : String(error)}`, {
         component: 'cache',
         action: 'clear_error'
-      }, error instanceof Error ? error : new Error('Unknown error'))
+      })
     }
   }
 
   keys(): string[] {
     if (typeof window === 'undefined') return []
-    
+
     try {
       const keys: string[] = []
       for (let i = 0; i < sessionStorage.length; i++) {
@@ -276,7 +276,7 @@ export class CacheManager<T> {
    */
   get(key: string): T | null {
     const entry = this.backend.get(key)
-    
+
     if (!entry) {
       this.stats.misses++
       logger.debug('Cache miss', {
@@ -303,13 +303,13 @@ export class CacheManager<T> {
     entry.hits++
     this.backend.set(key, entry)
     this.stats.hits++
-    
+
     logger.debug('Cache hit', {
       component: 'cache',
       action: 'cache_hit',
       metadata: { key, namespace: this.options.namespace, hits: entry.hits }
     })
-    
+
     return entry.data
   }
 
@@ -331,7 +331,7 @@ export class CacheManager<T> {
     }
 
     this.backend.set(key, entry)
-    
+
     logger.debug('Cache set', {
       component: 'cache',
       action: 'cache_set',
@@ -344,7 +344,7 @@ export class CacheManager<T> {
    */
   delete(key: string): boolean {
     const result = this.backend.delete(key)
-    
+
     if (result) {
       logger.debug('Cache delete', {
         component: 'cache',
@@ -352,7 +352,7 @@ export class CacheManager<T> {
         metadata: { key, namespace: this.options.namespace }
       })
     }
-    
+
     return result
   }
 
@@ -362,7 +362,7 @@ export class CacheManager<T> {
   clear(): void {
     this.backend.clear()
     this.stats = { hits: 0, misses: 0 }
-    
+
     logger.info('Cache cleared', {
       component: 'cache',
       action: 'cache_clear',
@@ -412,8 +412,8 @@ export class CacheManager<T> {
       logger.debug('Cache eviction', {
         component: 'cache',
         action: 'cache_evict',
-        metadata: { 
-          key: entries[0].key, 
+        metadata: {
+          key: entries[0].key,
           namespace: this.options.namespace,
           hits: entries[0].hits
         }

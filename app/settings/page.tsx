@@ -265,7 +265,7 @@ export default function SettingsPage() {
                         <div>
                           <p className="text-gray-300 text-sm">Enhance your account security with 2FA</p>
                           <p className="text-gray-500 text-xs mt-1">
-                            We'll ask for a verification code in addition to your password when you sign in
+                            We&apos;ll ask for a verification code in addition to your password when you sign in
                           </p>
                         </div>
                         <Switch />
@@ -274,7 +274,7 @@ export default function SettingsPage() {
 
                     <div className="bg-[#22252F] border border-gray-800 rounded-lg p-4">
                       <h3 className="text-md font-medium text-white mb-3">Login Sessions</h3>
-                      <p className="text-gray-300 text-sm mb-3">You're currently logged in on these devices:</p>
+                      <p className="text-gray-300 text-sm mb-3">You&apos;re currently logged in on these devices:</p>
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">

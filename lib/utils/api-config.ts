@@ -152,7 +152,7 @@ class ApiConfigManager {
         logger.warn(`Unknown provider: ${provider}`)
         return null
     }
-    
+
     return null
   }
 
@@ -249,7 +249,7 @@ class ApiConfigManager {
     for (const provider of providers) {
       const config = this.getProviderConfig(provider as any)
       const hasApiKey = Boolean(config?.apiKey)
-      
+
       let validation: ApiKeyValidation | undefined
       if (hasApiKey && config?.apiKey) {
         const cacheKey = `${provider}:${config.apiKey.substring(0, 8)}`
@@ -301,13 +301,13 @@ class ApiConfigManager {
 
   private async validateAllApiKeys(): Promise<void> {
     const providers = ['ticketmaster', 'eventbrite', 'rapidapi', 'predicthq'] as const
-    
+
     for (const provider of providers) {
       const config = this.getProviderConfig(provider)
       if (config?.apiKey) {
         // Validate in background, don't await
         this.validateApiKey(provider, config.apiKey).catch(error => {
-          logger.warn(`Failed to validate ${provider} API key`, { component: 'ApiConfigManager' }, error)
+          logger.warn(`Failed to validate ${provider} API key: ${error instanceof Error ? error.message : String(error)}`, { component: 'ApiConfigManager' })
         })
       }
     }

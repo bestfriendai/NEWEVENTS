@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
-import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap } from "lucide-react"
+import { MapPin, Search, ArrowRight, Users } from "lucide-react"
 
 export default function SimpleHome() {
   const [isClient, setIsClient] = useState(false)
@@ -43,7 +43,7 @@ export default function SimpleHome() {
                   preferences around the globe.
                 </p>
               </div>
-              
+
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <Link href="/events">
                   <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105">
@@ -104,7 +104,7 @@ export default function SimpleHome() {
               </div>
               <h3 className="text-xl font-semibold text-white mb-3">Smart Discovery</h3>
               <p className="text-gray-400">
-                Our AI analyzes your preferences to suggest events you'll love, from concerts to workshops and everything in between.
+                Our AI analyzes your preferences to suggest events you&apos;ll love, from concerts to workshops and everything in between.
               </p>
             </div>
 

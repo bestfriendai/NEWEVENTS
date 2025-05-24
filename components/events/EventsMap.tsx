@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { MAPBOX_API_KEY } from "@/lib/env"
 import { SimpleMapFallback } from "@/components/simple-map-fallback"
 import { MapSkeleton } from "@/components/ui/event-skeleton"
@@ -35,11 +35,11 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
     const initializeMap = async () => {
       try {
         setIsLoading(true)
-        
+
         // Load Mapbox GL JS dynamically
         const script = document.createElement("script")
         script.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"
-        
+
         script.onload = () => {
           // Load CSS
           const link = document.createElement("link")
@@ -65,18 +65,18 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
             mapRef.current.on("load", () => {
               setMapLoaded(true)
               setIsLoading(false)
-              
+
               logger.info("Map loaded successfully", {
                 component: "EventsMap",
                 action: "map_load_success"
               })
             })
 
-            mapRef.current.on("error", (e: any) => {
+            mapRef.current.on("error", () => {
               const errorMessage = "Failed to load map"
               setMapError(errorMessage)
               setIsLoading(false)
-              
+
               logger.error("Map load error", {
                 component: "EventsMap",
                 action: "map_load_error"
@@ -87,7 +87,7 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
             const errorMessage = "Failed to initialize Mapbox"
             setMapError(errorMessage)
             setIsLoading(false)
-            
+
             logger.error("Mapbox initialization error", {
               component: "EventsMap",
               action: "mapbox_init_error"
@@ -99,7 +99,7 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
           const errorMessage = "Failed to load Mapbox script"
           setMapError(errorMessage)
           setIsLoading(false)
-          
+
           logger.error("Mapbox script load error", {
             component: "EventsMap",
             action: "script_load_error"
@@ -112,7 +112,7 @@ export function EventsMap({ userLocation, events, onEventSelect, className }: Ev
         const errorMessage = "Map initialization failed"
         setMapError(errorMessage)
         setIsLoading(false)
-        
+
         logger.error("Map initialization failed", {
           component: "EventsMap",
           action: "init_error"

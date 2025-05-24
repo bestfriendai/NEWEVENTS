@@ -172,10 +172,10 @@ async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSear
   }
 
   const data = await response.json()
-  
+
   // Validate API response with Zod
   const parsedResponse = RapidApiResponseSchema.safeParse(data)
-  
+
   if (!parsedResponse.success) {
     logger.error("API Response Validation Error", {
       component: "event-actions",
@@ -204,7 +204,7 @@ async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSear
   }
 
   const events = transformRapidAPIEvents(validatedData.data.events, size)
-  
+
   logger.info("Successfully transformed events", {
     component: "event-actions",
     action: "transform_success",
@@ -218,14 +218,31 @@ async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSear
   }
 }
 
-function transformRapidAPIEvents(events: any[], maxCount: number): EventDetailProps[] {
+interface RapidAPIEvent {
+  event_id?: string
+  name?: string
+  description?: string
+  start_time?: string
+  venue?: {
+    name?: string
+    full_address?: string
+    latitude?: string | number
+    longitude?: string | number
+  } | null
+  tags?: string[]
+  thumbnail?: string
+  ticket_links?: unknown[]
+  publisher?: string
+}
+
+function transformRapidAPIEvents(events: RapidAPIEvent[], maxCount: number): EventDetailProps[] {
   logger.debug("Transforming events", {
     component: "event-actions",
     action: "transform_start",
     metadata: { eventCount: events.length, maxCount }
   })
 
-  return events.slice(0, maxCount).map((event, index) => {
+  return events.slice(0, maxCount).map((event: RapidAPIEvent, index) => {
     const venue = event.venue || {}
     const startDate = event.start_time ? new Date(event.start_time) : new Date()
 
@@ -234,13 +251,13 @@ function transformRapidAPIEvents(events: any[], maxCount: number): EventDetailPr
     if (venue.latitude && venue.longitude) {
       const lat = Number(venue.latitude)
       const lng = Number(venue.longitude)
-      
+
       // Validate coordinates are reasonable
       if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
         coordinates = { lat, lng }
       }
     }
-    
+
     if (!coordinates) {
       // Generate deterministic coordinates based on event data for consistency
       const seed = event.event_id || event.name || `event-${index}`
@@ -248,18 +265,18 @@ function transformRapidAPIEvents(events: any[], maxCount: number): EventDetailPr
         a = ((a << 5) - a) + b.charCodeAt(0)
         return a & a
       }, 0)
-      
+
       // Use hash to generate consistent coordinates around NYC
       const baseLat = 40.7128
       const baseLng = -74.006
       const latOffset = ((hash % 1000) / 1000 - 0.5) * 0.1 // ~5km radius
       const lngOffset = (((hash >> 10) % 1000) / 1000 - 0.5) * 0.1
-      
+
       coordinates = {
         lat: baseLat + latOffset,
         lng: baseLng + lngOffset,
       }
-      
+
       logger.debug("Generated fallback coordinates", {
         component: "event-actions",
         action: "fallback_coordinates",
@@ -301,7 +318,7 @@ function transformRapidAPIEvents(events: any[], maxCount: number): EventDetailPr
       }),
       location: venue.name || "Venue TBA",
       address: venue.full_address || "Address TBA",
-      price: event.ticket_links?.length > 0 ? "Tickets Available" : "Price TBA",
+      price: (event.ticket_links && event.ticket_links.length > 0) ? "Tickets Available" : "Price TBA",
       image: event.thumbnail || `/event-${(index % 12) + 1}.png`,
       organizer: {
         name: venue.name || event.publisher || "Event Organizer",
@@ -322,7 +339,7 @@ function transformRapidAPIEvents(events: any[], maxCount: number): EventDetailPr
         hasCoordinates: !!coordinates
       }
     })
-    
+
     return transformedEvent
   })
 }

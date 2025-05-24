@@ -51,7 +51,7 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
       })
 
       const { latitude, longitude } = position.coords
-      
+
       // TODO: Implement reverse geocoding to get address name
       const location: UserLocation = {
         lat: latitude,
@@ -60,28 +60,28 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setUserLocation(location)
-      
+
       logger.info("Current location obtained", {
         component: "LocationContext",
         action: "location_success",
-        metadata: { 
-          lat: latitude, 
+        metadata: {
+          lat: latitude,
           lng: longitude,
-          accuracy: position.coords.accuracy 
+          accuracy: position.coords.accuracy
         }
       })
 
     } catch (error) {
-      const errorMessage = error instanceof GeolocationPositionError 
+      const errorMessage = error instanceof GeolocationPositionError
         ? getGeolocationErrorMessage(error.code)
         : "Failed to get current location"
-      
+
       setLocationError(errorMessage)
-      
-      logger.error("Failed to get current location", {
+
+      logger.error(`Failed to get current location: ${errorMessage}`, {
         component: "LocationContext",
         action: "location_error"
-      }, error instanceof Error ? error : new Error(errorMessage))
+      })
     } finally {
       setIsLocationLoading(false)
     }
@@ -101,16 +101,16 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
       // For now, this is a placeholder
       const { geocodeAddress } = await import('@/lib/utils/geocoding')
       const result = await geocodeAddress(query)
-      
+
       if (result) {
         const location: UserLocation = {
           lat: result.lat,
           lng: result.lng,
           name: result.address
         }
-        
+
         setUserLocation(location)
-        
+
         logger.info("Location search successful", {
           component: "LocationContext",
           action: "search_success",
@@ -123,12 +123,12 @@ export const LocationProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to search location"
       setLocationError(errorMessage)
-      
-      logger.error("Location search failed", {
+
+      logger.error(`Location search failed: ${errorMessage}`, {
         component: "LocationContext",
         action: "search_error",
         metadata: { query }
-      }, error instanceof Error ? error : new Error(errorMessage))
+      })
     } finally {
       setIsLocationLoading(false)
     }
