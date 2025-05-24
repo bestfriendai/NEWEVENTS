@@ -1554,4 +1554,3 @@ logger.info("Events processed with coordinates", {
     </div>
   )
 }
-

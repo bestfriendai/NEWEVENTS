@@ -39,12 +39,12 @@ This document outlines a comprehensive code quality improvement strategy for the
 **Status: 🔴 CRITICAL - Must fix immediately**
 
 **Current Issue:**
-```typescript
+\`\`\`typescript
 // ❌ SECURITY RISK: API keys exposed in source code
 export const RAPIDAPI_KEY = "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"
 export const TICKETMASTER_API_KEY = "DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"
 export const MAPBOX_API_KEY = "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow"
-```
+\`\`\`
 
 **Solution Implementation:**
 1. **Create `.env.local` file** with proper API keys
@@ -53,7 +53,7 @@ export const MAPBOX_API_KEY = "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMm
 4. **Implement runtime environment validation**
 
 **New Secure Pattern:**
-```typescript
+\`\`\`typescript
 // ✅ SECURE: Environment-based configuration
 const envSchema = z.object({
   RAPIDAPI_KEY: z.string().min(1, "RapidAPI key is required"),
@@ -63,13 +63,13 @@ const envSchema = z.object({
 })
 
 export const env = envSchema.parse(process.env)
-```
+\`\`\`
 
 #### 1.2 🔧 **Build Configuration Fixes**
 **Status: 🔴 CRITICAL - Preventing proper error detection**
 
 **Current Issue in [`next.config.mjs`](next.config.mjs):**
-```javascript
+\`\`\`javascript
 // ❌ DANGEROUS: Ignoring all errors
 eslint: {
   ignoreDuringBuilds: true,
@@ -77,10 +77,10 @@ eslint: {
 typescript: {
   ignoreBuildErrors: true,
 },
-```
+\`\`\`
 
 **Fixed Configuration:**
-```javascript
+\`\`\`javascript
 // ✅ PROPER: Enable error checking
 const nextConfig = {
   eslint: {
@@ -101,13 +101,13 @@ const nextConfig = {
     ],
   },
 }
-```
+\`\`\`
 
 #### 1.3 📝 **TypeScript Strict Mode Enhancement**
 **Status: 🟡 HIGH - Improve type safety**
 
 **Current [`tsconfig.json`](tsconfig.json) Enhancement:**
-```json
+\`\`\`json
 {
   "compilerOptions": {
     "strict": true,
@@ -121,7 +121,7 @@ const nextConfig = {
     "moduleResolution": "bundler"
   }
 }
-```
+\`\`\`
 
 #### 1.4 📁 **File Extension Standardization**
 **Status: 🟡 HIGH - Fix import issues**
@@ -148,7 +148,7 @@ const nextConfig = {
 - Missing proper separation of concerns
 
 **New Structure:**
-```
+\`\`\`
 /components
   /ui/              # Base UI components (buttons, inputs, etc.)
   /features/        # Feature-specific components
@@ -161,7 +161,7 @@ const nextConfig = {
   /layouts/         # Layout components
   /forms/           # Form components
   /providers/       # Context providers
-```
+\`\`\`
 
 #### 2.2 **Error Handling & Boundaries**
 
@@ -172,7 +172,7 @@ const nextConfig = {
 4. **User-friendly Error Messages** with recovery options
 
 **Error Boundary Pattern:**
-```typescript
+\`\`\`typescript
 interface ErrorBoundaryState {
   hasError: boolean
   error?: Error
@@ -182,12 +182,12 @@ interface ErrorBoundaryState {
 class GlobalErrorBoundary extends Component<PropsWithChildren, ErrorBoundaryState> {
   // Implementation with proper logging and user feedback
 }
-```
+\`\`\`
 
 #### 2.3 **Performance Optimization**
 
 **Code Splitting Implementation:**
-```typescript
+\`\`\`typescript
 // Heavy components loaded dynamically
 const MapExplorer = dynamic(() => import('@/components/map-explorer'), {
   loading: () => <MapSkeleton />,
@@ -198,7 +198,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
   loading: () => <GlobeSkeleton />,
   ssr: false
 })
-```
+\`\`\`
 
 ---
 
@@ -208,7 +208,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
 #### 3.1 **API Layer Refactoring**
 
 **New API Architecture:**
-```
+\`\`\`
 /lib/api
   /clients/         # API client instances
     - supabase.ts
@@ -220,7 +220,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
   /types/           # Shared type definitions
   /utils/           # API utilities
   /cache/           # Caching strategies
-```
+\`\`\`
 
 #### 3.2 **State Management Enhancement**
 
@@ -232,7 +232,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
 #### 3.3 **Testing Infrastructure**
 
 **Testing Stack:**
-```json
+\`\`\`json
 {
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
@@ -242,13 +242,13 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
     "playwright": "^1.40.0"
   }
 }
-```
+\`\`\`
 
 ---
 
 ## 📈 Implementation Timeline
 
-```mermaid
+\`\`\`mermaid
 gantt
     title Code Quality Improvement Timeline
     dateFormat  YYYY-MM-DD
@@ -266,7 +266,7 @@ gantt
     API Layer Refactoring   :p3a, after p2c, 3d
     State Management        :p3b, after p3a, 2d
     Testing Infrastructure  :p3c, after p3b, 2d
-```
+\`\`\`
 
 ---
 
