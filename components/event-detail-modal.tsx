@@ -149,7 +149,7 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
             </div>
             {event.ticketLinks && event.ticketLinks.length > 0 ? (
               <a
-                href={event.ticketLinks[0].link}
+                href={event.ticketLinks[0]?.link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"

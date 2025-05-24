@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, type MotionStyle } from "framer-motion"
 import { Heart, Calendar, MapPin, Clock, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,7 +17,7 @@ interface EventMapMarkerProps {
   onViewDetails: () => void
   onToggleFavorite: () => void
   isSelected: boolean
-  style?: React.CSSProperties
+  style?: MotionStyle
 }
 
 export function EventMapMarker({
@@ -75,7 +75,7 @@ export function EventMapMarker({
       {/* Marker */}
       <motion.div
         className="absolute cursor-pointer z-10"
-        style={style}
+        {...(style && { style })}
         onClick={onClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -139,7 +139,6 @@ export function EventMapMarker({
         {isSelected && (
           <motion.div
             className="absolute z-30 bottom-8 left-1/2 transform -translate-x-1/2 w-72"
-            style={style}
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}

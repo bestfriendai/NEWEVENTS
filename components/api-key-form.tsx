@@ -35,7 +35,7 @@ export function ApiKeyForm() {
 
       // In a real app, we would reload the page or update environment variables
       // console.log(`Saved ${activeTab} API key`)
-    } catch (_err) {
+    } catch {
       setError("Failed to save API key. Please try again.")
     } finally {
       setIsSaving(false)

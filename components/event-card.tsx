@@ -32,7 +32,6 @@ export function EventCard({
   location,
   image,
   category,
-  isFeatured,
   index = 0,
   event,
   onViewDetails = () => {},

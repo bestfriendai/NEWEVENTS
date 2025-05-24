@@ -91,7 +91,7 @@ export default function EnhancedHeroBackground() {
       timeRef.current += 0.001
 
       // Update all particle systems
-      particlesRef.current.forEach((particles, index) => {
+      particlesRef.current.forEach((particles, _index) => {
         if (particles) {
           // Different rotation speeds for each layer
           particles.rotation.x += 0.0001 + (particles.userData.speed || 0)
@@ -106,21 +106,27 @@ export default function EnhancedHeroBackground() {
           particles.rotation.y += mouseRef.current.x * 0.0002 * (particles.userData.mouseResponsiveness || 1)
 
           // Update colors for some particles
-          if (particles.userData.colorShift) {
+          if (particles.userData.colorShift && particles.geometry.attributes.position && particles.geometry.attributes.color) {
             const positions = particles.geometry.attributes.position.array
             const colors = particles.geometry.attributes.color.array
 
-            for (let i = 0; i < colors.length; i += 3) {
-              // Subtle color shifting over time
-              const idx = i / 3
-              const phase = timeRef.current + idx * 0.0001
+            if (colors && positions) {
+              const colorArray = colors as Float32Array
+              for (let i = 0; i < colorArray.length; i += 3) {
+                // Subtle color shifting over time
+                const idx = i / 3
+                const phase = timeRef.current + idx * 0.0001
 
-              colors[i] = Math.max(0.3, Math.min(0.9, colors[i] + Math.sin(phase) * 0.001))
-              colors[i + 1] = Math.max(0.1, Math.min(0.5, colors[i + 1] + Math.cos(phase) * 0.001))
-              colors[i + 2] = Math.max(0.4, Math.min(1.0, colors[i + 2] + Math.sin(phase + 1) * 0.001))
+                // Check bounds before accessing array elements
+                if (i < colorArray.length && i + 1 < colorArray.length && i + 2 < colorArray.length) {
+                  colorArray[i] = Math.max(0.3, Math.min(0.9, (colorArray[i] || 0) + Math.sin(phase) * 0.001))
+                  colorArray[i + 1] = Math.max(0.1, Math.min(0.5, (colorArray[i + 1] || 0) + Math.cos(phase) * 0.001))
+                  colorArray[i + 2] = Math.max(0.4, Math.min(1.0, (colorArray[i + 2] || 0) + Math.sin(phase + 1) * 0.001))
+                }
+              }
+
+              particles.geometry.attributes.color.needsUpdate = true
             }
-
-            particles.geometry.attributes.color.needsUpdate = true
           }
         }
       })

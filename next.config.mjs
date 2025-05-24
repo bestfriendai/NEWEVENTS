@@ -1,13 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true, // Temporarily disable ESLint error checking
+    dirs: ['app', 'components', 'lib', 'hooks'],
+    ignoreDuringBuilds: false, // ✅ Enable proper ESLint error checking
   },
   typescript: {
-    ignoreBuildErrors: true, // Temporarily disable TypeScript error checking
+    ignoreBuildErrors: false, // ✅ Enable proper TypeScript error checking
+  },
+  experimental: {
+    optimizePackageImports: ['@radix-ui/react-*', 'lucide-react'],
   },
   images: {
-    unoptimized: true,
+    formats: ['image/webp', 'image/avif'],
+    remotePatterns: [
+      { hostname: 'images.unsplash.com' },
+      { hostname: '*.supabase.co' },
+      { hostname: 'via.placeholder.com' },
+    ],
   },
   reactStrictMode: true, // Enable React Strict Mode for better error detection
 }

@@ -46,14 +46,24 @@ export function EventsClient() {
         metadata: { location: userLocation }
       })
 
-      const result = await fetchEvents({
+      const searchParams: any = {
         location: `${userLocation.lat},${userLocation.lng}`,
         radius: filters.distance,
         size: 50, // Load more events for better map display
-        startDate: filters.dateRange?.start.toISOString().split('T')[0],
-        endDate: filters.dateRange?.end.toISOString().split('T')[0],
-        keyword: filters.searchQuery || undefined
-      })
+      }
+
+      // Only include optional properties if they have values
+      if (filters.dateRange?.start) {
+        searchParams.startDate = filters.dateRange.start.toISOString().split('T')[0]
+      }
+      if (filters.dateRange?.end) {
+        searchParams.endDate = filters.dateRange.end.toISOString().split('T')[0]
+      }
+      if (filters.searchQuery) {
+        searchParams.keyword = filters.searchQuery
+      }
+
+      const result = await fetchEvents(searchParams)
 
       if (result.events) {
         // Add coordinates to events if they don't have them
@@ -143,7 +153,7 @@ export function EventsClient() {
       if (event.price === "Free") return filters.priceRange.min === 0
       // Extract price from string like "$50" or "$25 - $100"
       const priceMatch = event.price.match(/\$(\d+)/)
-      if (priceMatch) {
+      if (priceMatch && priceMatch[1]) {
         const price = parseInt(priceMatch[1])
         return price >= filters.priceRange.min && price <= filters.priceRange.max
       }

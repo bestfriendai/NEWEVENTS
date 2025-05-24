@@ -134,6 +134,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       document.addEventListener("mousedown", handleClickOutside)
       return () => document.removeEventListener("mousedown", handleClickOutside)
     }
+    
+    // Return undefined for server-side rendering case
+    return undefined
   }, [isOpen])
 
   // Simulate receiving a new notification
@@ -165,6 +168,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     } catch (error) {
       console.error("Error setting up notification timer:", error)
       setError("Failed to set up notifications")
+      return undefined
     }
   }, [isOpen, getNextId])
 
@@ -190,6 +194,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         window.removeEventListener("error", handleError)
       }
     }
+    
+    // Return undefined for server-side rendering case
+    return undefined
   }, [])
 
   // Cleanup on unmount
@@ -215,17 +222,6 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       setError("Failed to toggle dropdown")
     }
   }, [isOpen, hasNewNotifications])
-
-  const handleMarkAsRead = useCallback((id: number) => {
-    try {
-      setNotifications((prev) =>
-        prev.map((notification) => (notification.id === id ? { ...notification, read: true } : notification)),
-      )
-    } catch (error) {
-      console.error("Error marking notification as read:", error)
-      setError("Failed to mark notification as read")
-    }
-  }, [])
 
   const handleMarkAllAsRead = useCallback(() => {
     try {

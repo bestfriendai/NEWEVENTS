@@ -1,47 +1,29 @@
 import { z } from "zod"
 
-// Helper function to create conditional validation based on environment
-const createApiKeySchema = (name: string, required = false) => {
-  const isDevelopment = process.env.NODE_ENV === "development"
 
-  if (required || !isDevelopment) {
-    // Required in production or when explicitly marked as required
-    return z.string().min(1, `${name} is required`)
-  } else {
-    // Optional in development - allow placeholder values
-    return z.string().optional().or(z.string().startsWith("dev-placeholder-").optional())
-  }
-}
-
-// Environment schema for validation
+// Environment schema for validation - NO HARDCODED KEYS
 const envSchema = z.object({
-  // Public environment variables - using your Supabase configuration
-  NEXT_PUBLIC_SUPABASE_URL: z.string().default("https://akwvmljopucsnorvdwuu.supabase.co"),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-    .string()
-    .default(
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrd3ZtbGpvcHVjc25vcnZkd3V1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3NTI1MzIsImV4cCI6MjA2MDMyODUzMn0.0cMnBX7ODkL16AlbzogsDpm-ykGjLXxJmT3ddB8_LGk",
-    ),
+  // Public environment variables
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url("Invalid Supabase URL"),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "Supabase anonymous key is required"),
 
-  // Server-side API keys - using your provided keys
-  RAPIDAPI_KEY: z.string().default("92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"),
-  RAPIDAPI_HOST: z.string().default("real-time-events-search.p.rapidapi.com"),
-  TICKETMASTER_API_KEY: z.string().default("DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"),
-  TICKETMASTER_SECRET: z.string().default("H1dYvpxiiaTgJow5"),
-  TOMTOM_API_KEY: z.string().default("L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz"),
-  MAPBOX_API_KEY: z
-    .string()
-    .default("pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow"),
+  // Server-side API keys - all from environment variables
+  RAPIDAPI_KEY: z.string().min(1, "RapidAPI key is required"),
+  RAPIDAPI_HOST: z.string().min(1, "RapidAPI host is required"),
+  TICKETMASTER_API_KEY: z.string().min(1, "Ticketmaster API key is required"),
+  TICKETMASTER_SECRET: z.string().min(1, "Ticketmaster secret is required"),
+  TOMTOM_API_KEY: z.string().min(1, "TomTom API key is required"),
+  MAPBOX_API_KEY: z.string().min(1, "Mapbox API key is required"),
 
   // Eventbrite API keys
-  EVENTBRITE_API_KEY: z.string().default("YJH4KGIHRNHOKODPZD"),
-  EVENTBRITE_CLIENT_SECRET: z.string().default("QGVOJ2QGDI2TMBZKOW5IKKPMZOVP6FA2VXLNGWSI4FP43BNLSQ"),
-  EVENTBRITE_PRIVATE_TOKEN: z.string().default("EUB5KUFLJH2SKVCHVD3E"),
-  EVENTBRITE_PUBLIC_TOKEN: z.string().default("C4WQAR3XB7XX2AYOUEQ4"),
+  EVENTBRITE_API_KEY: z.string().min(1, "Eventbrite API key is required"),
+  EVENTBRITE_CLIENT_SECRET: z.string().min(1, "Eventbrite client secret is required"),
+  EVENTBRITE_PRIVATE_TOKEN: z.string().min(1, "Eventbrite private token is required"),
+  EVENTBRITE_PUBLIC_TOKEN: z.string().min(1, "Eventbrite public token is required"),
 
   // Optional API keys
   PREDICTHQ_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().default("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"),
+  OPENROUTER_API_KEY: z.string().optional(),
 
   // Application settings
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),

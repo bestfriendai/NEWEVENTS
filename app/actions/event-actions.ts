@@ -219,20 +219,20 @@ async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSear
 }
 
 interface RapidAPIEvent {
-  event_id?: string
-  name?: string
-  description?: string
-  start_time?: string
+  event_id?: string | undefined
+  name?: string | undefined
+  description?: string | undefined
+  start_time?: string | undefined
   venue?: {
-    name?: string
-    full_address?: string
-    latitude?: string | number
-    longitude?: string | number
-  } | null
-  tags?: string[]
-  thumbnail?: string
-  ticket_links?: unknown[]
-  publisher?: string
+    name?: string | undefined
+    full_address?: string | undefined
+    latitude?: string | number | undefined
+    longitude?: string | number | undefined
+  } | null | undefined
+  tags?: string[] | undefined
+  thumbnail?: string | undefined
+  ticket_links?: unknown[] | undefined
+  publisher?: string | undefined
 }
 
 function transformRapidAPIEvents(events: RapidAPIEvent[], maxCount: number): EventDetailProps[] {
@@ -370,7 +370,7 @@ function extractCategory(tags: string[]): string {
     }
   }
 
-  return tags[0].charAt(0).toUpperCase() + tags[0].slice(1)
+  return (tags[0]?.charAt(0).toUpperCase() ?? "") + (tags[0]?.slice(1) ?? "") || "Event"
 }
 
 function generateFallbackEvents(location: string, count: number): EventDetailProps[] {
@@ -384,8 +384,8 @@ function generateFallbackEvents(location: string, count: number): EventDetailPro
   const venues = ["Arena", "Theater", "Stadium", "Hall", "Center", "Park", "Gallery", "Club"]
 
   return Array.from({ length: count }, (_, index) => {
-    const category = categories[index % categories.length]
-    const venue = venues[index % venues.length]
+    const category = categories[index % categories.length]!
+    const venue = venues[index % venues.length]!
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 30) + 1)
 

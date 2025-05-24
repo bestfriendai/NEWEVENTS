@@ -48,7 +48,7 @@ const SORT_OPTIONS = [
   { value: 'price', label: 'Price' }
 ]
 
-export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, className }: EventFiltersProps) {
+export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, className: _className }: EventFiltersProps) {
   const [localFilters, setLocalFilters] = useState<EventFilters>(filters)
 
   const updateFilters = (updates: Partial<EventFilters>) => {
@@ -205,10 +205,12 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                     Date Range
                   </Label>
                   <DateRangePicker
-                    dateRange={localFilters.dateRange ? {
-                      from: localFilters.dateRange.start,
-                      to: localFilters.dateRange.end
-                    } : undefined}
+                    {...(localFilters.dateRange ? {
+                      dateRange: {
+                        from: localFilters.dateRange.start,
+                        to: localFilters.dateRange.end
+                      }
+                    } : {})}
                     onDateRangeChange={(dateRange) => {
                       const newDateRange = dateRange && dateRange.from && dateRange.to ? {
                         start: dateRange.from,
@@ -230,7 +232,11 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <div className="px-2">
                     <Slider
                       value={[localFilters.priceRange.min, localFilters.priceRange.max]}
-                      onValueChange={([min, max]) => updateFilters({ priceRange: { min, max } })}
+                      onValueChange={([min, max]) => {
+                        if (min !== undefined && max !== undefined) {
+                          updateFilters({ priceRange: { min, max } })
+                        }
+                      }}
                       max={500}
                       step={10}
                       className="mb-3"
@@ -253,7 +259,11 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <div className="px-2">
                     <Slider
                       value={[localFilters.distance]}
-                      onValueChange={([distance]) => updateFilters({ distance })}
+                      onValueChange={([distance]) => {
+                        if (distance !== undefined) {
+                          updateFilters({ distance })
+                        }
+                      }}
                       max={100}
                       step={5}
                       className="mb-3"

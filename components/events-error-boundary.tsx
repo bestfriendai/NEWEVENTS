@@ -24,7 +24,7 @@ export class EventsErrorBoundary extends React.Component<EventsErrorBoundaryProp
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(_error: Error, _errorInfo: React.ErrorInfo) {
     // console.error("Events Error Boundary caught an error:", error, errorInfo)
   }
 

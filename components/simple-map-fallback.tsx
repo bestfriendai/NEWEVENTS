@@ -16,7 +16,7 @@ interface SimpleMapFallbackProps {
   onToggleFavorite: (eventId: number) => void
 }
 
-export function SimpleMapFallback({ events, onViewDetails, onToggleFavorite }: SimpleMapFallbackProps) {
+export function SimpleMapFallback({ events, onViewDetails: _onViewDetails, onToggleFavorite }: SimpleMapFallbackProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [filteredEvents, setFilteredEvents] = useState(events)
   const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)

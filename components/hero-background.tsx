@@ -9,7 +9,6 @@ export default function HeroBackground() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const particlesRef = useRef<THREE.Points | null>(null)
   const mouseRef = useRef({ x: 0, y: 0 })
   const timeRef = useRef(0)
   const animationFrameRef = useRef<number | null>(null)
@@ -105,7 +104,6 @@ export default function HeroBackground() {
 
           // Update colors for some particles
           if (child.userData.colorShift) {
-            const positions = child.geometry.attributes.position.array
             const colors = child.geometry.attributes.color.array
 
             for (let i = 0; i < colors.length; i += 3) {

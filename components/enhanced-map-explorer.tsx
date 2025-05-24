@@ -10,35 +10,19 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Calendar,
-  Users,
-  Compass,
-  Layers,
-  Zap,
-  Clock,
-  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventDetailModal } from "@/components/event-detail-modal"
-import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MAPBOX_API_KEY } from "@/lib/env"
 import { cn } from "@/lib/utils"
 import { fetchEvents } from "@/app/actions/event-actions"
-import { geocodeAddress, reverseGeocode } from "@/lib/api/map-api"
+import { reverseGeocode } from "@/lib/api/map-api"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { SimpleMapFallback } from "@/components/simple-map-fallback"
 
-// Categories for filtering
-const CATEGORIES = [
-  { id: "all", label: "All", icon: Zap },
-  { id: "music", label: "Music", icon: Layers },
-  { id: "arts", label: "Arts", icon: Star },
-  { id: "sports", label: "Sports", icon: Compass },
-  { id: "food", label: "Food", icon: Clock },
-  { id: "business", label: "Business", icon: Users },
-]
+// Categories for filtering (removed unused constant)
 
 // Default locations for initial events
 const DEFAULT_LOCATIONS = [
@@ -62,9 +46,7 @@ export function EnhancedMapExplorer({
 }: EnhancedMapExplorerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
   const clusterLayerRef = useRef<string | null>(null)
-  const clusterSourceRef = useRef<string | null>(null)
   const geoJsonSourceRef = useRef<any>(null)
   const userMarkerRef = useRef<any>(null)
   const popupRef = useRef<any>(null)
@@ -73,37 +55,33 @@ export function EnhancedMapExplorer({
   const eventsLoadedRef = useRef<boolean>(false)
 
   const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [events, setEvents] = useState<EventDetailProps[]>(initialEvents)
   const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>(initialEvents)
   const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [mapboxLoaded, setMapboxLoaded] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
-  const [showFilters, setShowFilters] = useState(false)
   const [mapStyle, setMapStyle] = useState("dark-v11")
   const [show3DBuildings, setShow3DBuildings] = useState(true)
   const [showTerrain, setShowTerrain] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(initialLocation || null)
-  const [userLocationName, setUserLocationName] = useState<string>(initialLocationName || "")
-  const [isRequestingLocation, setIsRequestingLocation] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const [searchRadius, setSearchRadius] = useState(25)
-  const [priceRange, setPriceRange] = useState([0, 100])
-  const [showFreeOnly, setShowFreeOnly] = useState(false)
-  const [sortBy, setSortBy] = useState("distance")
+  const [searchRadius] = useState(25)
   const [showClusters, setShowClusters] = useState(true)
   const [locationPermissionStatus, setLocationPermissionStatus] = useState<PermissionState | null>(null)
   const [locationPermissionRequested, setLocationPermissionRequested] = useState(false)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [mapError, setMapError] = useState<string | null>(null)
-  const [defaultLocation, setDefaultLocation] = useState<{ name: string; lat: number; lng: number }>(
-    initialLocation
-      ? { name: initialLocationName || "Your Location", lat: initialLocation.lat, lng: initialLocation.lng }
-      : DEFAULT_LOCATIONS[0],
-  )
+  const [searchQuery] = useState("")
+  const [selectedCategory] = useState("all")
+  const [priceRange] = useState([0, 100])
+  const [showFreeOnly] = useState(false)
+  const [sortBy] = useState("distance")
+  const [defaultLocation, setDefaultLocation] = useState<{ name: string; lat: number; lng: number }>(() => {
+    if (initialLocation) {
+      return { name: initialLocationName || "Your Location", lat: initialLocation.lat, lng: initialLocation.lng }
+    }
+    return DEFAULT_LOCATIONS[0] || { name: "New York", lat: 40.7128, lng: -74.006 }
+  })
 
   // Update events when initialEvents changes
   useEffect(() => {
@@ -242,7 +220,6 @@ export function EnhancedMapExplorer({
         if (!eventsLoadedRef.current && events.length === 0) {
           loadEventsNearLocation(defaultLocation.lat, defaultLocation.lng, searchRadius)
           setUserLocation({ lat: defaultLocation.lat, lng: defaultLocation.lng })
-          setUserLocationName(defaultLocation.name)
           eventsLoadedRef.current = true
         } else if (events.length > 0) {
           // If we already have events, just update the GeoJSON source
@@ -803,8 +780,7 @@ export function EnhancedMapExplorer({
 
   // Prompt for user location
   const promptForLocation = useCallback(() => {
-    setIsRequestingLocation(true)
-    setLocationError(null)
+    // Location request logic would go here
     setLocationPermissionRequested(true)
 
     if (navigator.geolocation) {
@@ -816,10 +792,10 @@ export function EnhancedMapExplorer({
           // Get location name
           try {
             const locationName = await reverseGeocode(latitude, longitude)
-            setUserLocationName(locationName)
+            setDefaultLocation({ name: locationName, lat: latitude, lng: longitude })
           } catch (error) {
             console.error("Error getting location name:", error)
-            setUserLocationName("Your Location")
+            setDefaultLocation({ name: "Your Location", lat: latitude, lng: longitude })
           }
 
           // Fly to user location
@@ -869,16 +845,16 @@ export function EnhancedMapExplorer({
           // Load events near user location
           loadEventsNearLocation(latitude, longitude, searchRadius)
 
-          setIsRequestingLocation(false)
+          // Location request completed
         },
         (error) => {
           console.error("Error getting location:", error)
-          setLocationError(
+          setMapError(
             error.code === 1
               ? "Location permission denied. Please enable location services to see events near you."
               : "Could not get your location. Please try again or search for a location.",
           )
-          setIsRequestingLocation(false)
+          // Location request failed
 
           // Load events for default location as fallback
           loadEventsNearLocation(defaultLocation.lat, defaultLocation.lng, searchRadius)
@@ -890,8 +866,8 @@ export function EnhancedMapExplorer({
         },
       )
     } else {
-      setLocationError("Geolocation is not supported by your browser.")
-      setIsRequestingLocation(false)
+      setMapError("Geolocation is not supported by your browser.")
+      // Geolocation not supported
 
       // Load events for default location as fallback
       loadEventsNearLocation(defaultLocation.lat, defaultLocation.lng, searchRadius)
@@ -900,7 +876,7 @@ export function EnhancedMapExplorer({
 
   // Load events near a location
   const loadEventsNearLocation = useCallback(async (lat: number, lng: number, radius: number) => {
-    setIsLoadingEvents(true)
+    setIsLoading(true)
 
     try {
       console.log("Loading events near", lat, lng, "with radius", radius)
@@ -950,7 +926,7 @@ export function EnhancedMapExplorer({
       setEvents(mockEvents)
       setFilteredEvents(mockEvents)
     } finally {
-      setIsLoadingEvents(false)
+      setIsLoading(false)
     }
   }, [])
 
@@ -1015,8 +991,8 @@ export function EnhancedMapExplorer({
       events.push({
         id: 1000 + i,
         title: `${category} Event ${i + 1}`,
-        description: `This is a mock ${category.toLowerCase()} event near your location.`,
-        category,
+        description: `This is a mock ${category?.toLowerCase() || 'general'} event near your location.`,
+        category: category || 'general',
         date: formattedDate,
         time: formattedTime,
         location: `${location} ${i + 1}`,
@@ -1036,70 +1012,6 @@ export function EnhancedMapExplorer({
     return events
   }
 
-  // Search for a location
-  const searchLocation = async (query: string) => {
-    if (!query) return
-
-    setIsLoadingEvents(true)
-    setLocationError(null)
-
-    try {
-      // Geocode the address
-      const location = await geocodeAddress(query)
-
-      if (location) {
-        setUserLocation({ lat: location.lat, lng: location.lng })
-        setUserLocationName(location.address)
-
-        // Fly to location
-        if (mapRef.current && styleLoadedRef.current) {
-          mapRef.current.flyTo({
-            center: [location.lng, location.lat],
-            zoom: 10,
-            duration: 2000,
-          })
-
-          // Add location marker
-          if (userMarkerRef.current) {
-            userMarkerRef.current.remove()
-          }
-
-          // Create a DOM element for the marker
-          const el = document.createElement("div")
-          el.className = "search-location-marker"
-          el.style.width = "20px"
-          el.style.height = "20px"
-          el.style.borderRadius = "50%"
-          el.style.backgroundColor = "#EC4899"
-          el.style.border = "3px solid white"
-          el.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)"
-
-          userMarkerRef.current = new (window as any).mapboxgl.Marker({
-            element: el,
-            anchor: "center",
-          })
-            .setLngLat([location.lng, location.lat])
-            .addTo(mapRef.current)
-        }
-
-        // Load events near location
-        loadEventsNearLocation(location.lat, location.lng, searchRadius)
-      } else {
-        setLocationError("Could not find that location. Please try a different search.")
-
-        // Load events for default location as fallback
-        loadEventsNearLocation(defaultLocation.lat, defaultLocation.lng, searchRadius)
-      }
-    } catch (error) {
-      console.error("Error searching location:", error)
-      setLocationError("Error searching for location. Please try again.")
-
-      // Load events for default location as fallback
-      loadEventsNearLocation(defaultLocation.lat, defaultLocation.lng, searchRadius)
-    } finally {
-      setIsLoadingEvents(false)
-    }
-  }
 
   // Filter events based on search, category, and other filters
   useEffect(() => {
@@ -1125,7 +1037,7 @@ export function EnhancedMapExplorer({
     // Filter by price
     if (showFreeOnly) {
       filtered = filtered.filter((event) => event.price.toLowerCase().includes("free"))
-    } else if (priceRange[0] > 0 || priceRange[1] < 100) {
+    } else if (priceRange && priceRange.length >= 2 && priceRange[0] !== undefined && priceRange[1] !== undefined && (priceRange[0] > 0 || priceRange[1] < 100)) {
       filtered = filtered.filter((event) => {
         // Extract numeric price value
         const priceMatch = event.price.match(/\d+/)
@@ -1133,8 +1045,8 @@ export function EnhancedMapExplorer({
         const price = Number.parseInt(priceMatch[0], 10)
 
         // Map price range from 0-100 to 0-1000
-        const minPrice = (priceRange[0] / 100) * 1000
-        const maxPrice = (priceRange[1] / 100) * 1000
+        const minPrice = (priceRange?.[0] ?? 0) / 100 * 1000
+        const maxPrice = (priceRange?.[1] ?? 100) / 100 * 1000
 
         return price >= minPrice && price <= maxPrice
       })
@@ -1185,24 +1097,6 @@ export function EnhancedMapExplorer({
     return deg * (Math.PI / 180)
   }
 
-  // Get color based on event category
-  const getCategoryColor = (category: string): string => {
-    switch (category.toLowerCase()) {
-      case "music":
-        return "#8B5CF6" // Purple
-      case "arts":
-        return "#3B82F6" // Blue
-      case "sports":
-        return "#10B981" // Green
-      case "food":
-        return "#EC4899" // Pink
-      case "business":
-        return "#F59E0B" // Yellow
-      default:
-        return "#6366F1" // Indigo
-    }
-  }
-
   // Toggle favorite status
   const handleToggleFavorite = (eventId: number) => {
     const updatedEvents = events.map((event) =>
@@ -1217,77 +1111,24 @@ export function EnhancedMapExplorer({
     setShowDetailModal(true)
   }
 
-  // Handle event selection
-  const handleEventSelect = (event: EventDetailProps) => {
-    setSelectedEvent(event)
-
-    // Fly to the event location
-    if (mapRef.current && event.coordinates && styleLoadedRef.current) {
-      mapRef.current.flyTo({
-        center: [event.coordinates.lng, event.coordinates.lat],
-        zoom: 14,
-        duration: 1500,
-      })
-
-      // Close any open popups
-      if (popupRef.current) {
-        popupRef.current.remove()
-      }
-
-      // Create popup
-      popupRef.current = new (window as any).mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        className: "event-popup",
-        maxWidth: "300px",
-        offset: 15,
-      })
-        .setLngLat([event.coordinates.lng, event.coordinates.lat])
-        .setHTML(
-          `
-          <div class="p-2">
-            <div class="font-medium text-sm">${event.title}</div>
-            <div class="text-xs text-gray-400 mt-1">${event.location}</div>
-            <div class="text-xs text-purple-400 mt-1">${event.date}</div>
-          </div>
-        `,
-        )
-        .addTo(mapRef.current)
-    }
-  }
-
-  // Handle search form submission
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    searchLocation(searchQuery)
-  }
-
-  // Handle radius change
-  const handleRadiusChange = (value: number[]) => {
-    setSearchRadius(value[0])
-
-    // If we have a user location, update the events
-    if (userLocation) {
-      loadEventsNearLocation(userLocation.lat, userLocation.lng, value[0])
-    }
-  }
-
   // Change default location
   const handleChangeDefaultLocation = (index: number) => {
     const newLocation = DEFAULT_LOCATIONS[index]
-    setDefaultLocation(newLocation)
+    if (newLocation) {
+      setDefaultLocation(newLocation)
 
-    if (mapRef.current && styleLoadedRef.current) {
-      mapRef.current.flyTo({
-        center: [newLocation.lng, newLocation.lat],
-        zoom: 10,
-        duration: 2000,
-      })
+      if (mapRef.current && styleLoadedRef.current) {
+        mapRef.current.flyTo({
+          center: [newLocation.lng, newLocation.lat],
+          zoom: 10,
+          duration: 2000,
+        })
+      }
+
+      setUserLocation({ lat: newLocation.lat, lng: newLocation.lng })
+      setDefaultLocation(newLocation)
+      loadEventsNearLocation(newLocation.lat, newLocation.lng, searchRadius)
     }
-
-    setUserLocation({ lat: newLocation.lat, lng: newLocation.lng })
-    setUserLocationName(newLocation.name)
-    loadEventsNearLocation(newLocation.lat, newLocation.lng, searchRadius)
   }
 
   // If there's a map error, show the fallback component
@@ -1600,104 +1441,3 @@ export function EnhancedMapExplorer({
   )
 }
 
-// Event list item component
-interface EventListItemProps {
-  event: EventDetailProps
-  isSelected: boolean
-  onSelect: () => void
-  onViewDetails: () => void
-  onToggleFavorite: () => void
-}
-
-function EventListItem({ event, isSelected, onSelect, onViewDetails, onToggleFavorite }: EventListItemProps) {
-  return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      className={cn(
-        "cursor-pointer rounded-xl overflow-hidden border transition-all duration-200",
-        isSelected
-          ? "border-purple-500 bg-[#22252F]/80 shadow-glow-sm"
-          : "border-gray-800 bg-[#22252F]/50 hover:border-gray-700",
-      )}
-      onClick={onSelect}
-    >
-      <div className="p-3">
-        <div className="flex gap-3">
-          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-            <img src={event.image || "/community-event.png"} alt={event.title} className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <Badge
-                className={cn(
-                  "text-xs font-medium border-0 px-2 py-0.5",
-                  event.category === "Music"
-                    ? "bg-purple-500/20 text-purple-300"
-                    : event.category === "Arts"
-                      ? "bg-blue-500/20 text-blue-300"
-                      : event.category === "Sports"
-                        ? "bg-green-500/20 text-green-300"
-                        : event.category === "Food"
-                          ? "bg-pink-500/20 text-pink-300"
-                          : "bg-yellow-500/20 text-yellow-300",
-                )}
-              >
-                {event.category}
-              </Badge>
-              <motion.button
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleFavorite()
-                }}
-                className="text-gray-400 hover:text-purple-400 transition-colors duration-200"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill={event.isFavorite ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={event.isFavorite ? "text-purple-500" : "text-gray-400"}
-                >
-                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                </svg>
-              </motion.button>
-            </div>
-            <h3 className="font-medium text-gray-200 text-sm truncate">{event.title}</h3>
-            <div className="flex items-center text-xs text-gray-400 mt-1">
-              <Calendar size={10} className="mr-1 text-purple-400 flex-shrink-0" />
-              <span className="truncate">{event.date}</span>
-            </div>
-            <div className="flex items-center text-xs text-gray-400 mt-1">
-              <MapPin size={10} className="mr-1 text-purple-400 flex-shrink-0" />
-              <span className="truncate">{event.location}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-800/50">
-          <div className="flex items-center text-xs text-gray-400">
-            <Users size={10} className="mr-1" />
-            <span className="text-purple-400 font-medium">{event.attendees}</span> attending
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-900/20"
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewDetails()
-            }}
-          >
-            Details
-          </Button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}

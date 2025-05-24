@@ -189,7 +189,7 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
 
           setIsLoading(false)
         },
-        (error) => {
+        (_error) => {
           // console.error("Error getting current location:", error)
           setError("Could not get your current location. Please try entering an address.")
           setIsLoading(false)
