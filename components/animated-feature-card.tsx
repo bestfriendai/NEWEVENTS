@@ -18,33 +18,47 @@ export function AnimatedFeatureCard({ icon: Icon, title, description, index }: A
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    gsap.registerPlugin(ScrollTrigger)
+    // Safely register ScrollTrigger plugin
+    try {
+      gsap.registerPlugin(ScrollTrigger)
+    } catch (error) {
+      console.warn("Failed to register ScrollTrigger:", error)
+      return
+    }
 
     const card = cardRef.current
     if (!card) return
 
-    gsap.fromTo(
-      card,
-      {
-        y: 50,
-        opacity: 0,
-      },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.8,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: card,
-          start: "top bottom-=100",
-          toggleActions: "play none none none",
+    try {
+      gsap.fromTo(
+        card,
+        {
+          y: 50,
+          opacity: 0,
         },
-        delay: index * 0.15,
-      },
-    )
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: card,
+            start: "top bottom-=100",
+            toggleActions: "play none none none",
+          },
+          delay: index * 0.15,
+        },
+      )
+    } catch (error) {
+      console.warn("Error creating GSAP animation:", error)
+    }
 
     return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      try {
+        ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      } catch (error) {
+        console.warn("Error cleaning up ScrollTrigger:", error)
+      }
     }
   }, [index])
 

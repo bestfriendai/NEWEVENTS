@@ -7,10 +7,10 @@ import {
   getEventsByCategory,
   getEventsByLocation,
   getPersonalizedEvents,
-  searchEnhancedEvents,
   type EventSearchParams,
   type EnhancedEventSearchParams,
 } from "@/lib/api/events-api"
+import { searchEnhancedEvents } from "@/lib/api/enhanced-events-api"
 
 export async function fetchEvents(params: EventSearchParams) {
   try {

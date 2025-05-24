@@ -5,11 +5,11 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
 import SimpleCobeGlobe from "@/components/simple-cobe-globe"
-import { gsap } from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { useGSAP } from "@/lib/gsap-utils"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null)
@@ -17,80 +17,91 @@ export default function Home() {
   const ctaButtonRef = useRef<HTMLDivElement>(null)
   const isMobile = useMobile()
   const [activeTab, setActiveTab] = useState("concerts")
+  const [isClient, setIsClient] = useState(false)
+  const { safeGSAP, cleanup, createFadeIn, createScaleAnimation } = useGSAP()
+
+  // Generate stable particle positions
+  const particlePositions = useState(() =>
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 2 + Math.random() * 2
+    }))
+  )[0]
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    setIsClient(true)
+  }, [])
 
-    gsap.registerPlugin(ScrollTrigger)
+  useEffect(() => {
+    if (typeof window === "undefined" || !isClient) return
 
     // Animate hero elements
     const heroElements = heroRef.current?.querySelectorAll(".animate-in")
-    if (heroElements) {
-      gsap.fromTo(
-        heroElements,
-        { y: 30, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.1,
-          ease: "power2.out",
-        },
-      )
+    if (heroElements && heroElements.length > 0) {
+      safeGSAP(() => {
+        import("gsap").then(({ gsap }) => {
+          gsap.fromTo(
+            heroElements,
+            { y: 30, opacity: 0 },
+            {
+              y: 0,
+              opacity: 1,
+              duration: 0.8,
+              stagger: 0.1,
+              ease: "power2.out",
+            },
+          )
+        })
+      })
     }
 
     // Animate globe container
     if (globeRef.current) {
-      gsap.fromTo(
-        globeRef.current,
-        { y: 20, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 1,
-          ease: "power2.out",
-          delay: 0.3,
-        },
-      )
+      createFadeIn(globeRef.current, {
+        y: 20,
+        duration: 1,
+        delay: 0.3,
+        ease: "power2.out"
+      })
     }
 
     // Animate floating cards
     const floatingCards = document.querySelectorAll(".floating-card")
     if (floatingCards.length) {
-      gsap.fromTo(
-        floatingCards,
-        { y: 20, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          stagger: 0.15,
-          ease: "back.out(1.7)",
-          delay: 0.8,
-        },
-      )
+      safeGSAP(() => {
+        import("gsap").then(({ gsap }) => {
+          gsap.fromTo(
+            floatingCards,
+            { y: 20, opacity: 0 },
+            {
+              y: 0,
+              opacity: 1,
+              duration: 0.8,
+              stagger: 0.15,
+              ease: "back.out(1.7)",
+              delay: 0.8,
+            },
+          )
+        })
+      })
     }
 
     // Animate CTA button
     const ctaButton = ctaButtonRef.current
     if (ctaButton) {
-      gsap.fromTo(
-        ctaButton,
-        { scale: 0.95, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 0.6,
-          ease: "back.out(1.7)",
-          delay: 0.6,
-        },
-      )
+      createScaleAnimation(ctaButton, {
+        scale: 0.95,
+        duration: 0.6,
+        delay: 0.6,
+        ease: "back.out(1.7)"
+      })
     }
 
-    return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
-    }
-  }, [])
+    return cleanup
+  }, [isClient, safeGSAP, createFadeIn, createScaleAnimation, cleanup])
 
   const features = [
     {
@@ -154,15 +165,15 @@ export default function Home() {
 
           {/* Floating particles */}
           <div className="absolute inset-0">
-            {[...Array(20)].map((_, i) => (
+            {isClient && particlePositions.map((particle) => (
               <div
-                key={i}
+                key={particle.id}
                 className="absolute w-1 h-1 bg-white/30 rounded-full animate-pulse"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 3}s`,
-                  animationDuration: `${2 + Math.random() * 2}s`,
+                  left: `${particle.left}%`,
+                  top: `${particle.top}%`,
+                  animationDelay: `${particle.delay}s`,
+                  animationDuration: `${particle.duration}s`,
                 }}
               />
             ))}
@@ -210,7 +221,9 @@ export default function Home() {
               {/* Main Globe */}
               <div className="relative z-10 flex justify-center">
                 <div className="relative">
-                  <SimpleCobeGlobe />
+                  <ErrorBoundary>
+                    <SimpleCobeGlobe />
+                  </ErrorBoundary>
                   {/* Glow effect around globe */}
                   <div className="absolute inset-0 bg-gradient-radial from-purple-500/20 via-transparent to-transparent rounded-full blur-xl pointer-events-none"></div>
                 </div>

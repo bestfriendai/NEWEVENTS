@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:improvements": "npx tsx scripts/test-improvements.ts",
+    "test:cache": "node -e \"require('./lib/utils/cache.ts').memoryCache.clear(); console.log('Cache cleared')\"",
+    "validate:env": "node -e \"require('./lib/env.ts'); console.log('Environment validation passed')\""
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.3.1",
@@ -68,7 +71,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.15.21",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.170.0",

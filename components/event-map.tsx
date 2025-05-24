@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { geocodeAddress } from "@/lib/api/map-api"
+import { createMap, createMarker, createPopup, cleanupMap } from "@/lib/mapbox-utils"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface EventMapProps {
@@ -21,6 +22,8 @@ export function EventMap({ event }: EventMapProps) {
       setIsLoading(false)
       return
     }
+
+    let mapInstance: any = null
 
     const initMap = async () => {
       try {
@@ -44,37 +47,13 @@ export function EventMap({ event }: EventMapProps) {
           lng = location.lng
         }
 
-        // Load the Mapbox script
-        let mapboxgl = (window as any).mapboxgl
-        if (!mapboxgl) {
-          const script = document.createElement("script")
-          script.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"
-          script.async = true
-          document.body.appendChild(script)
-
-          const link = document.createElement("link")
-          link.href = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
-          link.rel = "stylesheet"
-          document.head.appendChild(link)
-
-          await new Promise((resolve) => {
-            script.onload = resolve
-          })
-        }
-
-        // Initialize the map
-        mapboxgl = (window as any).mapboxgl
-        mapboxgl.accessToken =
-          "pk.eyJ1IjoiZGF0ZWFpIiwiYSI6ImNsbjRtYnFvejAyaWsycXBmcTkzYnN0am0ifQ.Z5Z9_rv0PVvJAGrb7AJmRg"
-
-        const map = new mapboxgl.Map({
-          container: mapRef.current,
-          style: "mapbox://styles/mapbox/dark-v11",
+        // Use the safe Mapbox utilities
+        mapInstance = await createMap(mapRef.current!, {
           center: [lng, lat],
           zoom: 14,
         })
 
-        // Add marker
+        // Create marker element
         const el = document.createElement("div")
         el.className = "marker"
         el.style.width = "24px"
@@ -84,25 +63,24 @@ export function EventMap({ event }: EventMapProps) {
         el.style.border = "3px solid white"
         el.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)"
 
-        new mapboxgl.Marker(el).setLngLat([lng, lat]).addTo(map)
+        // Create and add marker
+        const marker = await createMarker({ element: el })
+        marker.setLngLat([lng, lat]).addTo(mapInstance)
 
-        // Add popup
-        new mapboxgl.Popup({
+        // Create and add popup
+        const popup = await createPopup({
           closeButton: false,
           closeOnClick: false,
           offset: 25,
         })
+        popup
           .setLngLat([lng, lat])
           .setHTML(`<div class="p-2"><div class="font-medium text-sm">${event.title}</div></div>`)
-          .addTo(map)
+          .addTo(mapInstance)
 
-        map.on("load", () => {
+        mapInstance.on("load", () => {
           setIsLoading(false)
         })
-
-        return () => {
-          map.remove()
-        }
       } catch (err) {
         // console.error("Error initializing map:", err)
         setError("Could not load map")
@@ -111,6 +89,12 @@ export function EventMap({ event }: EventMapProps) {
     }
 
     initMap()
+
+    return () => {
+      if (mapInstance) {
+        cleanupMap(mapInstance)
+      }
+    }
   }, [event])
 
   return (

@@ -22,40 +22,44 @@ export function AnimatedText({ children, className = "", delay = 0 }: AnimatedTe
     const element = textRef.current
     if (!element) return
 
-    // Simple animation for mobile
-    if (isMobile) {
+    try {
+      // Simple animation for mobile
+      if (isMobile) {
+        gsap.fromTo(
+          element,
+          {
+            y: 20,
+            opacity: 0,
+          },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            ease: "power3.out",
+            delay: delay,
+          },
+        )
+        return
+      }
+
+      // More complex animation for desktop
       gsap.fromTo(
         element,
         {
-          y: 20,
+          y: 30,
           opacity: 0,
         },
         {
           y: 0,
           opacity: 1,
-          duration: 0.8,
-          ease: "power3.out",
+          duration: 1,
+          ease: "power4.out",
           delay: delay,
         },
       )
-      return
+    } catch (error) {
+      console.warn("Error creating GSAP animation:", error)
     }
-
-    // More complex animation for desktop
-    gsap.fromTo(
-      element,
-      {
-        y: 30,
-        opacity: 0,
-      },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 1,
-        ease: "power4.out",
-        delay: delay,
-      },
-    )
   }, [delay, isMobile])
 
   return (

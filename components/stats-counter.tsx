@@ -19,7 +19,13 @@ export function StatsCounter({ value, label, suffix = "", delay = 0 }: StatsCoun
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    gsap.registerPlugin(ScrollTrigger)
+    // Safely register ScrollTrigger plugin
+    try {
+      gsap.registerPlugin(ScrollTrigger)
+    } catch (error) {
+      console.warn("Failed to register ScrollTrigger:", error)
+      return
+    }
 
     const counter = counterRef.current
     if (!counter || hasAnimated.current) return
@@ -27,43 +33,55 @@ export function StatsCounter({ value, label, suffix = "", delay = 0 }: StatsCoun
     const triggerAnimation = () => {
       hasAnimated.current = true
 
-      // Animate the counter value
-      const obj = { value: 0 }
-      gsap.to(obj, {
-        value: value,
-        duration: 2,
-        delay: delay,
-        ease: "power2.out",
-        onUpdate: () => {
-          setDisplayValue(Math.round(obj.value))
-        },
-      })
-
-      // Animate the counter appearance
-      gsap.fromTo(
-        counter,
-        {
-          y: 20,
-          opacity: 0,
-        },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
+      try {
+        // Animate the counter value
+        const obj = { value: 0 }
+        gsap.to(obj, {
+          value: value,
+          duration: 2,
           delay: delay,
-          ease: "power3.out",
-        },
-      )
+          ease: "power2.out",
+          onUpdate: () => {
+            setDisplayValue(Math.round(obj.value))
+          },
+        })
+
+        // Animate the counter appearance
+        gsap.fromTo(
+          counter,
+          {
+            y: 20,
+            opacity: 0,
+          },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            delay: delay,
+            ease: "power3.out",
+          },
+        )
+      } catch (error) {
+        console.warn("Error creating GSAP animation:", error)
+      }
     }
 
-    ScrollTrigger.create({
-      trigger: counter,
-      start: "top bottom-=100",
-      onEnter: triggerAnimation,
-    })
+    try {
+      ScrollTrigger.create({
+        trigger: counter,
+        start: "top bottom-=100",
+        onEnter: triggerAnimation,
+      })
+    } catch (error) {
+      console.warn("Error creating ScrollTrigger:", error)
+    }
 
     return () => {
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      try {
+        ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      } catch (error) {
+        console.warn("Error cleaning up ScrollTrigger:", error)
+      }
     }
   }, [value, delay])
 
