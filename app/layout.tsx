@@ -4,6 +4,8 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { LocationProvider } from "@/contexts/LocationContext"
+import { FavoritesProvider } from "@/contexts/FavoritesContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -23,7 +25,11 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-            {children}
+            <LocationProvider>
+              <FavoritesProvider>
+                {children}
+              </FavoritesProvider>
+            </LocationProvider>
           </ThemeProvider>
         </ErrorBoundary>
         <script
