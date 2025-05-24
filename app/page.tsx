@@ -12,9 +12,9 @@ import { useGSAP } from "@/lib/gsap-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function Home() {
-  const heroRef = useRef<HTMLDivElement>(null)
-  const globeRef = useRef<HTMLDivElement>(null)
-  const ctaButtonRef = useRef<HTMLDivElement>(null)
+  const heroRef = useRef(null)
+  const globeRef = useRef(null)
+  const ctaButtonRef = useRef(null)
   const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState("concerts")
   const [isClient, setIsClient] = useState(false)
@@ -27,8 +27,8 @@ export default function Home() {
       left: (i * 17 + 23) % 100, // Deterministic positioning
       top: (i * 13 + 37) % 100,
       delay: (i * 0.15) % 3,
-      duration: 2 + (i * 0.1) % 2
-    }))
+      duration: 2 + ((i * 0.1) % 2),
+    })),
   )[0]
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function Home() {
         y: 20,
         duration: 1,
         delay: 0.3,
-        ease: "power2.out"
+        ease: "power2.out",
       })
     }
 
@@ -96,7 +96,7 @@ export default function Home() {
         scale: 0.95,
         duration: 0.6,
         delay: 0.6,
-        ease: "back.out(1.7)"
+        ease: "back.out(1.7)",
       })
     }
 
@@ -165,18 +165,19 @@ export default function Home() {
 
           {/* Floating particles */}
           <div className="absolute inset-0">
-            {isClient && particlePositions.map((particle) => (
-              <div
-                key={particle.id}
-                className="absolute w-1 h-1 bg-white/30 rounded-full animate-pulse"
-                style={{
-                  left: `${particle.left}%`,
-                  top: `${particle.top}%`,
-                  animationDelay: `${particle.delay}s`,
-                  animationDuration: `${particle.duration}s`,
-                }}
-              />
-            ))}
+            {isClient &&
+              particlePositions.map((particle) => (
+                <div
+                  key={particle.id}
+                  className="absolute w-1 h-1 bg-white/30 rounded-full animate-pulse"
+                  style={{
+                    left: `${particle.left}%`,
+                    top: `${particle.top}%`,
+                    animationDelay: `${particle.delay}s`,
+                    animationDuration: `${particle.duration}s`,
+                  }}
+                />
+              ))}
           </div>
         </div>
 
@@ -559,7 +560,7 @@ export default function Home() {
 }
 
 // Floating Card Component
-function FloatingCard({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
+function FloatingCard({ icon, title, subtitle }) {
   return (
     <div className="bg-[#12141D]/90 backdrop-blur-md rounded-xl p-3 border border-gray-800 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
       <div className="flex items-center gap-3">
@@ -574,7 +575,7 @@ function FloatingCard({ icon, title, subtitle }: { icon: React.ReactNode; title:
 }
 
 // Event Card Component
-function EventCard({ title, date, location, image, category }: { title: string; date: string; location: string; image: string; category: string }) {
+function EventCard({ title, date, location, image, category }) {
   return (
     <div className="group relative rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
       <div className="aspect-[3/2] w-full">

@@ -1,182 +1,85 @@
-/**
- * Centralized logging utility for structured logging and error tracking
- */
+// lib/utils/logger.ts
 
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-}
-
-export interface LogContext {
-  userId?: string
-  sessionId?: string
-  component?: string
-  action?: string
-  metadata?: Record<string, any>
-}
-
-export interface LogEntry {
-  level: LogLevel
-  message: string
-  timestamp: Date
-  context?: LogContext
-  error?: Error
-  stack?: string
+// Define a simple logger class
+interface LogContext {
+  [key: string]: any
 }
 
 class Logger {
-  private logLevel: LogLevel
-  private isDevelopment: boolean
+  private serviceName: string
 
-  constructor() {
-    this.isDevelopment = process.env.NODE_ENV === "development"
-    this.logLevel = this.isDevelopment ? LogLevel.DEBUG : LogLevel.INFO
+  constructor(serviceName = "default-service") {
+    this.serviceName = serviceName
   }
 
-  private shouldLog(level: LogLevel): boolean {
-    return level >= this.logLevel
-  }
-
-  private formatMessage(entry: LogEntry): string {
-    const timestamp = entry.timestamp.toISOString()
-    const level = LogLevel[entry.level]
-    const context = entry.context ? ` [${entry.context.component || "Unknown"}]` : ""
-
-    return `[${timestamp}] ${level}${context}: ${entry.message}`
-  }
-
-  private createLogEntry(level: LogLevel, message: string, context?: LogContext, error?: Error): LogEntry {
-    return {
+  private log(level: string, message: string, context?: LogContext, error?: Error) {
+    const timestamp = new Date().toISOString()
+    const logEntry = {
+      timestamp,
       level,
+      service: this.serviceName,
       message,
-      timestamp: new Date(),
       context,
-      error,
-      stack: error?.stack,
+      error: error ? { name: error.name, message: error.message, stack: error.stack } : undefined,
     }
+    console.log(JSON.stringify(logEntry))
   }
 
-  private log(entry: LogEntry): void {
-    if (!this.shouldLog(entry.level)) return
-
-    const formattedMessage = this.formatMessage(entry)
-
-    // In development, use console methods for better formatting
-    if (this.isDevelopment) {
-      switch (entry.level) {
-        case LogLevel.DEBUG:
-          console.debug(formattedMessage, entry.context, entry.error)
-          break
-        case LogLevel.INFO:
-          console.info(formattedMessage, entry.context)
-          break
-        case LogLevel.WARN:
-          console.warn(formattedMessage, entry.context, entry.error)
-          break
-        case LogLevel.ERROR:
-          console.error(formattedMessage, entry.context, entry.error)
-          break
-      }
-    } else {
-      // In production, use structured logging
-      console.log(JSON.stringify(entry))
-    }
-
-    // In production, you might want to send logs to an external service
-    // this.sendToExternalService(entry)
+  info(message: string, context?: LogContext) {
+    this.log("info", message, context)
   }
 
-  debug(message: string, context?: LogContext): void {
-    const entry = this.createLogEntry(LogLevel.DEBUG, message, context)
-    this.log(entry)
+  warn(message: string, context?: LogContext) {
+    this.log("warn", message, context)
   }
 
-  info(message: string, context?: LogContext): void {
-    const entry = this.createLogEntry(LogLevel.INFO, message, context)
-    this.log(entry)
+  error(message: string, context?: LogContext, error?: Error) {
+    this.log("error", message, context, error)
   }
 
-  warn(message: string, context?: LogContext, error?: Error): void {
-    const entry = this.createLogEntry(LogLevel.WARN, message, context, error)
-    this.log(entry)
+  debug(message: string, context?: LogContext) {
+    this.log("debug", message, context)
   }
 
-  error(message: string, context?: LogContext, error?: Error): void {
-    const entry = this.createLogEntry(LogLevel.ERROR, message, context, error)
-    this.log(entry)
+  apiRequest(method: string, url: string, context?: LogContext) {
+    this.info(`API Request: ${method} ${url}`, { ...context, action: "api_request", method, url })
   }
 
-  // API-specific logging methods
-  apiRequest(method: string, url: string, context?: LogContext): void {
-    this.info(`API Request: ${method} ${url}`, {
-      ...context,
-      action: "api_request",
-      metadata: { method, url },
-    })
-  }
-
-  apiResponse(method: string, url: string, status: number, duration?: number, context?: LogContext): void {
-    const level = status >= 400 ? LogLevel.ERROR : LogLevel.INFO
-    const message = `API Response: ${method} ${url} - ${status}${duration ? ` (${duration}ms)` : ""}`
-
-    const entry = this.createLogEntry(level, message, {
+  apiResponse(method: string, url: string, status: number, duration?: number, context?: LogContext) {
+    const message = `API Response: ${method} ${url} - Status: ${status}`
+    const logContext: LogContext = {
       ...context,
       action: "api_response",
-      metadata: { method, url, status, duration },
-    })
-
-    this.log(entry)
+      method,
+      url,
+      status,
+    }
+    if (duration) {
+      logContext.duration = duration
+    }
+    this.info(message, logContext)
   }
 
-  apiError(method: string, url: string, error: Error, context?: LogContext): void {
-    this.error(
-      `API Error: ${method} ${url}`,
-      {
-        ...context,
-        action: "api_error",
-        metadata: { method, url },
-      },
-      error,
-    )
+  userAction(action: string, context?: LogContext) {
+    this.info(`User Action: ${action}`, { ...context, action })
   }
 
-  // User action logging
-  userAction(action: string, context?: LogContext): void {
-    this.info(`User Action: ${action}`, {
-      ...context,
-      action: "user_action",
-      metadata: { action },
-    })
-  }
-
-  // Performance logging
-  performance(operation: string, duration: number, context?: LogContext): void {
-    const level = duration > 5000 ? LogLevel.WARN : LogLevel.INFO
-    const message = `Performance: ${operation} took ${duration}ms`
-
-    const entry = this.createLogEntry(level, message, {
+  performance(operation: string, duration: number, context?: LogContext) {
+    this.info(`Performance: ${operation} took ${duration.toFixed(2)}ms`, {
       ...context,
       action: "performance",
-      metadata: { operation, duration },
-    })
-
-    this.log(entry)
-  }
-
-  // Security logging
-  security(event: string, context?: LogContext): void {
-    this.warn(`Security Event: ${event}`, {
-      ...context,
-      action: "security_event",
-      metadata: { event },
+      operation,
+      duration,
     })
   }
 }
 
 // Create singleton instance
-export const logger = new Logger()
+const logger = new Logger()
+
+// Export the logger instance as default and named export
+export { logger }
+export default logger
 
 // Convenience functions for common logging patterns
 export const logApiCall = (method: string, url: string, context?: LogContext) => {
@@ -206,11 +109,13 @@ export const logPerformance = (operation: string, duration: number, context?: Lo
 }
 
 // Performance measurement utility
-export const measurePerformance = async <T>(
+export const measurePerformance = async <T>(\
   operation: string,
   fn: () => Promise<T>,
   context?: LogContext
-): Promise<T> => {
+)
+: Promise<T> =>
+{
   const start = performance.now()
   try {
     const result = await fn()

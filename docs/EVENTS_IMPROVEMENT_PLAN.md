@@ -23,7 +23,7 @@ This document outlines a systematic approach to improving the events application
 **Current State**: Basic try-catch with fallback events
 **Improvement**: Structured error types and detailed error responses
 
-```typescript
+\`\`\`typescript
 // Enhanced error interface
 export interface EventSearchResult {
   events: EventDetailProps[]
@@ -35,13 +35,13 @@ export interface EventSearchResult {
   }
   source?: string
 }
-```
+\`\`\`
 
 ### 1.2 Data Validation with Zod
 **Current State**: No validation of API responses
 **Improvement**: Schema validation for RapidAPI responses
 
-```typescript
+\`\`\`typescript
 const RapidApiEventSchema = z.object({
   event_id: z.string().optional(),
   name: z.string().optional(),
@@ -54,13 +54,13 @@ const RapidApiEventSchema = z.object({
   }).optional().nullable(),
   start_time: z.string().optional(),
 })
-```
+\`\`\`
 
 ### 1.3 Caching Strategy
 **Current State**: No caching for API calls
 **Improvement**: Server-side caching with TTL
 
-```typescript
+\`\`\`typescript
 const getCachedEvents = unstable_cache(
   async (params: EventSearchParams) => {
     return await _fetchEventsFromApi(params)
@@ -71,13 +71,13 @@ const getCachedEvents = unstable_cache(
     revalidate: 3600, // 1 hour
   }
 )
-```
+\`\`\`
 
 ### 1.4 Advanced API Querying
 **Current State**: Basic query, location, date=any parameters
 **Improvement**: Utilize startDate, endDate, radius parameters
 
-```typescript
+\`\`\`typescript
 // Enhanced URL construction
 if (params.startDate && params.endDate) {
   queryParams.set("date", `${params.startDate}..${params.endDate}`)
@@ -85,7 +85,7 @@ if (params.startDate && params.endDate) {
 if (params.radius) {
   queryParams.set("radius_miles", String(params.radius))
 }
-```
+\`\`\`
 
 ## Phase 2: Frontend Architecture & State Management
 
@@ -102,19 +102,19 @@ if (params.radius) {
 **Current State**: Local state in EventsClient
 **Improvement**: Global context for user location
 
-```typescript
+\`\`\`typescript
 // contexts/LocationContext.tsx
 interface LocationContextType {
   userLocation: UserLocation | null
   setUserLocation: Dispatch<SetStateAction<UserLocation | null>>
 }
-```
+\`\`\`
 
 ### 2.3 Favorites System
 **Current State**: Local state, not persisted
 **Improvement**: Backend-connected with optimistic updates
 
-```typescript
+\`\`\`typescript
 // Optimistic updates with Supabase backend
 const handleToggleFavorite = async (eventId: number) => {
   // Update UI immediately
@@ -128,17 +128,17 @@ const handleToggleFavorite = async (eventId: number) => {
     showErrorToast()
   }
 }
-```
+\`\`\`
 
 ### 2.4 Enhanced Loading States
 **Current State**: Basic Loader2 spinner
 **Improvement**: Skeleton screens and contextual loading
 
-```typescript
+\`\`\`typescript
 // Skeleton components for better perceived performance
 <EventCardSkeleton />
 <MapSkeleton />
-```
+\`\`\`
 
 ## Phase 3: UI/UX Enhancements
 
@@ -146,7 +146,7 @@ const handleToggleFavorite = async (eventId: number) => {
 **Current State**: Non-functional "Filter Events" button
 **Improvement**: Functional filter sidebar/modal
 
-```typescript
+\`\`\`typescript
 // Filter options
 interface EventFilters {
   category: string[]
@@ -154,7 +154,7 @@ interface EventFilters {
   priceRange: { min: number; max: number }
   distance: number
 }
-```
+\`\`\`
 
 ### 3.2 Responsive Design
 **Current State**: Basic responsiveness
@@ -168,7 +168,7 @@ interface EventFilters {
 **Current State**: DOM markers for events
 **Improvement**: GeoJSON sources with clustering
 
-```typescript
+\`\`\`typescript
 // GeoJSON source for better performance
 mapRef.current.addSource('events', {
   type: 'geojson',
@@ -177,7 +177,7 @@ mapRef.current.addSource('events', {
   clusterMaxZoom: 14,
   clusterRadius: 50,
 })
-```
+\`\`\`
 
 ### 3.4 Accessibility
 **Current State**: Basic accessibility
@@ -261,7 +261,7 @@ mapRef.current.addSource('events', {
 
 ## Architecture Diagram
 
-```mermaid
+\`\`\`mermaid
 graph TD
     A[User] --> B[Events Page]
     B --> C[Events Client]
@@ -283,6 +283,6 @@ graph TD
     O[Error Boundary] --> C
     P[Loading States] --> C
     Q[Filter System] --> C
-```
+\`\`\`
 
 This comprehensive plan will transform the events application into a production-ready, scalable, and user-friendly platform with excellent performance, accessibility, and maintainability.
