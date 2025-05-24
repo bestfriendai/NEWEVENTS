@@ -2,7 +2,7 @@
  * Runtime validation utilities for API responses and user input
  */
 
-import { logger } from '@/lib/utils/logger'
+import { logger } from "@/lib/utils/logger"
 
 export interface ValidationResult {
   isValid: boolean
@@ -59,42 +59,60 @@ export const validators = {
     return validators.coordinate(value) && value >= -90 && value <= 90
   },
 
-  longitude: (value: number): boolean => {
-    return validators.coordinate(value) && value >= -180 && value <= 180
-  },
+  longitude: (value: number)
+: boolean =>
+{
+  return validators.coordinate(value) && value >= -180 && value <= 180
+}
+,
 
-  dateString: (value: string): boolean => {
-    const date = new Date(value)
-    return !isNaN(date.getTime())
-  },
+  dateString: (value: string): boolean =>
+{
+  const date = new Date(value)
+  return !isNaN(date.getTime())
+}
+,
 
-  positiveNumber: (value: number): boolean => {
-    return validators.number(value) && value > 0
-  },
+  positiveNumber: (value: number): boolean =>
+{
+  return validators.number(value) && value > 0
+}
+,
 
-  nonNegativeNumber: (value: number): boolean => {
-    return validators.number(value) && value >= 0
-  },
+  nonNegativeNumber: (value: number): boolean =>
+{
+  return validators.number(value) && value >= 0
+}
+,
 
-  minLength: (min: number) => (value: string): boolean => {
-    return validators.string(value) && value.length >= min
-  },
+  minLength: (min: number) => (value: string): boolean =>
+{
+  return validators.string(value) && value.length >= min
+}
+,
 
-  maxLength: (max: number) => (value: string): boolean => {
-    return validators.string(value) && value.length <= max
-  },
+  maxLength: (max: number) => (value: string): boolean =>
+{
+  return validators.string(value) && value.length <= max
+}
+,
 
-  range: (min: number, max: number) => (value: number): boolean => {
-    return validators.number(value) && value >= min && value <= max
-  },
+  range: (min: number, max: number) => (value: number): boolean =>
+{
+  return validators.number(value) && value >= min && value <= max
+}
+,
 
-  oneOf: <T>(options: T[]) => (value: T): boolean => {
-    return options.includes(value)
-  },
+  oneOf: <T>(options: T[]) => (value: T): boolean =>
+{
+  return options.includes(value)
+}
+,
 
-  pattern: (regex: RegExp) => (value: string): boolean => {
-    return validators.string(value) && regex.test(value)
-  }
+  pattern: (regex: RegExp) => (value: string): boolean =>
+{
+  return validators.string(value) && regex.test(value)
+}
 }
 
 /**
@@ -103,7 +121,7 @@ export const validators = {
 export interface ValidationSchema {
   [key: string]: {
     required?: boolean
-    type?: 'string' | 'number' | 'boolean' | 'array' | 'object'
+    type?: "string" | "number" | "boolean" | "array" | "object"
     validator?: (value: any) => boolean
     message?: string
     nested?: ValidationSchema
@@ -117,7 +135,7 @@ export class SchemaValidator {
     if (!validators.object(data)) {
       return {
         isValid: false,
-        errors: ['Data must be an object']
+        errors: ["Data must be an object"],
       }
     }
 
@@ -154,7 +172,7 @@ export class SchemaValidator {
       if (rules.nested && validators.object(value)) {
         const nestedResult = this.validate(value, rules.nested)
         if (!nestedResult.isValid) {
-          errors.push(...nestedResult.errors.map(error => `${key}.${error}`))
+          errors.push(...nestedResult.errors.map((error) => `${key}.${error}`))
         }
       }
     }
@@ -162,7 +180,7 @@ export class SchemaValidator {
     return {
       isValid: errors.length === 0,
       errors,
-      data: errors.length === 0 ? data : undefined
+      data: errors.length === 0 ? data : undefined,
     }
   }
 }
@@ -173,34 +191,34 @@ export class SchemaValidator {
 export const apiValidators = {
   eventDetail: (data: any): ValidationResult => {
     const schema: ValidationSchema = {
-      id: { required: true, type: 'number' },
-      title: { required: true, type: 'string', validator: validators.minLength(1) },
-      description: { required: true, type: 'string' },
-      category: { required: true, type: 'string' },
-      date: { required: true, type: 'string', validator: validators.dateString },
-      time: { required: true, type: 'string' },
-      location: { required: true, type: 'string' },
-      address: { required: true, type: 'string' },
-      price: { required: true, type: 'string' },
-      image: { required: true, type: 'string', validator: validators.url },
+      id: { required: true, type: "number" },
+      title: { required: true, type: "string", validator: validators.minLength(1) },
+      description: { required: true, type: "string" },
+      category: { required: true, type: "string" },
+      date: { required: true, type: "string", validator: validators.dateString },
+      time: { required: true, type: "string" },
+      location: { required: true, type: "string" },
+      address: { required: true, type: "string" },
+      price: { required: true, type: "string" },
+      image: { required: true, type: "string", validator: validators.url },
       organizer: {
         required: true,
-        type: 'object',
+        type: "object",
         nested: {
-          name: { required: true, type: 'string' },
-          avatar: { required: true, type: 'string' }
-        }
+          name: { required: true, type: "string" },
+          avatar: { required: true, type: "string" },
+        },
       },
-      attendees: { required: true, type: 'number', validator: validators.nonNegativeNumber },
-      isFavorite: { required: true, type: 'boolean' },
+      attendees: { required: true, type: "number", validator: validators.nonNegativeNumber },
+      isFavorite: { required: true, type: "boolean" },
       coordinates: {
         required: false,
-        type: 'object',
+        type: "object",
         nested: {
-          lat: { required: true, type: 'number', validator: validators.latitude },
-          lng: { required: true, type: 'number', validator: validators.longitude }
-        }
-      }
+          lat: { required: true, type: "number", validator: validators.latitude },
+          lng: { required: true, type: "number", validator: validators.longitude },
+        },
+      },
     }
 
     const validator = new SchemaValidator()
@@ -209,15 +227,15 @@ export const apiValidators = {
 
   searchParams: (data: any): ValidationResult => {
     const schema: ValidationSchema = {
-      keyword: { required: false, type: 'string' },
-      location: { required: false, type: 'string' },
-      radius: { required: false, type: 'number', validator: validators.positiveNumber },
-      startDateTime: { required: false, type: 'string', validator: validators.dateString },
-      endDateTime: { required: false, type: 'string', validator: validators.dateString },
-      categories: { required: false, type: 'array' },
-      page: { required: false, type: 'number', validator: validators.nonNegativeNumber },
-      size: { required: false, type: 'number', validator: validators.range(1, 100) },
-      sort: { required: false, type: 'string' }
+      keyword: { required: false, type: "string" },
+      location: { required: false, type: "string" },
+      radius: { required: false, type: "number", validator: validators.positiveNumber },
+      startDateTime: { required: false, type: "string", validator: validators.dateString },
+      endDateTime: { required: false, type: "string", validator: validators.dateString },
+      categories: { required: false, type: "array" },
+      page: { required: false, type: "number", validator: validators.nonNegativeNumber },
+      size: { required: false, type: "number", validator: validators.range(1, 100) },
+      sort: { required: false, type: "string" },
     }
 
     const validator = new SchemaValidator()
@@ -226,8 +244,8 @@ export const apiValidators = {
 
   coordinates: (data: any): ValidationResult => {
     const schema: ValidationSchema = {
-      lat: { required: true, type: 'number', validator: validators.latitude },
-      lng: { required: true, type: 'number', validator: validators.longitude }
+      lat: { required: true, type: "number", validator: validators.latitude },
+      lng: { required: true, type: "number", validator: validators.longitude },
     }
 
     const validator = new SchemaValidator()
@@ -236,16 +254,16 @@ export const apiValidators = {
 
   apiResponse: (data: any): ValidationResult => {
     const schema: ValidationSchema = {
-      events: { required: true, type: 'array' },
-      totalCount: { required: true, type: 'number', validator: validators.nonNegativeNumber },
-      page: { required: true, type: 'number', validator: validators.nonNegativeNumber },
-      totalPages: { required: true, type: 'number', validator: validators.nonNegativeNumber },
-      sources: { required: false, type: 'array' }
+      events: { required: true, type: "array" },
+      totalCount: { required: true, type: "number", validator: validators.nonNegativeNumber },
+      page: { required: true, type: "number", validator: validators.nonNegativeNumber },
+      totalPages: { required: true, type: "number", validator: validators.nonNegativeNumber },
+      sources: { required: false, type: "array" },
     }
 
     const validator = new SchemaValidator()
     return validator.validate(data, schema)
-  }
+  },
 }
 
 /**
@@ -253,8 +271,8 @@ export const apiValidators = {
  */
 export const sanitizers = {
   string: (value: any): string => {
-    if (typeof value === 'string') return value.trim()
-    return String(value || '')
+    if (typeof value === "string") return value.trim()
+    return String(value || "")
   },
 
   number: (value: any): number => {
@@ -263,9 +281,9 @@ export const sanitizers = {
   },
 
   boolean: (value: any): boolean => {
-    if (typeof value === 'boolean') return value
-    if (typeof value === 'string') {
-      return value.toLowerCase() === 'true' || value === '1'
+    if (typeof value === "boolean") return value
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true" || value === "1"
     }
     return Boolean(value)
   },
@@ -279,36 +297,36 @@ export const sanitizers = {
   coordinates: (lat: any, lng: any): { lat: number; lng: number } | null => {
     const numLat = sanitizers.number(lat)
     const numLng = sanitizers.number(lng)
-    
+
     if (validators.latitude(numLat) && validators.longitude(numLng)) {
       return { lat: numLat, lng: numLng }
     }
-    
+
     return null
   },
 
   url: (value: any): string => {
     const str = sanitizers.string(value)
-    if (!str) return ''
-    
+    if (!str) return ""
+
     // Add protocol if missing
-    if (str.startsWith('//')) return `https:${str}`
-    if (!str.startsWith('http://') && !str.startsWith('https://')) {
+    if (str.startsWith("//")) return `https:${str}`
+    if (!str.startsWith("http://") && !str.startsWith("https://")) {
       return `https://${str}`
     }
-    
+
     return str
   },
 
   html: (value: any): string => {
     const str = sanitizers.string(value)
     return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-  }
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;")
+  },
 }
 
 /**

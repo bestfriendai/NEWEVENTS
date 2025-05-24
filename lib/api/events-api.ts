@@ -3,8 +3,7 @@ import { searchEnhancedEvents, type EnhancedEventSearchParams } from "@/lib/api/
 import { RAPIDAPI_KEY, RAPIDAPI_HOST } from "@/lib/env"
 import { withRetry, formatErrorMessage } from "@/lib/utils"
 import { logger, measurePerformance } from "@/lib/utils/logger"
-import { createApiClient } from "@/lib/utils/api-client"
-import { getProviderConfig, checkRateLimit } from "@/lib/utils/api-config"
+import { checkRateLimit } from "@/lib/utils/api-config"
 
 // Interface for search parameters (keeping backward compatibility)
 export interface EventSearchParams {
@@ -27,12 +26,12 @@ export async function searchEvents(params: EventSearchParams): Promise<{
   totalPages: number
   sources?: string[]
 }> {
-  return measurePerformance('searchEvents', async () => {
+  return measurePerformance("searchEvents", async () => {
     try {
-      logger.info('Searching events', {
-        component: 'events-api',
-        action: 'search_events',
-        metadata: { params }
+      logger.info("Searching events", {
+        component: "events-api",
+        action: "search_events",
+        metadata: { params },
       })
 
       // Convert to enhanced params
@@ -48,24 +47,28 @@ export async function searchEvents(params: EventSearchParams): Promise<{
 
       const result = await searchEnhancedEvents(enhancedParams)
 
-      logger.info('Events search completed', {
-        component: 'events-api',
-        action: 'search_events_success',
+      logger.info("Events search completed", {
+        component: "events-api",
+        action: "search_events_success",
         metadata: {
           eventCount: result.events.length,
           totalCount: result.totalCount,
-          sources: result.sources
-        }
+          sources: result.sources,
+        },
       })
 
       return result
     } catch (error) {
       const errorMessage = formatErrorMessage(error)
-      logger.error('Events search failed', {
-        component: 'events-api',
-        action: 'search_events_error',
-        metadata: { params }
-      }, error instanceof Error ? error : new Error(errorMessage))
+      logger.error(
+        "Events search failed",
+        {
+          component: "events-api",
+          action: "search_events_error",
+          metadata: { params },
+        },
+        error instanceof Error ? error : new Error(errorMessage),
+      )
 
       return {
         events: [],
@@ -80,150 +83,155 @@ export async function searchEvents(params: EventSearchParams): Promise<{
 
 // Function to get event details - enhanced with multiple source checking
 export async function getEventDetails(eventId: string): Promise<EventDetailProps | null> {
-  return measurePerformance('getEventDetails', async () => {
+  return measurePerformance("getEventDetails", async () => {
     try {
-      logger.info('Getting event details', {
-        component: 'events-api',
-        action: 'get_event_details',
-        metadata: { eventId }
+      logger.info("Getting event details", {
+        component: "events-api",
+        action: "get_event_details",
+        metadata: { eventId },
       })
 
       // Check rate limit for RapidAPI
-      const rateLimitCheck = checkRateLimit('rapidapi')
+      const rateLimitCheck = checkRateLimit("rapidapi")
       if (!rateLimitCheck.allowed) {
-        logger.warn('RapidAPI rate limit exceeded', {
-          component: 'events-api',
-          action: 'rate_limit_exceeded',
-          metadata: { provider: 'rapidapi', resetTime: rateLimitCheck.resetTime }
+        logger.warn("RapidAPI rate limit exceeded", {
+          component: "events-api",
+          action: "rate_limit_exceeded",
+          metadata: { provider: "rapidapi", resetTime: rateLimitCheck.resetTime },
         })
       }
 
       // Try to get details directly from RapidAPI with retry logic
       try {
         const response = await withRetry(
-          () => fetch(
-            `https://real-time-events-search.p.rapidapi.com/event-details?event_id=${encodeURIComponent(eventId)}`,
-            {
-              method: "GET",
-              headers: {
-                "x-rapidapi-key": RAPIDAPI_KEY || "",
-                "x-rapidapi-host": RAPIDAPI_HOST,
+          () =>
+            fetch(
+              `https://real-time-events-search.p.rapidapi.com/event-details?event_id=${encodeURIComponent(eventId)}`,
+              {
+                method: "GET",
+                headers: {
+                  "x-rapidapi-key": RAPIDAPI_KEY || "",
+                  "x-rapidapi-host": RAPIDAPI_HOST,
+                },
               },
-            },
-          ),
-          { maxAttempts: 2, baseDelay: 1000 }
+            ),
+          { maxAttempts: 2, baseDelay: 1000 },
         )
 
         if (response.ok) {
           const data = await response.json()
-          logger.info('RapidAPI event details retrieved', {
-            component: 'events-api',
-            action: 'rapidapi_success',
-            metadata: { eventId }
+          logger.info("RapidAPI event details retrieved", {
+            component: "events-api",
+            action: "rapidapi_success",
+            metadata: { eventId },
           })
 
-        if (data.status === "OK" && data.data) {
-          // Transform the event data
-          const event = data.data
-          const venue = event.venue || {}
+          if (data.status === "OK" && data.data) {
+            // Transform the event data
+            const event = data.data
+            const venue = event.venue || {}
 
-          // Generate numeric ID
-          const numericId = Math.abs(
-            event.event_id?.split("").reduce((a: number, b: string) => {
-              a = (a << 5) - a + b.charCodeAt(0)
-              return a & a
-            }, 0) || Math.floor(Math.random() * 10000),
-          )
-
-          // Format dates
-          const startDate = event.start_time ? new Date(event.start_time) : new Date()
-          const endDate = event.end_time ? new Date(event.end_time) : null
-
-          const formattedDate = startDate.toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
-
-          const formattedTime = endDate
-            ? `${startDate.toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              })} - ${endDate.toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              })}`
-            : `${startDate.toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              })} onwards`
-
-          // Extract ticket links
-          const ticketLinks = []
-
-          if (event.ticket_links) {
-            ticketLinks.push(
-              ...event.ticket_links.map((link: any) => ({
-                source: link.source || "Ticket Provider",
-                link: link.link,
-              })),
+            // Generate numeric ID
+            const numericId = Math.abs(
+              event.event_id?.split("").reduce((a: number, b: string) => {
+                a = (a << 5) - a + b.charCodeAt(0)
+                return a & a
+              }, 0) || Math.floor(Math.random() * 10000),
             )
-          }
 
-          // Add info links if no ticket links
-          if (ticketLinks.length === 0 && event.info_links) {
-            ticketLinks.push(
-              ...event.info_links.slice(0, 3).map((link: any) => ({
-                source: link.source || "Event Info",
-                link: link.link,
-              })),
-            )
-          }
+            // Format dates
+            const startDate = event.start_time ? new Date(event.start_time) : new Date()
+            const endDate = event.end_time ? new Date(event.end_time) : null
 
-          // Extract category from tags
-          const category = extractCategory(event.tags || [])
+            const formattedDate = startDate.toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
 
-          return {
-            id: numericId,
-            title: event.name || "Untitled Event",
-            description: event.description || "No description available.",
-            category,
-            date: formattedDate,
-            time: formattedTime,
-            location: venue.name || "Venue TBA",
-            address: venue.full_address || "Address TBA",
-            price: ticketLinks.length > 0 ? "Tickets Available" : "Price TBA",
-            image: event.thumbnail || "/community-event.png",
-            organizer: {
-              name: venue.name || event.publisher || "Event Organizer",
-              avatar: "/avatar-1.png",
-            },
-            attendees: Math.floor(Math.random() * 1000) + 50,
-            isFavorite: false,
-            coordinates:
-              venue.latitude && venue.longitude
-                ? { lat: Number(venue.latitude), lng: Number(venue.longitude) }
-                : undefined,
-            ticketLinks,
+            const formattedTime = endDate
+              ? `${startDate.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })} - ${endDate.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })}`
+              : `${startDate.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })} onwards`
+
+            // Extract ticket links
+            const ticketLinks = []
+
+            if (event.ticket_links) {
+              ticketLinks.push(
+                ...event.ticket_links.map((link: any) => ({
+                  source: link.source || "Ticket Provider",
+                  link: link.link,
+                })),
+              )
+            }
+
+            // Add info links if no ticket links
+            if (ticketLinks.length === 0 && event.info_links) {
+              ticketLinks.push(
+                ...event.info_links.slice(0, 3).map((link: any) => ({
+                  source: link.source || "Event Info",
+                  link: link.link,
+                })),
+              )
+            }
+
+            // Extract category from tags
+            const category = extractCategory(event.tags || [])
+
+            return {
+              id: numericId,
+              title: event.name || "Untitled Event",
+              description: event.description || "No description available.",
+              category,
+              date: formattedDate,
+              time: formattedTime,
+              location: venue.name || "Venue TBA",
+              address: venue.full_address || "Address TBA",
+              price: ticketLinks.length > 0 ? "Tickets Available" : "Price TBA",
+              image: event.thumbnail || "/community-event.png",
+              organizer: {
+                name: venue.name || event.publisher || "Event Organizer",
+                avatar: "/avatar-1.png",
+              },
+              attendees: Math.floor(Math.random() * 1000) + 50,
+              isFavorite: false,
+              coordinates:
+                venue.latitude && venue.longitude
+                  ? { lat: Number(venue.latitude), lng: Number(venue.longitude) }
+                  : undefined,
+              ticketLinks,
+            }
           }
-        }
         }
       } catch (error) {
-        logger.error('Error fetching event details from RapidAPI', {
-          component: 'events-api',
-          action: 'rapidapi_error',
-          metadata: { eventId }
-        }, error instanceof Error ? error : new Error(formatErrorMessage(error)))
+        logger.error(
+          "Error fetching event details from RapidAPI",
+          {
+            component: "events-api",
+            action: "rapidapi_error",
+            metadata: { eventId },
+          },
+          error instanceof Error ? error : new Error(formatErrorMessage(error)),
+        )
       }
 
       // If RapidAPI fails, try to get details from enhanced search
-      logger.info('Falling back to enhanced search for event details', {
-        component: 'events-api',
-        action: 'fallback_search',
-        metadata: { eventId }
+      logger.info("Falling back to enhanced search for event details", {
+        component: "events-api",
+        action: "fallback_search",
+        metadata: { eventId },
       })
 
       const searchResult = await searchEnhancedEvents({
@@ -232,26 +240,30 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
       })
 
       if (searchResult.events.length > 0) {
-        logger.info('Event details found via enhanced search', {
-          component: 'events-api',
-          action: 'enhanced_search_success',
-          metadata: { eventId }
+        logger.info("Event details found via enhanced search", {
+          component: "events-api",
+          action: "enhanced_search_success",
+          metadata: { eventId },
         })
         return searchResult.events[0]
       }
 
-      logger.warn('Event details not found', {
-        component: 'events-api',
-        action: 'event_not_found',
-        metadata: { eventId }
+      logger.warn("Event details not found", {
+        component: "events-api",
+        action: "event_not_found",
+        metadata: { eventId },
       })
       return null
     } catch (error) {
-      logger.error('Get event details failed', {
-        component: 'events-api',
-        action: 'get_event_details_error',
-        metadata: { eventId }
-      }, error instanceof Error ? error : new Error(formatErrorMessage(error)))
+      logger.error(
+        "Get event details failed",
+        {
+          component: "events-api",
+          action: "get_event_details_error",
+          metadata: { eventId },
+        },
+        error instanceof Error ? error : new Error(formatErrorMessage(error)),
+      )
       return null
     }
   })
@@ -371,6 +383,7 @@ export async function getPersonalizedEvents(
 ): Promise<{
   events: EventDetailProps[]
   sources: string[]
+  error?: string
 }> {
   try {
     // console.log("Getting personalized events for coordinates:", coordinates)
@@ -407,7 +420,7 @@ export async function testRapidApiConnection(): Promise<boolean> {
           "x-rapidapi-key": RAPIDAPI_KEY || "",
           "x-rapidapi-host": RAPIDAPI_HOST,
         },
-      }
+      },
     )
 
     return response.ok

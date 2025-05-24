@@ -31,7 +31,7 @@ class Logger {
   private isDevelopment: boolean
 
   constructor() {
-    this.isDevelopment = process.env.NODE_ENV === 'development'
+    this.isDevelopment = process.env.NODE_ENV === "development"
     this.logLevel = this.isDevelopment ? LogLevel.DEBUG : LogLevel.INFO
   }
 
@@ -42,17 +42,12 @@ class Logger {
   private formatMessage(entry: LogEntry): string {
     const timestamp = entry.timestamp.toISOString()
     const level = LogLevel[entry.level]
-    const context = entry.context ? ` [${entry.context.component || 'Unknown'}]` : ''
-    
+    const context = entry.context ? ` [${entry.context.component || "Unknown"}]` : ""
+
     return `[${timestamp}] ${level}${context}: ${entry.message}`
   }
 
-  private createLogEntry(
-    level: LogLevel,
-    message: string,
-    context?: LogContext,
-    error?: Error
-  ): LogEntry {
+  private createLogEntry(level: LogLevel, message: string, context?: LogContext, error?: Error): LogEntry {
     return {
       level,
       message,
@@ -117,38 +112,42 @@ class Logger {
   apiRequest(method: string, url: string, context?: LogContext): void {
     this.info(`API Request: ${method} ${url}`, {
       ...context,
-      action: 'api_request',
-      metadata: { method, url }
+      action: "api_request",
+      metadata: { method, url },
     })
   }
 
   apiResponse(method: string, url: string, status: number, duration?: number, context?: LogContext): void {
     const level = status >= 400 ? LogLevel.ERROR : LogLevel.INFO
-    const message = `API Response: ${method} ${url} - ${status}${duration ? ` (${duration}ms)` : ''}`
-    
+    const message = `API Response: ${method} ${url} - ${status}${duration ? ` (${duration}ms)` : ""}`
+
     const entry = this.createLogEntry(level, message, {
       ...context,
-      action: 'api_response',
-      metadata: { method, url, status, duration }
+      action: "api_response",
+      metadata: { method, url, status, duration },
     })
-    
+
     this.log(entry)
   }
 
   apiError(method: string, url: string, error: Error, context?: LogContext): void {
-    this.error(`API Error: ${method} ${url}`, {
-      ...context,
-      action: 'api_error',
-      metadata: { method, url }
-    }, error)
+    this.error(
+      `API Error: ${method} ${url}`,
+      {
+        ...context,
+        action: "api_error",
+        metadata: { method, url },
+      },
+      error,
+    )
   }
 
   // User action logging
   userAction(action: string, context?: LogContext): void {
     this.info(`User Action: ${action}`, {
       ...context,
-      action: 'user_action',
-      metadata: { action }
+      action: "user_action",
+      metadata: { action },
     })
   }
 
@@ -156,13 +155,13 @@ class Logger {
   performance(operation: string, duration: number, context?: LogContext): void {
     const level = duration > 5000 ? LogLevel.WARN : LogLevel.INFO
     const message = `Performance: ${operation} took ${duration}ms`
-    
+
     const entry = this.createLogEntry(level, message, {
       ...context,
-      action: 'performance',
-      metadata: { operation, duration }
+      action: "performance",
+      metadata: { operation, duration },
     })
-    
+
     this.log(entry)
   }
 
@@ -170,8 +169,8 @@ class Logger {
   security(event: string, context?: LogContext): void {
     this.warn(`Security Event: ${event}`, {
       ...context,
-      action: 'security_event',
-      metadata: { event }
+      action: "security_event",
+      metadata: { event },
     })
   }
 }
@@ -184,7 +183,13 @@ export const logApiCall = (method: string, url: string, context?: LogContext) =>
   logger.apiRequest(method, url, context)
 }
 
-export const logApiResponse = (method: string, url: string, status: number, duration?: number, context?: LogContext) => {
+export const logApiResponse = (
+  method: string,
+  url: string,
+  status: number,
+  duration?: number,
+  context?: LogContext,
+) => {
   logger.apiResponse(method, url, status, duration, context)
 }
 
@@ -201,11 +206,13 @@ export const logPerformance = (operation: string, duration: number, context?: Lo
 }
 
 // Performance measurement utility
-export const measurePerformance = async <T>(
+export const measurePerformance = async <T>(\
   operation: string,
   fn: () => Promise<T>,
   context?: LogContext
-): Promise<T> => {
+)
+: Promise<T> =>
+{
   const start = performance.now()
   try {
     const result = await fn()
@@ -221,9 +228,13 @@ export const measurePerformance = async <T>(
 
 // Error boundary logging helper
 export const logComponentError = (componentName: string, error: Error, errorInfo?: any) => {
-  logger.error(`Component Error in ${componentName}`, {
-    component: componentName,
-    action: 'component_error',
-    metadata: { errorInfo }
-  }, error)
+  logger.error(
+    `Component Error in ${componentName}`,
+    {
+      component: componentName,
+      action: "component_error",
+      metadata: { errorInfo },
+    },
+    error,
+  )
 }

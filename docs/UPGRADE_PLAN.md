@@ -40,7 +40,7 @@ This document outlines a comprehensive upgrade strategy for the DateAI events di
 - [ ] Implement proper peer dependency management
 
 **Dependencies to Update**:
-```json
+\`\`\`json
 {
   "@supabase/supabase-js": "^2.39.0",
   "next": "^15.2.4",
@@ -51,7 +51,7 @@ This document outlines a comprehensive upgrade strategy for the DateAI events di
   "cobe": "^0.6.3",
   "gsap": "^3.12.5"
 }
-```
+\`\`\`
 
 #### 1.2 Next.js Configuration Enhancement
 **Objective**: Optimize Next.js configuration for performance and development experience
@@ -62,7 +62,7 @@ This document outlines a comprehensive upgrade strategy for the DateAI events di
 - Images unoptimized
 
 **Enhanced Configuration**:
-```javascript
+\`\`\`javascript
 const nextConfig = {
   experimental: {
     optimizePackageImports: ['@radix-ui/react-*', 'lucide-react'],
@@ -90,7 +90,7 @@ const nextConfig = {
     ignoreBuildErrors: false, // Enable proper type checking
   },
 }
-```
+\`\`\`
 
 #### 1.3 TypeScript Configuration Improvements
 **Objective**: Enable stricter type checking and better development experience
@@ -112,7 +112,7 @@ const nextConfig = {
 - Insecure key exposure
 
 **Solution**:
-```typescript
+\`\`\`typescript
 // lib/env.ts - Secure environment management
 import { z } from 'zod'
 
@@ -127,13 +127,13 @@ const envSchema = z.object({
 })
 
 export const env = envSchema.parse(process.env)
-```
+\`\`\`
 
 #### 2.2 API Layer Restructuring
 **Objective**: Create a robust, maintainable API architecture
 
 **New Structure**:
-```
+\`\`\`
 /lib
   /api
     /clients/          # API client instances
@@ -153,7 +153,7 @@ export const env = envSchema.parse(process.env)
     /cache/           # Caching strategies
       - redis.ts
       - memory.ts
-```
+\`\`\`
 
 #### 2.3 State Management Enhancement
 **Objective**: Implement proper state management for complex application state
@@ -177,7 +177,7 @@ export const env = envSchema.parse(process.env)
 - [ ] Error states and empty states
 
 **Design Tokens**:
-```css
+\`\`\`css
 :root {
   /* Colors */
   --color-primary-50: #f0f9ff;
@@ -198,13 +198,13 @@ export const env = envSchema.parse(process.env)
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
 }
-```
+\`\`\`
 
 #### 3.2 Component Architecture Modernization
 **Objective**: Improve component reusability and maintainability
 
 **New Structure**:
-```
+\`\`\`
 /components
   /ui/              # Base UI components (buttons, inputs, etc.)
   /features/        # Feature-specific components
@@ -215,7 +215,7 @@ export const env = envSchema.parse(process.env)
   /forms/           # Form components
   /data-display/    # Data visualization components
   /feedback/        # Loading, error, success states
-```
+\`\`\`
 
 #### 3.3 Animation & Interaction Improvements
 **Objective**: Enhance user experience with smooth animations and interactions
@@ -228,7 +228,7 @@ export const env = envSchema.parse(process.env)
 - [ ] Implement gesture support for mobile
 
 **Animation Patterns**:
-```typescript
+\`\`\`typescript
 // Consistent animation variants
 export const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -244,20 +244,20 @@ export const staggerContainer = {
     }
   }
 }
-```
+\`\`\`
 
 #### 3.4 Responsive Design Enhancement
 **Objective**: Ensure optimal experience across all devices
 
 **Breakpoints**:
-```css
+\`\`\`css
 /* Mobile First Approach */
 @media (min-width: 640px) { /* sm */ }
 @media (min-width: 768px) { /* md */ }
 @media (min-width: 1024px) { /* lg */ }
 @media (min-width: 1280px) { /* xl */ }
 @media (min-width: 1536px) { /* 2xl */ }
-```
+\`\`\`
 
 ### Phase 4: Performance Optimization ⚡
 
@@ -265,7 +265,7 @@ export const staggerContainer = {
 **Objective**: Reduce initial bundle size and improve loading performance
 
 **Implementation**:
-```typescript
+\`\`\`typescript
 // Dynamic imports for heavy components
 const MapExplorer = dynamic(() => import('@/components/map-explorer'), {
   loading: () => <MapSkeleton />,
@@ -276,7 +276,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
   loading: () => <GlobeSkeleton />,
   ssr: false
 })
-```
+\`\`\`
 
 #### 4.2 Image Optimization
 **Objective**: Optimize image loading and performance
@@ -331,7 +331,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
 **Objective**: Implement comprehensive testing strategy
 
 **Testing Stack**:
-```json
+\`\`\`json
 {
   "devDependencies": {
     "@testing-library/react": "^14.0.0",
@@ -342,7 +342,7 @@ const ThreeGlobe = dynamic(() => import('@/components/three-globe'), {
     "msw": "^2.0.0"
   }
 }
-```
+\`\`\`
 
 #### 6.2 Quality Tools
 **Objective**: Ensure code quality and consistency

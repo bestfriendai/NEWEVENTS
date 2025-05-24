@@ -2,11 +2,11 @@
  * Test utilities and helpers for improved code testing
  */
 
-import { logger } from '@/lib/utils/logger'
-import { apiValidators } from '@/lib/utils/validation'
-import { geocodingManager } from '@/lib/utils/geocoding'
-import { memoryCache } from '@/lib/utils/cache'
-import { apiConfigManager } from '@/lib/utils/api-config'
+import { logger } from "@/lib/utils/logger"
+import { apiValidators } from "@/lib/utils/validation"
+import { geocodingManager } from "@/lib/utils/geocoding"
+import { memoryCache } from "@/lib/utils/cache"
+import { apiConfigManager } from "@/lib/utils/api-config"
 
 export interface TestResult {
   name: string
@@ -32,76 +32,83 @@ export class TestRunner {
 
   async runTest(name: string, testFn: () => Promise<void> | void): Promise<TestResult> {
     const startTime = performance.now()
-    
+
     try {
       await testFn()
       const duration = performance.now() - startTime
-      
+
       logger.info(`Test passed: ${name}`, {
-        component: 'test-runner',
-        action: 'test_passed',
-        metadata: { name, duration }
+        component: "test-runner",
+        action: "test_passed",
+        metadata: { name, duration },
       })
-      
+
       return {
         name,
         passed: true,
-        duration
+        duration,
       }
     } catch (error) {
       const duration = performance.now() - startTime
       const errorMessage = error instanceof Error ? error.message : String(error)
-      
-      logger.error(`Test failed: ${name}`, {
-        component: 'test-runner',
-        action: 'test_failed',
-        metadata: { name, duration, error: errorMessage }
-      }, error instanceof Error ? error : new Error(errorMessage))
-      
+
+      logger.error(
+        `Test failed: ${name}`,
+        {
+          component: "test-runner",
+          action: "test_failed",
+          metadata: { name, duration, error: errorMessage },
+        },
+        error instanceof Error ? error : new Error(errorMessage),
+      )
+
       return {
         name,
         passed: false,
         error: errorMessage,
-        duration
+        duration,
       }
     }
   }
 
-  async runSuite(suiteName: string, tests: Array<{ name: string; test: () => Promise<void> | void }>): Promise<TestSuite> {
+  async runSuite(
+    suiteName: string,
+    tests: Array<{ name: string; test: () => Promise<void> | void }>,
+  ): Promise<TestSuite> {
     const startTime = performance.now()
     const results: TestResult[] = []
-    
+
     logger.info(`Starting test suite: ${suiteName}`, {
-      component: 'test-runner',
-      action: 'suite_start',
-      metadata: { suiteName, testCount: tests.length }
+      component: "test-runner",
+      action: "suite_start",
+      metadata: { suiteName, testCount: tests.length },
     })
-    
+
     for (const { name, test } of tests) {
       const result = await this.runTest(name, test)
       results.push(result)
     }
-    
+
     const duration = performance.now() - startTime
-    const passed = results.filter(r => r.passed).length
-    const failed = results.filter(r => !r.passed).length
-    
+    const passed = results.filter((r) => r.passed).length
+    const failed = results.filter((r) => !r.passed).length
+
     const suite: TestSuite = {
       name: suiteName,
       tests: results,
       passed,
       failed,
-      duration
+      duration,
     }
-    
+
     this.results.push(suite)
-    
+
     logger.info(`Test suite completed: ${suiteName}`, {
-      component: 'test-runner',
-      action: 'suite_complete',
-      metadata: { suiteName, passed, failed, duration }
+      component: "test-runner",
+      action: "suite_complete",
+      metadata: { suiteName, passed, failed, duration },
     })
-    
+
     return suite
   }
 
@@ -114,7 +121,7 @@ export class TestRunner {
     const totalPassed = this.results.reduce((sum, suite) => sum + suite.passed, 0)
     const totalFailed = this.results.reduce((sum, suite) => sum + suite.failed, 0)
     const totalDuration = this.results.reduce((sum, suite) => sum + suite.duration, 0)
-    
+
     return { totalTests, totalPassed, totalFailed, totalDuration }
   }
 }
@@ -136,20 +143,20 @@ export const mockData = {
     image: "https://example.com/test-image.jpg",
     organizer: {
       name: "Test Organizer",
-      avatar: "https://example.com/avatar.jpg"
+      avatar: "https://example.com/avatar.jpg",
     },
     attendees: 150,
     isFavorite: false,
     coordinates: {
       lat: 40.7128,
-      lng: -74.0060
+      lng: -74.006,
     },
     ticketLinks: [
       {
         source: "Test Tickets",
-        link: "https://example.com/tickets"
-      }
-    ]
+        link: "https://example.com/tickets",
+      },
+    ],
   }),
 
   searchParams: () => ({
@@ -157,12 +164,12 @@ export const mockData = {
     location: "New York",
     radius: 25,
     page: 0,
-    size: 20
+    size: 20,
   }),
 
   coordinates: () => ({
     lat: 40.7128,
-    lng: -74.0060
+    lng: -74.006,
   }),
 
   apiResponse: () => ({
@@ -170,8 +177,8 @@ export const mockData = {
     totalCount: 1,
     page: 0,
     totalPages: 1,
-    sources: ["test-api"]
-  })
+    sources: ["test-api"],
+  }),
 }
 
 /**
@@ -180,13 +187,13 @@ export const mockData = {
 export const assert = {
   isTrue: (value: boolean, message?: string) => {
     if (!value) {
-      throw new Error(message || 'Expected value to be true')
+      throw new Error(message || "Expected value to be true")
     }
   },
 
   isFalse: (value: boolean, message?: string) => {
     if (value) {
-      throw new Error(message || 'Expected value to be false')
+      throw new Error(message || "Expected value to be false")
     }
   },
 
@@ -204,56 +211,56 @@ export const assert = {
 
   isNull: (value: any, message?: string) => {
     if (value !== null) {
-      throw new Error(message || 'Expected value to be null')
+      throw new Error(message || "Expected value to be null")
     }
   },
 
   isNotNull: (value: any, message?: string) => {
     if (value === null) {
-      throw new Error(message || 'Expected value to not be null')
+      throw new Error(message || "Expected value to not be null")
     }
   },
 
   isUndefined: (value: any, message?: string) => {
     if (value !== undefined) {
-      throw new Error(message || 'Expected value to be undefined')
+      throw new Error(message || "Expected value to be undefined")
     }
   },
 
   isDefined: (value: any, message?: string) => {
     if (value === undefined) {
-      throw new Error(message || 'Expected value to be defined')
+      throw new Error(message || "Expected value to be defined")
     }
   },
 
   isArray: (value: any, message?: string) => {
     if (!Array.isArray(value)) {
-      throw new Error(message || 'Expected value to be an array')
+      throw new Error(message || "Expected value to be an array")
     }
   },
 
   isObject: (value: any, message?: string) => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      throw new Error(message || 'Expected value to be an object')
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new Error(message || "Expected value to be an object")
     }
   },
 
   isString: (value: any, message?: string) => {
-    if (typeof value !== 'string') {
-      throw new Error(message || 'Expected value to be a string')
+    if (typeof value !== "string") {
+      throw new Error(message || "Expected value to be a string")
     }
   },
 
   isNumber: (value: any, message?: string) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-      throw new Error(message || 'Expected value to be a number')
+    if (typeof value !== "number" || isNaN(value)) {
+      throw new Error(message || "Expected value to be a number")
     }
   },
 
   throws: async (fn: () => Promise<any> | any, message?: string) => {
     try {
       await fn()
-      throw new Error(message || 'Expected function to throw an error')
+      throw new Error(message || "Expected function to throw an error")
     } catch (error) {
       // Expected behavior
     }
@@ -265,53 +272,62 @@ export const assert = {
     } catch (error) {
       throw new Error(message || `Expected function not to throw, but it threw: ${error}`)
     }
-  }
+  },
 }
 
 /**
  * Performance testing utilities
  */
-export const performance = {
+export const performance = {\
   measure: async <T>(name: string, fn: () => Promise<T> | T): Promise<{ result: T; duration: number }> => {
-    const start = Date.now()
-    const result = await fn()
-    const duration = Date.now() - start
-    
-    logger.info(`Performance measurement: ${name}`, {
-      component: 'performance',
-      action: 'measure',
-      metadata: { name, duration }
-    })
-    
-    return { result, duration }
-  },
+    const start = Date.now();
+const result = await fn()
+const duration = Date.now()
+;-start
+
+logger.info(`Performance measurement: ${name}`, {
+  component: "performance",
+  action: "measure",
+  metadata: { name, duration },
+})
+
+return { result, duration }
+},
 
   benchmark: async <T>(
     name: string,
     fn: () => Promise<T> | T,
     iterations: number = 10
-  ): Promise<{ averageDuration: number; minDuration: number; maxDuration: number; results: T[] }> => {
-    const durations: number[] = []
-    const results: T[] = []
-    
-    for (let i = 0; i < iterations; i++) {
-      const { result, duration } = await performance.measure(`${name} iteration ${i + 1}`, fn)
-      durations.push(duration)
-      results.push(result)
-    }
-    
-    const averageDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length
-    const minDuration = Math.min(...durations)
-    const maxDuration = Math.max(...durations)
-    
-    logger.info(`Benchmark completed: ${name}`, {
-      component: 'performance',
-      action: 'benchmark',
-      metadata: { name, iterations, averageDuration, minDuration, maxDuration }
-    })
-    
-    return { averageDuration, minDuration, maxDuration, results }
+  ): Promise<
+{
+  averageDuration: number
+  minDuration: number
+  maxDuration: number
+  results: T[]
+}
+> =>
+{
+  const durations: number[] = []
+  const results: T[] = []
+
+  for (let i = 0; i < iterations; i++) {
+    const { result, duration } = await performance.measure(`${name} iteration ${i + 1}`, fn)
+    durations.push(duration)
+    results.push(result)
   }
+
+  const averageDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length
+  const minDuration = Math.min(...durations)
+  const maxDuration = Math.max(...durations)
+
+  logger.info(`Benchmark completed: ${name}`, {
+    component: "performance",
+    action: "benchmark",
+    metadata: { name, iterations, averageDuration, minDuration, maxDuration },
+  })
+
+  return { averageDuration, minDuration, maxDuration, results }
+}
 }
 
 /**
@@ -320,145 +336,145 @@ export const performance = {
 export const integrationTests = {
   validation: async (): Promise<TestSuite> => {
     const runner = new TestRunner()
-    
-    return runner.runSuite('Validation Tests', [
+
+    return runner.runSuite("Validation Tests", [
       {
-        name: 'Valid event detail validation',
+        name: "Valid event detail validation",
         test: () => {
           const data = mockData.eventDetail()
           const result = apiValidators.eventDetail(data)
-          assert.isTrue(result.isValid, 'Event detail should be valid')
-        }
+          assert.isTrue(result.isValid, "Event detail should be valid")
+        },
       },
       {
-        name: 'Invalid event detail validation',
+        name: "Invalid event detail validation",
         test: () => {
-          const data = { ...mockData.eventDetail(), id: 'invalid' }
+          const data = { ...mockData.eventDetail(), id: "invalid" }
           const result = apiValidators.eventDetail(data)
-          assert.isFalse(result.isValid, 'Event detail should be invalid')
-        }
+          assert.isFalse(result.isValid, "Event detail should be invalid")
+        },
       },
       {
-        name: 'Valid search params validation',
+        name: "Valid search params validation",
         test: () => {
           const data = mockData.searchParams()
           const result = apiValidators.searchParams(data)
-          assert.isTrue(result.isValid, 'Search params should be valid')
-        }
-      }
+          assert.isTrue(result.isValid, "Search params should be valid")
+        },
+      },
     ])
   },
 
   geocoding: async (): Promise<TestSuite> => {
     const runner = new TestRunner()
-    
-    return runner.runSuite('Geocoding Tests', [
+
+    return runner.runSuite("Geocoding Tests", [
       {
-        name: 'Geocode known address',
+        name: "Geocode known address",
         test: async () => {
-          const result = await geocodingManager.geocode('New York')
-          assert.isNotNull(result, 'Should return geocoding result')
+          const result = await geocodingManager.geocode("New York")
+          assert.isNotNull(result, "Should return geocoding result")
           if (result) {
-            assert.isNumber(result.lat, 'Latitude should be a number')
-            assert.isNumber(result.lng, 'Longitude should be a number')
+            assert.isNumber(result.lat, "Latitude should be a number")
+            assert.isNumber(result.lng, "Longitude should be a number")
           }
-        }
+        },
       },
       {
-        name: 'Reverse geocode coordinates',
+        name: "Reverse geocode coordinates",
         test: async () => {
-          const result = await geocodingManager.reverseGeocode(40.7128, -74.0060)
-          assert.isString(result, 'Should return address string')
-        }
+          const result = await geocodingManager.reverseGeocode(40.7128, -74.006)
+          assert.isString(result, "Should return address string")
+        },
       },
       {
-        name: 'Calculate distance',
+        name: "Calculate distance",
         test: () => {
-          const distance = geocodingManager.calculateDistance(40.7128, -74.0060, 34.0522, -118.2437)
-          assert.isNumber(distance, 'Distance should be a number')
-          assert.isTrue(distance > 0, 'Distance should be positive')
-        }
-      }
+          const distance = geocodingManager.calculateDistance(40.7128, -74.006, 34.0522, -118.2437)
+          assert.isNumber(distance, "Distance should be a number")
+          assert.isTrue(distance > 0, "Distance should be positive")
+        },
+      },
     ])
   },
 
   cache: async (): Promise<TestSuite> => {
     const runner = new TestRunner()
-    
-    return runner.runSuite('Cache Tests', [
+
+    return runner.runSuite("Cache Tests", [
       {
-        name: 'Set and get cache value',
+        name: "Set and get cache value",
         test: () => {
-          const key = 'test-key'
-          const value = 'test-value'
-          
+          const key = "test-key"
+          const value = "test-value"
+
           memoryCache.set(key, value)
           const retrieved = memoryCache.get(key)
-          
-          assert.equals(retrieved, value, 'Retrieved value should match set value')
-        }
+
+          assert.equals(retrieved, value, "Retrieved value should match set value")
+        },
       },
       {
-        name: 'Cache expiration',
+        name: "Cache expiration",
         test: async () => {
-          const key = 'expire-test'
-          const value = 'expire-value'
-          
+          const key = "expire-test"
+          const value = "expire-value"
+
           memoryCache.set(key, value, 100) // 100ms TTL
-          
+
           // Should be available immediately
-          assert.equals(memoryCache.get(key), value, 'Value should be available immediately')
-          
+          assert.equals(memoryCache.get(key), value, "Value should be available immediately")
+
           // Wait for expiration
-          await new Promise(resolve => setTimeout(resolve, 150))
-          
+          await new Promise((resolve) => setTimeout(resolve, 150))
+
           // Should be expired
-          assert.isNull(memoryCache.get(key), 'Value should be expired')
-        }
+          assert.isNull(memoryCache.get(key), "Value should be expired")
+        },
       },
       {
-        name: 'Cache statistics',
+        name: "Cache statistics",
         test: () => {
           memoryCache.clear()
-          
+
           // Generate some cache activity
-          memoryCache.set('stats-test-1', 'value1')
-          memoryCache.set('stats-test-2', 'value2')
-          memoryCache.get('stats-test-1') // hit
-          memoryCache.get('stats-test-1') // hit
-          memoryCache.get('nonexistent') // miss
-          
+          memoryCache.set("stats-test-1", "value1")
+          memoryCache.set("stats-test-2", "value2")
+          memoryCache.get("stats-test-1") // hit
+          memoryCache.get("stats-test-1") // hit
+          memoryCache.get("nonexistent") // miss
+
           const stats = memoryCache.getStats()
-          assert.isNumber(stats.hits, 'Hits should be a number')
-          assert.isNumber(stats.misses, 'Misses should be a number')
-          assert.isNumber(stats.hitRate, 'Hit rate should be a number')
-        }
-      }
+          assert.isNumber(stats.hits, "Hits should be a number")
+          assert.isNumber(stats.misses, "Misses should be a number")
+          assert.isNumber(stats.hitRate, "Hit rate should be a number")
+        },
+      },
     ])
   },
 
   apiConfig: async (): Promise<TestSuite> => {
     const runner = new TestRunner()
-    
-    return runner.runSuite('API Config Tests', [
+
+    return runner.runSuite("API Config Tests", [
       {
-        name: 'Get provider status',
+        name: "Get provider status",
         test: () => {
           const status = apiConfigManager.getProviderStatus()
-          assert.isObject(status, 'Status should be an object')
-          assert.isDefined(status.ticketmaster, 'Ticketmaster status should be defined')
-        }
+          assert.isObject(status, "Status should be an object")
+          assert.isDefined(status.ticketmaster, "Ticketmaster status should be defined")
+        },
       },
       {
-        name: 'Rate limit check',
+        name: "Rate limit check",
         test: () => {
-          const result = apiConfigManager.checkRateLimit('test-provider')
-          assert.isObject(result, 'Rate limit result should be an object')
-          assert.isDefined(result.allowed, 'Allowed property should be defined')
-        }
-      }
+          const result = apiConfigManager.checkRateLimit("test-provider")
+          assert.isObject(result, "Rate limit result should be an object")
+          assert.isDefined(result.allowed, "Allowed property should be defined")
+        },
+      },
     ])
-  }
+  },
 }
 
 // Create test runner instance
@@ -466,31 +482,31 @@ export const testRunner = new TestRunner()
 
 // Convenience function to run all integration tests
 export const runAllTests = async (): Promise<TestSuite[]> => {
-  logger.info('Starting comprehensive test suite', {
-    component: 'test-runner',
-    action: 'run_all_tests'
+  logger.info("Starting comprehensive test suite", {
+    component: "test-runner",
+    action: "run_all_tests",
   })
-  
+
   const results = await Promise.all([
     integrationTests.validation(),
     integrationTests.geocoding(),
     integrationTests.cache(),
-    integrationTests.apiConfig()
+    integrationTests.apiConfig(),
   ])
-  
+
   const summary = {
     totalSuites: results.length,
     totalTests: results.reduce((sum, suite) => sum + suite.tests.length, 0),
     totalPassed: results.reduce((sum, suite) => sum + suite.passed, 0),
     totalFailed: results.reduce((sum, suite) => sum + suite.failed, 0),
-    totalDuration: results.reduce((sum, suite) => sum + suite.duration, 0)
+    totalDuration: results.reduce((sum, suite) => sum + suite.duration, 0),
   }
-  
-  logger.info('All tests completed', {
-    component: 'test-runner',
-    action: 'all_tests_complete',
-    metadata: summary
+
+  logger.info("All tests completed", {
+    component: "test-runner",
+    action: "all_tests_complete",
+    metadata: summary,
   })
-  
+
   return results
 }

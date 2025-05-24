@@ -25,13 +25,13 @@ The improvements focus on five key areas:
   - Rate limiting tracking
   - Provider status monitoring
 
-```typescript
+\`\`\`typescript
 // Usage
 import { getProviderConfig, checkRateLimit } from '@/lib/utils/api-config'
 
 const config = getProviderConfig('ticketmaster')
 const rateLimit = checkRateLimit('rapidapi')
-```
+\`\`\`
 
 ### Benefits
 - ✅ Secure API key management
@@ -53,7 +53,7 @@ const rateLimit = checkRateLimit('rapidapi')
   - Performance measurement utilities
   - Production-ready logging format
 
-```typescript
+\`\`\`typescript
 // Usage
 import { logger, measurePerformance } from '@/lib/utils/logger'
 
@@ -66,7 +66,7 @@ logger.info('API request started', {
 const result = await measurePerformance('searchEvents', async () => {
   return await searchAPI()
 })
-```
+\`\`\`
 
 ### Benefits
 - ✅ Structured, searchable logs
@@ -88,7 +88,7 @@ const result = await measurePerformance('searchEvents', async () => {
 - Request timeout handling
 - Structured error responses
 
-```typescript
+\`\`\`typescript
 // Usage
 import { createApiClient } from '@/lib/utils/api-client'
 
@@ -99,7 +99,7 @@ const client = createApiClient({
 })
 
 const response = await client.get('/events')
-```
+\`\`\`
 
 #### 2. **Comprehensive Caching** (`lib/utils/cache.ts`)
 - Multiple storage backends (memory, localStorage, sessionStorage)
@@ -107,7 +107,7 @@ const response = await client.get('/events')
 - LRU eviction
 - Cache statistics
 
-```typescript
+\`\`\`typescript
 // Usage
 import { memoryCache, persistentCache } from '@/lib/utils/cache'
 
@@ -115,14 +115,14 @@ import { memoryCache, persistentCache } from '@/lib/utils/cache'
 const events = await memoryCache.getOrSet('events-nyc', async () => {
   return await fetchEvents('New York')
 }, 5 * 60 * 1000) // 5 minutes TTL
-```
+\`\`\`
 
 #### 3. **Utility Functions** (`lib/utils.ts`)
 - Retry mechanism with exponential backoff
 - Debounce and throttle functions
 - Performance helpers
 
-```typescript
+\`\`\`typescript
 // Usage
 import { withRetry, debounce, throttle } from '@/lib/utils'
 
@@ -130,7 +130,7 @@ const result = await withRetry(apiCall, {
   maxAttempts: 3,
   baseDelay: 1000
 })
-```
+\`\`\`
 
 ### Benefits
 - ✅ 50-80% reduction in API call failures
@@ -152,13 +152,13 @@ const result = await withRetry(apiCall, {
 - Fallback mechanisms
 - Consistent interface
 
-```typescript
+\`\`\`typescript
 // Usage
 import { geocodeAddress, reverseGeocode } from '@/lib/utils/geocoding'
 
 const location = await geocodeAddress('New York, NY')
 const address = await reverseGeocode(40.7128, -74.0060)
-```
+\`\`\`
 
 #### 2. **Improved Events API** (`lib/api/events-api.ts`)
 - Enhanced error handling with structured logging
@@ -185,7 +185,7 @@ const address = await reverseGeocode(40.7128, -74.0060)
 - Type guards
 - Data sanitization
 
-```typescript
+\`\`\`typescript
 // Usage
 import { apiValidators, sanitizers } from '@/lib/utils/validation'
 
@@ -194,7 +194,7 @@ if (result.isValid) {
   // Safe to use data
   processEvent(result.data)
 }
-```
+\`\`\`
 
 #### 2. **Enhanced Type Definitions**
 - Stronger TypeScript types
@@ -215,7 +215,7 @@ if (result.isValid) {
 - Performance benchmarking
 - Integration test suites
 
-```typescript
+\`\`\`typescript
 // Usage
 import { runAllTests, testRunner, assert } from '@/lib/utils/test-helpers'
 
@@ -228,7 +228,7 @@ await testRunner.runTest('API validation', () => {
   const result = apiValidators.eventDetail(data)
   assert.isTrue(result.isValid)
 })
-```
+\`\`\`
 
 ### Benefits
 - ✅ Automated testing capabilities
@@ -248,7 +248,7 @@ await testRunner.runTest('API validation', () => {
 ## 🚀 Usage Examples
 
 ### Basic API Call with All Improvements
-```typescript
+\`\`\`typescript
 import { searchEvents } from '@/lib/api/events-api'
 import { logger } from '@/lib/utils/logger'
 
@@ -268,10 +268,10 @@ try {
     component: 'events-page'
   }, error)
 }
-```
+\`\`\`
 
 ### Geocoding with Fallback
-```typescript
+\`\`\`typescript
 import { geocodeAddress } from '@/lib/utils/geocoding'
 
 const location = await geocodeAddress('San Francisco, CA')
@@ -279,10 +279,10 @@ if (location) {
   console.log(`Coordinates: ${location.lat}, ${location.lng}`)
   console.log(`Provider: ${location.provider}`)
 }
-```
+\`\`\`
 
 ### Caching API Responses
-```typescript
+\`\`\`typescript
 import { memoryCache } from '@/lib/utils/cache'
 
 const getCachedEvents = async (city: string) => {
@@ -290,7 +290,7 @@ const getCachedEvents = async (city: string) => {
     return await fetchEventsFromAPI(city)
   }, 10 * 60 * 1000) // 10 minutes
 }
-```
+\`\`\`
 
 ## 🔧 Migration Guide
 
