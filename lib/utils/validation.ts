@@ -129,7 +129,7 @@ export interface ValidationSchema {
 }
 
 export class SchemaValidator {
-  validate(data: any, schema: ValidationSchema): ValidationResult {
+  validate(data: Record<string, any>, schema: ValidationSchema): ValidationResult {
     const errors: string[] = []
 
     if (!validators.object(data)) {

@@ -3,7 +3,7 @@
  */
 
 import { withRetry, formatErrorMessage, isNetworkError } from '@/lib/utils'
-import { logger, logApiCall, logApiResponse, logApiError } from '@/lib/utils/logger'
+import { logger, logApiCall, logApiResponse, logError } from '@/lib/utils/logger'
 
 export interface ApiClientConfig {
   baseUrl?: string
@@ -100,7 +100,7 @@ class ApiClient {
         const timeoutError = new Error(`Request timeout after ${this.config.timeout}ms`) as ApiError
         timeoutError.isNetworkError = true
         timeoutError.isRetryable = true
-        logApiError(method, url, timeoutError, { component: 'ApiClient' })
+        logError(`${method} ${url} - Request timeout`, timeoutError, { component: 'ApiClient' })
         throw timeoutError
       }
 
@@ -108,7 +108,7 @@ class ApiClient {
         const apiError = error as ApiError
         apiError.isNetworkError = isNetworkError(error)
         apiError.isRetryable = this.isRetryableError(apiError)
-        logApiError(method, url, apiError, { component: 'ApiClient' })
+        logError(`${method} ${url} - API error`, apiError, { component: 'ApiClient' })
         throw apiError
       }
 
@@ -255,4 +255,4 @@ export const createApiClient = (config: ApiClientConfig): ApiClient => {
 }
 
 // Export types
-export type { ApiClientConfig, ApiResponse, ApiError }
+// Note: ApiClientConfig, ApiResponse, and ApiError are already exported as interfaces above

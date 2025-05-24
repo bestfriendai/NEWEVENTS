@@ -38,6 +38,7 @@ class ApiConfigManager {
    */
   getProviderConfig(provider: keyof typeof API_CONFIG): ApiProviderConfig | null {
     const config = API_CONFIG[provider]
+
     if (!config) {
       logger.warn(`No configuration found for provider: ${provider}`)
       return null
@@ -45,66 +46,78 @@ class ApiConfigManager {
 
     switch (provider) {
       case 'ticketmaster':
-        return {
-          name: 'Ticketmaster',
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          timeout: 10000,
-          retryAttempts: 3,
-          rateLimit: {
-            requests: 5000,
-            window: 24 * 60 * 60 * 1000, // 24 hours
-          },
+        if ('baseUrl' in config && 'apiKey' in config) {
+          return {
+            name: 'Ticketmaster',
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            timeout: 10000,
+            retryAttempts: 3,
+            rateLimit: {
+              requests: 5000,
+              window: 24 * 60 * 60 * 1000, // 24 hours
+            },
+          }
         }
+        break
 
       case 'eventbrite':
-        return {
-          name: 'Eventbrite',
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          headers: {
-            'Authorization': `Bearer ${config.apiKey}`,
-          },
-          timeout: 10000,
-          retryAttempts: 3,
-          rateLimit: {
-            requests: 1000,
-            window: 60 * 60 * 1000, // 1 hour
-          },
+        if ('baseUrl' in config && 'apiKey' in config) {
+          return {
+            name: 'Eventbrite',
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+            },
+            timeout: 10000,
+            retryAttempts: 3,
+            rateLimit: {
+              requests: 1000,
+              window: 60 * 60 * 1000, // 1 hour
+            },
+          }
         }
+        break
 
       case 'rapidapi':
-        return {
-          name: 'RapidAPI',
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          headers: {
-            'x-rapidapi-key': config.apiKey || '',
-            'x-rapidapi-host': config.host,
-          },
-          timeout: 15000,
-          retryAttempts: 2,
-          rateLimit: {
-            requests: 500,
-            window: 60 * 60 * 1000, // 1 hour
-          },
+        if ('baseUrl' in config && 'apiKey' in config && 'host' in config) {
+          return {
+            name: 'RapidAPI',
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            headers: {
+              'x-rapidapi-key': config.apiKey || '',
+              'x-rapidapi-host': config.host,
+            },
+            timeout: 15000,
+            retryAttempts: 2,
+            rateLimit: {
+              requests: 500,
+              window: 60 * 60 * 1000, // 1 hour
+            },
+          }
         }
+        break
 
       case 'predicthq':
-        return {
-          name: 'PredictHQ',
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          headers: {
-            'Authorization': `Bearer ${config.apiKey}`,
-          },
-          timeout: 10000,
-          retryAttempts: 3,
-          rateLimit: {
-            requests: 1000,
-            window: 60 * 60 * 1000, // 1 hour
-          },
+        if ('baseUrl' in config && 'apiKey' in config) {
+          return {
+            name: 'PredictHQ',
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            headers: {
+              'Authorization': `Bearer ${config.apiKey}`,
+            },
+            timeout: 10000,
+            retryAttempts: 3,
+            rateLimit: {
+              requests: 1000,
+              window: 60 * 60 * 1000, // 1 hour
+            },
+          }
         }
+        break
 
       case 'maps':
         if ('mapbox' in config && config.mapbox.apiKey) {
@@ -139,6 +152,8 @@ class ApiConfigManager {
         logger.warn(`Unknown provider: ${provider}`)
         return null
     }
+    
+    return null
   }
 
   /**

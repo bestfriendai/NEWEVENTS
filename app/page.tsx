@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
 import SimpleCobeGlobe from "@/components/simple-cobe-globe"
 import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap } from "lucide-react"
-import { useMobile } from "@/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { useGSAP } from "@/lib/gsap-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -15,7 +15,7 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const ctaButtonRef = useRef<HTMLDivElement>(null)
-  const isMobile = useMobile()
+  const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState("concerts")
   const [isClient, setIsClient] = useState(false)
   const { safeGSAP, cleanup, createFadeIn, createScaleAnimation } = useGSAP()

@@ -74,7 +74,9 @@ class MemoryCache<T> extends CacheBackend<T> {
  * LocalStorage cache backend
  */
 class LocalStorageCache<T> extends CacheBackend<T> {
-  constructor(private namespace: string = 'cache') {}
+  constructor(private namespace: string = 'cache') {
+    super()
+  }
 
   private getStorageKey(key: string): string {
     return `${this.namespace}:${key}`
@@ -156,7 +158,9 @@ class LocalStorageCache<T> extends CacheBackend<T> {
  * SessionStorage cache backend
  */
 class SessionStorageCache<T> extends CacheBackend<T> {
-  constructor(private namespace: string = 'cache') {}
+  constructor(private namespace: string = 'cache') {
+    super()
+  }
 
   private getStorageKey(key: string): string {
     return `${this.namespace}:${key}`

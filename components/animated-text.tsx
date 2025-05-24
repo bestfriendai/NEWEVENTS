@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect, useRef } from "react"
 import { gsap } from "gsap"
-import { useMobile } from "@/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface AnimatedTextProps {
   children: React.ReactNode
@@ -14,7 +14,7 @@ interface AnimatedTextProps {
 
 export function AnimatedText({ children, className = "", delay = 0 }: AnimatedTextProps) {
   const textRef = useRef<HTMLDivElement>(null)
-  const isMobile = useMobile()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (typeof window === "undefined") return
