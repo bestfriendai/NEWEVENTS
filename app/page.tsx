@@ -20,14 +20,14 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const { safeGSAP, cleanup, createFadeIn, createScaleAnimation } = useGSAP()
 
-  // Generate stable particle positions
+  // Generate stable particle positions (fixed values to prevent hydration mismatch)
   const particlePositions = useState(() =>
     Array.from({ length: 20 }, (_, i) => ({
       id: i,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      delay: Math.random() * 3,
-      duration: 2 + Math.random() * 2
+      left: (i * 17 + 23) % 100, // Deterministic positioning
+      top: (i * 13 + 37) % 100,
+      delay: (i * 0.15) % 3,
+      duration: 2 + (i * 0.1) % 2
     }))
   )[0]
 

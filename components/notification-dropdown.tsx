@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Bell, Calendar, Heart, MessageSquare, User, X, Settings, Check, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -99,104 +99,253 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
   const [notifications, setNotifications] = useState<Notification[]>(sampleNotifications)
   const [activeTab, setActiveTab] = useState("all")
   const [hasNewNotifications, setHasNewNotifications] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Safe function to get next ID
+  const getNextId = useCallback(() => {
+    try {
+      if (notifications.length === 0) return 1
+      const maxId = Math.max(...notifications.map((n) => n.id))
+      return maxId + 1
+    } catch (error) {
+      console.error("Error getting next ID:", error)
+      return Date.now() // Fallback to timestamp
+    }
+  }, [notifications])
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (isOpen && !target.closest("[data-notification-dropdown]")) {
-        setIsOpen(false)
+      try {
+        const target = event.target as HTMLElement
+        if (isOpen && dropdownRef.current && !dropdownRef.current.contains(target)) {
+          setIsOpen(false)
+        }
+      } catch (error) {
+        console.error("Error in click outside handler:", error)
+        setError("Failed to handle click outside")
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    if (typeof document !== "undefined") {
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
+    }
   }, [isOpen])
 
   // Simulate receiving a new notification
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isOpen) {
-        const newNotification = {
-          id: Math.max(...notifications.map((n) => n.id)) + 1,
-          type: "event_update",
-          title: "Event Update",
-          message: "The venue for Tech Startup Conference has changed",
-          time: "Just now",
-          read: false,
-          image: "/vibrant-community-event.png?height=40&width=40&query=tech conference",
-          link: "/events/4",
+    try {
+      timerRef.current = setTimeout(() => {
+        if (!isOpen) {
+          const newNotification = {
+            id: getNextId(),
+            type: "event_update",
+            title: "Event Update",
+            message: "The venue for Tech Startup Conference has changed",
+            time: "Just now",
+            read: false,
+            image: "/vibrant-community-event.png?height=40&width=40&query=tech conference",
+            link: "/events/4",
+          }
+          setNotifications((prev) => [newNotification, ...prev])
+          setHasNewNotifications(true)
         }
-        setNotifications([newNotification, ...notifications])
-        setHasNewNotifications(true)
-      }
-    }, 30000) // Add a new notification after 30 seconds if dropdown is closed
+      }, 30000) // Add a new notification after 30 seconds if dropdown is closed
 
-    return () => clearTimeout(timer)
-  }, [notifications, isOpen])
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current)
+          timerRef.current = null
+        }
+      }
+    } catch (error) {
+      console.error("Error setting up notification timer:", error)
+      setError("Failed to set up notifications")
+    }
+  }, [isOpen, getNextId])
+
+  // Global error handlers
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error("Unhandled promise rejection in NotificationDropdown:", event.reason)
+      setError("An unexpected error occurred")
+      event.preventDefault() // Prevent the default browser behavior
+    }
+
+    const handleError = (event: ErrorEvent) => {
+      console.error("Runtime error in NotificationDropdown:", event.error)
+      setError("A runtime error occurred")
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("unhandledrejection", handleUnhandledRejection)
+      window.addEventListener("error", handleError)
+
+      return () => {
+        window.removeEventListener("unhandledrejection", handleUnhandledRejection)
+        window.removeEventListener("error", handleError)
+      }
+    }
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
-  const handleToggleDropdown = () => {
-    setIsOpen(!isOpen)
-    if (!isOpen && hasNewNotifications) {
-      setHasNewNotifications(false)
+  const handleToggleDropdown = useCallback(() => {
+    try {
+      setIsOpen(!isOpen)
+      if (!isOpen && hasNewNotifications) {
+        setHasNewNotifications(false)
+      }
+      setError(null) // Clear any previous errors
+    } catch (error) {
+      console.error("Error toggling dropdown:", error)
+      setError("Failed to toggle dropdown")
     }
-  }
+  }, [isOpen, hasNewNotifications])
 
-  const handleMarkAsRead = (id: number) => {
-    setNotifications(
-      notifications.map((notification) => (notification.id === id ? { ...notification, read: true } : notification)),
-    )
-  }
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((notification) => ({ ...notification, read: true })))
-  }
-
-  const handleRemoveNotification = (id: number) => {
-    setNotifications(notifications.filter((notification) => notification.id !== id))
-  }
-
-  const handleAction = (id: number, action: string) => {
-    // In a real app, this would send a request to the server
-    // console.log(`Notification ${id}: ${action}`)
-
-    // Mark as read and update UI
-    setNotifications(
-      notifications.map((notification) =>
-        notification.id === id ? { ...notification, read: true, actionTaken: action } : notification,
-      ),
-    )
-  }
-
-  const filteredNotifications = notifications.filter((notification) => {
-    if (activeTab === "all") return true
-    if (activeTab === "unread") return !notification.read
-    return notification.type === activeTab
-  })
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "event_reminder":
-      case "event_invite":
-      case "event_update":
-        return <Calendar className="h-4 w-4 text-purple-400" />
-      case "friend_request":
-        return <User className="h-4 w-4 text-blue-400" />
-      case "message":
-        return <MessageSquare className="h-4 w-4 text-green-400" />
-      case "like":
-        return <Heart className="h-4 w-4 text-pink-400" />
-      case "system":
-        return <Settings className="h-4 w-4 text-gray-400" />
-      default:
-        return <Bell className="h-4 w-4 text-purple-400" />
+  const handleMarkAsRead = useCallback((id: number) => {
+    try {
+      setNotifications((prev) =>
+        prev.map((notification) => (notification.id === id ? { ...notification, read: true } : notification)),
+      )
+    } catch (error) {
+      console.error("Error marking notification as read:", error)
+      setError("Failed to mark notification as read")
     }
+  }, [])
+
+  const handleMarkAllAsRead = useCallback(() => {
+    try {
+      setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error)
+      setError("Failed to mark all notifications as read")
+    }
+  }, [])
+
+  const handleRemoveNotification = useCallback((id: number) => {
+    try {
+      setNotifications((prev) => prev.filter((notification) => notification.id !== id))
+    } catch (error) {
+      console.error("Error removing notification:", error)
+      setError("Failed to remove notification")
+    }
+  }, [])
+
+  const handleAction = useCallback((id: number, action: string) => {
+    try {
+      // In a real app, this would send a request to the server
+      // console.log(`Notification ${id}: ${action}`)
+
+      // Mark as read and update UI
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === id ? { ...notification, read: true, actionTaken: action } : notification,
+        ),
+      )
+    } catch (error) {
+      console.error("Error handling notification action:", error)
+      setError("Failed to handle notification action")
+    }
+  }, [])
+
+  // Validate notification data
+  const validateNotification = useCallback((notification: any): notification is Notification => {
+    return (
+      notification &&
+      typeof notification.id === "number" &&
+      typeof notification.type === "string" &&
+      typeof notification.title === "string" &&
+      typeof notification.message === "string" &&
+      typeof notification.time === "string" &&
+      typeof notification.read === "boolean" &&
+      typeof notification.image === "string" &&
+      typeof notification.link === "string"
+    )
+  }, [])
+
+  const filteredNotifications = useMemo(() => {
+    try {
+      setIsLoading(true)
+      const validNotifications = notifications.filter(validateNotification)
+
+      if (validNotifications.length !== notifications.length) {
+        console.warn("Some notifications failed validation and were filtered out")
+      }
+
+      const filtered = validNotifications.filter((notification) => {
+        if (activeTab === "all") return true
+        if (activeTab === "unread") return !notification.read
+        return notification.type === activeTab
+      })
+
+      setIsLoading(false)
+      return filtered
+    } catch (error) {
+      console.error("Error filtering notifications:", error)
+      setError("Failed to filter notifications")
+      setIsLoading(false)
+      return []
+    }
+  }, [notifications, activeTab, validateNotification])
+
+  const getNotificationIcon = useCallback((type: string) => {
+    try {
+      switch (type) {
+        case "event_reminder":
+        case "event_invite":
+        case "event_update":
+          return <Calendar className="h-4 w-4 text-purple-400" />
+        case "friend_request":
+          return <User className="h-4 w-4 text-blue-400" />
+        case "message":
+          return <MessageSquare className="h-4 w-4 text-green-400" />
+        case "like":
+          return <Heart className="h-4 w-4 text-pink-400" />
+        case "system":
+          return <Settings className="h-4 w-4 text-gray-400" />
+        default:
+          return <Bell className="h-4 w-4 text-purple-400" />
+      }
+    } catch (error) {
+      console.error("Error getting notification icon:", error)
+      return <Bell className="h-4 w-4 text-purple-400" />
+    }
+  }, [])
+
+  // Error display component
+  const ErrorDisplay = () => {
+    if (!error) return null
+    return (
+      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg m-2">
+        <p className="text-red-400 text-sm">{error}</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="mt-1 h-6 px-2 text-xs text-red-400 hover:text-red-300"
+          onClick={() => setError(null)}
+        >
+          Dismiss
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <div className={cn("relative", className)} data-notification-dropdown>
+    <div className={cn("relative", className)} data-notification-dropdown ref={dropdownRef}>
       <Button
         variant="ghost"
         size="icon"
@@ -244,6 +393,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                   )}
                 </div>
               </div>
+              <ErrorDisplay />
             </div>
 
             <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
@@ -278,7 +428,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
 
               <ScrollArea className="max-h-[60vh] overflow-y-auto">
                 <TabsContent value={activeTab} className="m-0 min-h-[200px]">
-                  {filteredNotifications.length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                      <div className="bg-[#22252F] p-3 rounded-full mb-3 animate-pulse">
+                        <Bell className="h-6 w-6 text-gray-500" />
+                      </div>
+                      <p className="text-gray-400 text-sm">Loading notifications...</p>
+                    </div>
+                  ) : filteredNotifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
                       <div className="bg-[#22252F] p-3 rounded-full mb-3">
                         <Bell className="h-6 w-6 text-gray-500" />
@@ -303,9 +460,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                   <AvatarImage
                                     src={notification.image || "/placeholder.svg"}
                                     alt={notification.title}
+                                    onError={(e) => {
+                                      console.warn("Failed to load notification image:", notification.image)
+                                      // Fallback to placeholder or remove src to show fallback
+                                      e.currentTarget.src = "/placeholder.svg"
+                                    }}
                                   />
                                   <AvatarFallback className="bg-purple-900 text-purple-200">
-                                    {notification.title.charAt(0)}
+                                    {notification.title?.charAt(0) || "N"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="absolute -top-1 -right-1 bg-[#1A1D25] rounded-full p-0.5">
@@ -321,9 +483,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                         notification.read ? "text-gray-300" : "text-white",
                                       )}
                                     >
-                                      {notification.title}
+                                      {notification.title || "Untitled Notification"}
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-0.5">{notification.message}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{notification.message || "No message"}</p>
                                   </div>
                                   <Button
                                     variant="ghost"
@@ -337,9 +499,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                 <div className="flex items-center justify-between mt-2">
                                   <div className="flex items-center text-xs text-gray-500">
                                     <Clock className="mr-1 h-3 w-3" />
-                                    {notification.time}
+                                    {notification.time || "Unknown time"}
                                   </div>
-                                  {notification.actions && !notification.actionTaken && (
+                                  {notification.actions && Array.isArray(notification.actions) && !notification.actionTaken && (
                                     <div className="flex space-x-2">
                                       <Button
                                         variant="outline"
