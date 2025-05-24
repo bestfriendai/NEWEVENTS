@@ -1,6 +1,10 @@
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { searchEnhancedEvents, type EnhancedEventSearchParams } from "@/lib/api/enhanced-events-api"
 import { RAPIDAPI_KEY, RAPIDAPI_HOST } from "@/lib/env"
+import { withRetry, formatErrorMessage } from "@/lib/utils"
+import { logger, measurePerformance } from "@/lib/utils/logger"
+import { createApiClient } from "@/lib/utils/api-client"
+import { getProviderConfig, checkRateLimit } from "@/lib/utils/api-config"
 
 // Interface for search parameters (keeping backward compatibility)
 export interface EventSearchParams {
@@ -23,54 +27,100 @@ export async function searchEvents(params: EventSearchParams): Promise<{
   totalPages: number
   sources?: string[]
 }> {
-  try {
-    // console.log("Searching events with params:", params)
+  return measurePerformance('searchEvents', async () => {
+    try {
+      logger.info('Searching events', {
+        component: 'events-api',
+        action: 'search_events',
+        metadata: { params }
+      })
 
-    // Convert to enhanced params
-    const enhancedParams: EnhancedEventSearchParams = {
-      ...params,
-      size: params.size || 50, // Increased default size
-      userPreferences: {
-        favoriteCategories: params.categories,
-        pricePreference: "any",
-        timePreference: "any",
-      },
-    }
+      // Convert to enhanced params
+      const enhancedParams: EnhancedEventSearchParams = {
+        ...params,
+        size: params.size || 50, // Increased default size
+        userPreferences: {
+          favoriteCategories: params.categories,
+          pricePreference: "any",
+          timePreference: "any",
+        },
+      }
 
-    return await searchEnhancedEvents(enhancedParams)
-  } catch (error) {
-    console.error("Search events error:", error)
-    return {
-      events: [],
-      totalCount: 0,
-      page: params.page || 0,
-      totalPages: 0,
-      sources: [],
+      const result = await searchEnhancedEvents(enhancedParams)
+
+      logger.info('Events search completed', {
+        component: 'events-api',
+        action: 'search_events_success',
+        metadata: {
+          eventCount: result.events.length,
+          totalCount: result.totalCount,
+          sources: result.sources
+        }
+      })
+
+      return result
+    } catch (error) {
+      const errorMessage = formatErrorMessage(error)
+      logger.error('Events search failed', {
+        component: 'events-api',
+        action: 'search_events_error',
+        metadata: { params }
+      }, error instanceof Error ? error : new Error(errorMessage))
+
+      return {
+        events: [],
+        totalCount: 0,
+        page: params.page || 0,
+        totalPages: 0,
+        sources: [],
+      }
     }
-  }
+  })
 }
 
 // Function to get event details - enhanced with multiple source checking
 export async function getEventDetails(eventId: string): Promise<EventDetailProps | null> {
-  try {
-    // console.log("Getting event details for ID:", eventId)
-
-    // Try to get details directly from RapidAPI
+  return measurePerformance('getEventDetails', async () => {
     try {
-      const response = await fetch(
-        `https://real-time-events-search.p.rapidapi.com/event-details?event_id=${encodeURIComponent(eventId)}`,
-        {
-          method: "GET",
-          headers: {
-            "x-rapidapi-key": RAPIDAPI_KEY || "",
-            "x-rapidapi-host": RAPIDAPI_HOST,
-          },
-        },
-      )
+      logger.info('Getting event details', {
+        component: 'events-api',
+        action: 'get_event_details',
+        metadata: { eventId }
+      })
 
-      if (response.ok) {
-        const data = await response.json()
-        // console.log("RapidAPI event details response:", data)
+      // Check rate limit for RapidAPI
+      const rateLimitCheck = checkRateLimit('rapidapi')
+      if (!rateLimitCheck.allowed) {
+        logger.warn('RapidAPI rate limit exceeded', {
+          component: 'events-api',
+          action: 'rate_limit_exceeded',
+          metadata: { provider: 'rapidapi', resetTime: rateLimitCheck.resetTime }
+        })
+      }
+
+      // Try to get details directly from RapidAPI with retry logic
+      try {
+        const response = await withRetry(
+          () => fetch(
+            `https://real-time-events-search.p.rapidapi.com/event-details?event_id=${encodeURIComponent(eventId)}`,
+            {
+              method: "GET",
+              headers: {
+                "x-rapidapi-key": RAPIDAPI_KEY || "",
+                "x-rapidapi-host": RAPIDAPI_HOST,
+              },
+            },
+          ),
+          { maxAttempts: 2, baseDelay: 1000 }
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          logger.info('RapidAPI event details retrieved', {
+            component: 'events-api',
+            action: 'rapidapi_success',
+            metadata: { eventId }
+          })
 
         if (data.status === "OK" && data.data) {
           // Transform the event data
@@ -160,26 +210,51 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
             ticketLinks,
           }
         }
+        }
+      } catch (error) {
+        logger.error('Error fetching event details from RapidAPI', {
+          component: 'events-api',
+          action: 'rapidapi_error',
+          metadata: { eventId }
+        }, error instanceof Error ? error : new Error(formatErrorMessage(error)))
       }
+
+      // If RapidAPI fails, try to get details from enhanced search
+      logger.info('Falling back to enhanced search for event details', {
+        component: 'events-api',
+        action: 'fallback_search',
+        metadata: { eventId }
+      })
+
+      const searchResult = await searchEnhancedEvents({
+        keyword: eventId,
+        size: 1,
+      })
+
+      if (searchResult.events.length > 0) {
+        logger.info('Event details found via enhanced search', {
+          component: 'events-api',
+          action: 'enhanced_search_success',
+          metadata: { eventId }
+        })
+        return searchResult.events[0]
+      }
+
+      logger.warn('Event details not found', {
+        component: 'events-api',
+        action: 'event_not_found',
+        metadata: { eventId }
+      })
+      return null
     } catch (error) {
-      console.error("Error fetching event details from RapidAPI:", error)
+      logger.error('Get event details failed', {
+        component: 'events-api',
+        action: 'get_event_details_error',
+        metadata: { eventId }
+      }, error instanceof Error ? error : new Error(formatErrorMessage(error)))
+      return null
     }
-
-    // If RapidAPI fails, try to get details from enhanced search
-    const searchResult = await searchEnhancedEvents({
-      keyword: eventId,
-      size: 1,
-    })
-
-    if (searchResult.events.length > 0) {
-      return searchResult.events[0]
-    }
-
-    return null
-  } catch (error) {
-    console.error("Get event details error:", error)
-    return null
-  }
+  })
 }
 
 // Helper function to extract category from tags
@@ -342,5 +417,5 @@ export async function testRapidApiConnection(): Promise<boolean> {
   }
 }
 
-// Export the enhanced search function for direct use
-export { searchEnhancedEvents, type EnhancedEventSearchParams }
+// Re-export enhanced search types for convenience
+export type { EnhancedEventSearchParams }
