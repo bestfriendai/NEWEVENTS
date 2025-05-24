@@ -15,13 +15,9 @@ const createApiKeySchema = (name: string, required: boolean = false) => {
 
 // Environment schema for validation
 const envSchema = z.object({
-  // Public environment variables - allow placeholders in development
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NODE_ENV === 'development'
-    ? z.string().min(1, 'Supabase URL is required')
-    : z.string().url('Invalid Supabase URL'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NODE_ENV === 'development'
-    ? z.string().min(1, 'Supabase anon key is required')
-    : z.string().min(1, 'Supabase anon key is required'),
+  // Public environment variables - always required but allow any valid string in development
+  NEXT_PUBLIC_SUPABASE_URL: z.string().min(1, 'Supabase URL is required'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
   
   // Server-side API keys - required in production, optional in development
   RAPIDAPI_KEY: createApiKeySchema('RapidAPI key'),
