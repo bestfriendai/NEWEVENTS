@@ -89,15 +89,15 @@ export function EventCard({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: index * 0.05 }}
-        whileHover={{ y: -4, transition: { duration: 0.2 } }}
+        whileHover={{ y: -2, transition: { duration: 0.2 } }}
         className="group cursor-pointer"
         onClick={onViewDetails}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/50 rounded-xl overflow-hidden transition-all duration-300 group-hover:shadow-glow-sm">
-          <div className="flex items-center p-3">
-            <div className="relative w-16 h-16 rounded-lg overflow-hidden mr-3 flex-shrink-0">
+        <div className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/50 rounded-lg overflow-hidden transition-all duration-300 group-hover:shadow-glow-xs group-hover:border-purple-500/40">
+          <div className="flex items-center p-2">
+            <div className="relative w-14 h-14 rounded-md overflow-hidden mr-2.5 flex-shrink-0">
               <motion.img
                 src={eventData.image}
                 alt={eventData.title}
@@ -108,7 +108,7 @@ export function EventCard({
               <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25]/70 to-transparent"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-0.5">
                 <Badge className={cn("text-xs font-medium border-0 px-2 py-0.5", getBadgeStyles())}>
                   {eventData.category}
                 </Badge>
@@ -122,20 +122,25 @@ export function EventCard({
                   className="text-gray-400 hover:text-purple-400 transition-colors duration-200"
                 >
                   <Heart
-                    size={14}
+                    size={12}
                     className={eventData.isFavorite ? "fill-purple-500 text-purple-500" : "text-gray-400"}
                   />
                 </motion.button>
               </div>
-              <h3 className="font-medium text-gray-200 text-sm truncate">{eventData.title}</h3>
-              <div className="flex items-center text-xs text-gray-400 mt-1">
+              <h3 className="font-medium text-gray-200 text-xs truncate mb-0.5">{eventData.title}</h3>
+              <div className="flex items-center text-xs text-gray-400 mt-0.5">
                 <Calendar size={10} className="mr-1 text-purple-400 flex-shrink-0" />
                 <span className="truncate">{eventData.date}</span>
+              </div>
+              <div className="flex items-center text-xs text-gray-400 mt-0.5">
+                <MapPin size={10} className="mr-1 text-purple-400 flex-shrink-0" />
+                <span className="truncate">{eventData.location}</span>
               </div>
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
+    </motion.div>
     )
   }
 

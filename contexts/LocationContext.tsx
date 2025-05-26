@@ -8,11 +8,15 @@ interface Location {
   longitude: number
   city?: string
   address?: string
+  name?: string // Add name property
 }
 
+// Update the context interface
 interface LocationContextType {
   location: Location | null
+  userLocation: { lat: number; lng: number; name?: string } | null // Add userLocation for compatibility
   setLocation: (location: Location) => void
+  searchLocation: (query: string) => Promise<void> // Add searchLocation method
   getCurrentLocation: () => Promise<void>
   isLoading: boolean
   error: string | null
@@ -61,9 +65,48 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // In the provider, add the searchLocation method:
+  const searchLocation = useCallback(async (query: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Use your geocoding API (from lib/api/map-api.ts)
+      const { geocodeAddress } = await import("@/lib/api/map-api")
+      const result = await geocodeAddress(query)
+
+      if (result) {
+        const newLocation: Location = {
+          latitude: result.lat,
+          longitude: result.lng,
+          name: result.name,
+          address: result.address,
+        }
+        setLocationState(newLocation)
+      } else {
+        setError("Location not found")
+      }
+    } catch (err) {
+      setError("Failed to search location")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Add userLocation computed property for compatibility
+  const userLocation = location
+    ? {
+        lat: location.latitude,
+        lng: location.longitude,
+        name: location.name || location.city || location.address,
+      }
+    : null
+
   const value = {
     location,
+    userLocation,
     setLocation,
+    searchLocation,
     getCurrentLocation,
     isLoading,
     error,

@@ -1,231 +1,215 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { loadMapbox, createMap, createMarker, createPopup, cleanupMap } from "@/lib/mapbox-utils"
 import { logger } from "@/lib/utils/logger"
-
-interface ProcessedEvent {
-  event_id: string
-  name: string
-  category: string
-  venue: {
-    name: string
-    latitude: number
-    longitude: number
-  }
-  start_time: string
-}
+import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface EventsMapProps {
-  events: ProcessedEvent[]
-  center: [number, number]
-  selectedEvent: ProcessedEvent | null
-  onEventSelect: (event: ProcessedEvent) => void
-  onError?: () => void
+  events: EventDetailProps[]
+  center: { lat: number; lng: number }
+  zoom?: number
+  selectedEventId: number | null
+  onEventSelect: (event: EventDetailProps) => void
+  className?: string
 }
 
-const CATEGORY_COLORS = {
-  Concerts: "#8B5CF6",
-  "General Events": "#06B6D4",
-  "Day Parties": "#F59E0B",
-  "Club Events": "#EF4444",
-  Parties: "#10B981",
-}
+export function EventsMap({ events, center, zoom = 10, selectedEventId, onEventSelect, className }: EventsMapProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
+  const [mapboxLoaded, setMapboxLoaded] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
 
-export default function EventsMap({ events, center, selectedEvent, onEventSelect, onError }: EventsMapProps) {
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<any>(null)
-  const markers = useRef<any[]>([])
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Initialize map
+  // Load Mapbox and initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current) return
+    if (typeof window === "undefined") return
 
-    const initMap = async () => {
+    const mapboxApiKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
+    if (!mapboxApiKey) {
+      setMapError("Mapbox API key not configured. Please add NEXT_PUBLIC_MAPBOX_API_KEY to your environment variables.")
+      logger.error("Mapbox API key missing", { component: "EventsMap" })
+      return
+    }
+
+    const loadMapbox = async () => {
       try {
-        // Check if Mapbox API key is available
-        if (!process.env.NEXT_PUBLIC_MAPBOX_API_KEY) {
-          setError(
-            "Mapbox API key is not configured. Please add NEXT_PUBLIC_MAPBOX_API_KEY to your environment variables.",
-          )
-          return
+        // Import Mapbox GL JS
+        const mapboxgl = (await import("mapbox-gl")).default
+
+        // Set access token
+        ;(mapboxgl as any).accessToken = mapboxApiKey
+
+        if (mapContainerRef.current && !mapRef.current) {
+          // Create map instance
+          mapRef.current = new mapboxgl.Map({
+            container: mapContainerRef.current,
+            style: "mapbox://styles/mapbox/dark-v11",
+            center: [center.lng, center.lat],
+            zoom: zoom,
+            projection: { name: "globe" } as any,
+          })
+
+          // Add map event listeners
+          mapRef.current.on("load", () => {
+            setMapboxLoaded(true)
+            logger.info("Mapbox map loaded successfully", { component: "EventsMap" })
+
+            // Set fog for globe effect
+            try {
+              mapRef.current.setFog({})
+            } catch (e) {
+              logger.warn("Could not set fog effect", { component: "EventsMap" })
+            }
+          })
+
+          mapRef.current.on("error", (e: any) => {
+            const errorMessage = e.error?.message || "Unknown map error"
+            logger.error("Mapbox error", { component: "EventsMap", error: errorMessage })
+            setMapError(`Map error: ${errorMessage}`)
+          })
+
+          // Add navigation controls
+          mapRef.current.addControl(new mapboxgl.NavigationControl(), "top-right")
         }
-
-        const mapboxgl = await loadMapbox()
-
-        map.current = await createMap(mapContainer.current!, {
-          style: "mapbox://styles/mapbox/dark-v11",
-          center: center[0] !== 0 && center[1] !== 0 ? center : [-74.006, 40.7128], // Default to NYC
-          zoom: 12,
-          attributionControl: false,
-        })
-
-        map.current.on("load", () => {
-          setMapLoaded(true)
-        })
-
-        map.current.on("error", (e: any) => {
-          logger.error("Map error:", e)
-          setError("Failed to load map. Please check your Mapbox configuration.")
-        })
       } catch (err) {
-        logger.error("Failed to initialize map:", err)
-        const errorMessage =
-          err instanceof Error && err.message.includes("API access token")
-            ? "Mapbox API key is missing or invalid. Please check your configuration."
-            : "Failed to initialize map. Please check your internet connection."
-
-        setError(errorMessage)
-        onError?.()
+        const message = err instanceof Error ? err.message : "Failed to load Mapbox"
+        logger.error("Failed to load Mapbox", { component: "EventsMap", error: message })
+        setMapError(`Failed to load map: ${message}`)
       }
     }
 
-    initMap()
+    loadMapbox()
 
+    // Cleanup function
     return () => {
-      if (map.current) {
-        cleanupMap(map.current)
-        map.current = null
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove()
+        } catch (e) {
+          logger.warn("Error removing map", { component: "EventsMap" })
+        }
+        mapRef.current = null
       }
     }
-  }, [])
+  }, []) // Only run once on mount
 
-  // Update map center when location changes
+  // Update map center and zoom when props change
   useEffect(() => {
-    if (map.current && mapLoaded && center[0] !== 0 && center[1] !== 0) {
-      map.current.flyTo({
-        center: center,
-        zoom: 12,
-        duration: 1000,
-      })
+    if (mapRef.current && mapboxLoaded) {
+      try {
+        mapRef.current.flyTo({
+          center: [center.lng, center.lat],
+          zoom: zoom,
+          duration: 1500,
+        })
+      } catch (e) {
+        logger.warn("Error flying to location", { component: "EventsMap" })
+      }
     }
-  }, [center, mapLoaded])
+  }, [center, zoom, mapboxLoaded])
 
-  // Update markers when events change
+  // Create marker element
+  const createMarkerElement = (event: EventDetailProps, isSelected: boolean): HTMLElement => {
+    const el = document.createElement("div")
+    el.className = `w-8 h-8 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all duration-200 transform hover:scale-110 ${
+      isSelected
+        ? "bg-purple-500 border-white ring-4 ring-purple-500/50 scale-110 z-10"
+        : "bg-pink-500 border-white hover:bg-pink-400"
+    }`
+
+    el.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    `
+
+    el.title = event.title
+    el.style.zIndex = isSelected ? "1000" : "100"
+
+    return el
+  }
+
+  // Update markers when events or selection changes
   useEffect(() => {
-    if (!map.current || !mapLoaded) return
+    if (!mapRef.current || !mapboxLoaded || mapError) return
 
     // Clear existing markers
-    markers.current.forEach((marker) => marker.remove())
-    markers.current = []
+    markersRef.current.forEach((marker) => {
+      try {
+        marker.remove()
+      } catch (e) {
+        logger.warn("Error removing marker", { component: "EventsMap" })
+      }
+    })
+    markersRef.current = []
+
+    // Get Mapbox GL from window (it should be loaded by now)
+    const mapboxgl = (window as any).mapboxgl
+    if (!mapboxgl) {
+      logger.warn("Mapbox GL not available on window", { component: "EventsMap" })
+      return
+    }
 
     // Add new markers
-    const addMarkers = async () => {
-      try {
-        for (const event of events) {
-          if (!event.venue.latitude || !event.venue.longitude) continue
+    events.forEach((event) => {
+      if (event.coordinates) {
+        try {
+          const isSelected = event.id === selectedEventId
+          const markerElement = createMarkerElement(event, isSelected)
 
-          const color = CATEGORY_COLORS[event.category as keyof typeof CATEGORY_COLORS] || "#6B7280"
-
-          // Create custom marker element
-          const markerElement = document.createElement("div")
-          markerElement.className = "custom-marker"
-          markerElement.style.cssText = `
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: ${color};
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: transform 0.2s;
-          `
-
-          // Add hover effect
-          markerElement.addEventListener("mouseenter", () => {
-            markerElement.style.transform = "scale(1.5)"
-          })
-          markerElement.addEventListener("mouseleave", () => {
-            markerElement.style.transform = "scale(1)"
-          })
-
-          const marker = await createMarker({
-            element: markerElement,
-            anchor: "center",
-          })
-
-          marker.setLngLat([event.venue.longitude, event.venue.latitude])
-
-          // Create popup
-          const popup = await createPopup({
-            closeButton: false,
-            closeOnClick: false,
-            className: "event-popup",
-          })
-
-          const formatDate = (dateString: string) => {
-            try {
-              return new Date(dateString).toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            } catch {
-              return "Date TBD"
-            }
-          }
-
-          popup.setHTML(`
-            <div class="p-3 max-w-xs">
-              <div class="font-semibold text-sm mb-1">${event.name}</div>
-              <div class="text-xs text-gray-600 mb-1">${event.venue.name}</div>
-              <div class="text-xs text-gray-500">${formatDate(event.start_time)}</div>
-              <div class="mt-2">
-                <span class="inline-block px-2 py-1 text-xs rounded-full" style="background-color: ${color}20; color: ${color};">
-                  ${event.category}
-                </span>
-              </div>
-            </div>
-          `)
-
-          marker.setPopup(popup)
+          // Create marker
+          const marker = new mapboxgl.Marker(markerElement)
+            .setLngLat([event.coordinates.lng, event.coordinates.lat])
+            .addTo(mapRef.current)
 
           // Add click handler
-          markerElement.addEventListener("click", () => {
+          markerElement.addEventListener("click", (e) => {
+            e.stopPropagation()
             onEventSelect(event)
           })
 
-          marker.addTo(map.current)
-          markers.current.push(marker)
+          // Create popup
+          const popup = new mapboxgl.Popup({
+            offset: 25,
+            closeButton: false,
+            closeOnClick: false,
+          }).setHTML(`
+            <div class="p-2 max-w-xs">
+              <div class="font-semibold text-sm mb-1">${event.title}</div>
+              <div class="text-xs text-gray-600 mb-1">${event.location}</div>
+              <div class="text-xs text-gray-500">${event.date} ${event.time || ""}</div>
+              <div class="text-xs font-medium text-purple-600 mt-1">${event.price}</div>
+            </div>
+          `)
+
+          // Show popup on hover
+          markerElement.addEventListener("mouseenter", () => {
+            marker.setPopup(popup).togglePopup()
+          })
+
+          markerElement.addEventListener("mouseleave", () => {
+            popup.remove()
+          })
+
+          markersRef.current.push(marker)
+        } catch (e) {
+          logger.warn("Error creating marker", { component: "EventsMap", eventId: event.id })
         }
-      } catch (err) {
-        logger.error("Failed to add markers:", err)
       }
-    }
-
-    addMarkers()
-  }, [events, mapLoaded, onEventSelect])
-
-  // Highlight selected event
-  useEffect(() => {
-    if (!map.current || !mapLoaded || !selectedEvent) return
-
-    // Find and highlight the selected event marker
-    const selectedMarker = markers.current.find((marker, index) => {
-      const event = events[index]
-      return event && event.event_id === selectedEvent.event_id
     })
 
-    if (selectedMarker) {
-      // Fly to the selected marker
-      map.current.flyTo({
-        center: [selectedEvent.venue.longitude, selectedEvent.venue.latitude],
-        zoom: 15,
-        duration: 1000,
-      })
+    logger.info("Updated map markers", {
+      component: "EventsMap",
+      markerCount: markersRef.current.length,
+      eventCount: events.length,
+    })
+  }, [events, selectedEventId, mapboxLoaded, mapError, onEventSelect])
 
-      // Show popup
-      selectedMarker.togglePopup()
-    }
-  }, [selectedEvent, mapLoaded, events])
-
-  if (error) {
+  // Error state
+  if (mapError) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-900 text-white p-6">
+      <div className={`flex items-center justify-center bg-gray-800 text-red-400 p-8 ${className}`}>
         <div className="text-center max-w-md">
           <div className="mb-4">
             <svg className="w-16 h-16 mx-auto text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,8 +221,8 @@ export default function EventsMap({ events, center, selectedEvent, onEventSelect
               />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold mb-2">Map Unavailable</h3>
-          <p className="text-gray-300 mb-4">{error}</p>
+          <h3 className="text-lg font-semibold mb-2 text-white">Map Unavailable</h3>
+          <p className="text-gray-300 mb-4">{mapError}</p>
           <div className="space-y-2">
             <button
               onClick={() => window.location.reload()}
@@ -246,45 +230,37 @@ export default function EventsMap({ events, center, selectedEvent, onEventSelect
             >
               Reload Page
             </button>
-            <p className="text-xs text-gray-400">Events will still be available in the sidebar</p>
+            <p className="text-xs text-gray-400">Events are still available in the sidebar</p>
           </div>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="relative h-full">
-      <div ref={mapContainer} className="h-full w-full" />
-
-      {!mapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
-            <p>Loading map...</p>
-          </div>
+  // Loading state
+  if (!mapboxLoaded) {
+    return (
+      <div className={`flex items-center justify-center bg-gray-900 ${className}`}>
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-lg">Loading interactive map...</p>
+          <p className="text-sm text-gray-400 mt-2">Powered by Mapbox</p>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Legend */}
-      {mapLoaded && events.length > 0 && (
-        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-          <h4 className="text-sm font-semibold mb-2">Event Categories</h4>
-          <div className="space-y-1">
-            {Object.entries(CATEGORY_COLORS).map(([category, color]) => {
-              const count = events.filter((e) => e.category === category).length
-              if (count === 0) return null
+  return (
+    <div className={`relative ${className}`}>
+      <div ref={mapContainerRef} className="w-full h-full" />
 
-              return (
-                <div key={category} className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full mr-2 border border-white" style={{ backgroundColor: color }} />
-                  <span>
-                    {category} ({count})
-                  </span>
-                </div>
-              )
-            })}
+      {/* Map overlay info */}
+      {events.length > 0 && (
+        <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white">
+          <div className="text-sm">
+            <span className="font-medium">{events.length}</span> events found
           </div>
+          <div className="text-xs text-gray-400 mt-1">Click markers to view details</div>
         </div>
       )}
     </div>

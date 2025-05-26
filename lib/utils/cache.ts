@@ -730,9 +730,21 @@ export class CacheManager<T> {
 
 export const memoryCache = new MemoryCache(1000)
 
-// Cleanup expired entries every 5 minutes
+// Create default cache instances
+export const sessionCache = new CacheManager({ storage: "sessionStorage", namespace: "session" })
+export const persistentCache = new CacheManager({
+  storage: "localStorage",
+  namespace: "persistent",
+  ttl: 24 * 60 * 60 * 1000,
+}) // 24 hours
+
+// Convenience function for creating custom caches
+export function createCache<T>(options: CacheOptions = {}) {
+  return new CacheManager<T>(options)
+}
+
+// Cleanup expired entries every 5 minutes (server-side only)
 if (typeof window === "undefined") {
-  // Server-side only
   setInterval(
     () => {
       const removed = memoryCache.cleanup()
@@ -743,15 +755,3 @@ if (typeof window === "undefined") {
     5 * 60 * 1000,
   )
 }
-
-// Create default cache instances
-// export const memoryCache = new CacheManager({ storage: 'memory', namespace: 'memory' })
-export const sessionCache = new CacheManager({ storage: "sessionStorage", namespace: "session" })
-export const persistentCache = new CacheManager({
-  storage: "localStorage",
-  namespace: "persistent",
-  ttl: 24 * 60 * 60 * 1000,
-}) // 24 hours
-
-// Convenience function for creating custom caches
-export const createCache = <T>(options: CacheOptions = {}) => new CacheManager<T>(options)

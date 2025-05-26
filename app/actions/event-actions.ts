@@ -71,14 +71,43 @@ export async function fetchEvents(params: EventSearchParams): Promise<EventSearc
 
     const validatedParams = validationResult.data
 
-    // Create cache key
-    const cacheKey = `events:search:${JSON.stringify(validatedParams)}`
+    // If location is a string and radius is not set, provide a default
+    if (
+      typeof validatedParams.location === "string" &&
+      validatedParams.location.trim() !== "" &&
+      typeof validatedParams.radius === "undefined"
+    ) {
+      validatedParams.radius = 50 // Default radius of 50km
+      logger.info("Default radius applied for string location", {
+        component: "event-actions",
+        metadata: { location: validatedParams.location, radius: validatedParams.radius },
+      })
+    }
 
-    // Try to get from cache first
-    const cachedResult = await cacheService.get<EventSearchResult>(cacheKey, {
-      ttl: 300, // 5 minutes
-      namespace: "events",
-    })
+    // Create cache key - make it shorter and more stable
+    const cacheKeyData = {
+      loc: validatedParams.location,
+      r: validatedParams.radius,
+      k: validatedParams.keyword,
+      s: validatedParams.size || 20,
+      p: validatedParams.page || 0,
+    }
+    const cacheKey = `search:${Buffer.from(JSON.stringify(cacheKeyData)).toString("base64").slice(0, 50)}`
+
+    // Try to get from cache first (with graceful fallback)
+    let cachedResult: EventSearchResult | null = null
+    try {
+      cachedResult = await cacheService.get<EventSearchResult>(cacheKey, {
+        ttl: 300, // 5 minutes
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Cache service unavailable, proceeding without cache", {
+        component: "event-actions",
+        action: "cache_unavailable",
+        metadata: { error: cacheError instanceof Error ? cacheError.message : String(cacheError) },
+      })
+    }
 
     if (cachedResult) {
       logger.info("Cache hit for event search", {
@@ -93,11 +122,18 @@ export async function fetchEvents(params: EventSearchParams): Promise<EventSearc
     const dbResult = await searchEventsFromDatabase(validatedParams)
 
     if (dbResult.events.length > 0) {
-      // Cache the database result
-      await cacheService.set(cacheKey, dbResult, {
-        ttl: 600, // 10 minutes for database results
-        namespace: "events",
-      })
+      // Try to cache the database result (don't fail if caching fails)
+      try {
+        await cacheService.set(cacheKey, dbResult, {
+          ttl: 600, // 10 minutes for database results
+          namespace: "events",
+        })
+      } catch (cacheError) {
+        logger.warn("Failed to cache database result", {
+          component: "event-actions",
+          action: "cache_set_warning",
+        })
+      }
 
       logger.info("Database search successful", {
         component: "event-actions",
@@ -121,11 +157,18 @@ export async function fetchEvents(params: EventSearchParams): Promise<EventSearc
       await storeEventsInDatabase(apiResult.events)
     }
 
-    // Cache the API result
-    await cacheService.set(cacheKey, apiResult, {
-      ttl: 300, // 5 minutes for API results
-      namespace: "events",
-    })
+    // Try to cache the API result (don't fail if caching fails)
+    try {
+      await cacheService.set(cacheKey, apiResult, {
+        ttl: 300, // 5 minutes for API results
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Failed to cache API result", {
+        component: "event-actions",
+        action: "cache_set_warning",
+      })
+    }
 
     return apiResult
   } catch (error) {
@@ -434,28 +477,59 @@ export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]>
   try {
     const cacheKey = `featured_events:${limit}`
 
-    const cachedEvents = await cacheService.getOrSet(
-      cacheKey,
-      async () => {
-        // Try database first
-        const dbResult = await eventRepository.getPopularEvents(limit)
-        if (dbResult.data.length > 0) {
-          return dbResult.data.map(transformDatabaseEventToEventDetail)
-        }
+    // Try cache first, but don't fail if cache is unavailable
+    let cachedEvents: EventDetailProps[] | null = null
+    try {
+      cachedEvents = await cacheService.get<EventDetailProps[]>(cacheKey, {
+        ttl: 1800, // 30 minutes
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Cache unavailable for featured events", {
+        component: "event-actions",
+        action: "featured_cache_warning",
+      })
+    }
 
+    if (cachedEvents) {
+      return cachedEvents
+    }
+
+    // Generate fresh data
+    let freshEvents: EventDetailProps[]
+    try {
+      // Try database first
+      const dbResult = await eventRepository.getPopularEvents(limit)
+      if (dbResult.data.length > 0) {
+        freshEvents = dbResult.data.map(transformDatabaseEventToEventDetail)
+      } else {
         // Fallback to API
         const apiResult = await searchEnhancedEvents({
           keyword: "featured popular trending concerts festivals",
           location: "New York",
           size: limit,
         })
+        freshEvents = apiResult.events
+      }
+    } catch (error) {
+      // Final fallback
+      freshEvents = generateFallbackEvents("New York", limit)
+    }
 
-        return apiResult.events
-      },
-      { ttl: 1800, namespace: "events" }, // 30 minutes
-    )
+    // Try to cache the result
+    try {
+      await cacheService.set(cacheKey, freshEvents, {
+        ttl: 1800,
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Failed to cache featured events", {
+        component: "event-actions",
+        action: "featured_cache_set_warning",
+      })
+    }
 
-    return cachedEvents || []
+    return freshEvents
   } catch (error) {
     logger.error(
       "Error getting featured events",
@@ -466,7 +540,7 @@ export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]>
       error instanceof Error ? error : new Error(String(error)),
     )
 
-    return []
+    return generateFallbackEvents("New York", limit)
   }
 }
 
@@ -477,15 +551,32 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
   try {
     const cacheKey = `category_events:${category}:${limit}`
 
-    const cachedEvents = await cacheService.getOrSet(
-      cacheKey,
-      async () => {
-        // Try database first
-        const dbResult = await eventRepository.getEventsByCategory(category, limit)
-        if (dbResult.data.length > 0) {
-          return dbResult.data.map(transformDatabaseEventToEventDetail)
-        }
+    // Try cache first, but don't fail if cache is unavailable
+    let cachedEvents: EventDetailProps[] | null = null
+    try {
+      cachedEvents = await cacheService.get<EventDetailProps[]>(cacheKey, {
+        ttl: 1800, // 30 minutes
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Cache unavailable for category events", {
+        component: "event-actions",
+        action: "category_cache_warning",
+      })
+    }
 
+    if (cachedEvents) {
+      return cachedEvents
+    }
+
+    // Generate fresh data
+    let freshEvents: EventDetailProps[]
+    try {
+      // Try database first
+      const dbResult = await eventRepository.getEventsByCategory(category, limit)
+      if (dbResult.data.length > 0) {
+        freshEvents = dbResult.data.map(transformDatabaseEventToEventDetail)
+      } else {
         // Fallback to API
         const apiResult = await searchEnhancedEvents({
           keyword: category,
@@ -493,13 +584,27 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
           size: limit,
           categories: [category.toLowerCase()],
         })
+        freshEvents = apiResult.events
+      }
+    } catch (error) {
+      // Final fallback
+      freshEvents = generateFallbackEvents("New York", limit)
+    }
 
-        return apiResult.events
-      },
-      { ttl: 1800, namespace: "events" }, // 30 minutes
-    )
+    // Try to cache the result
+    try {
+      await cacheService.set(cacheKey, freshEvents, {
+        ttl: 1800,
+        namespace: "events",
+      })
+    } catch (cacheError) {
+      logger.warn("Failed to cache category events", {
+        component: "event-actions",
+        action: "category_cache_set_warning",
+      })
+    }
 
-    return cachedEvents || []
+    return freshEvents
   } catch (error) {
     logger.error(
       "Error getting events by category",
@@ -511,6 +616,6 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
       error instanceof Error ? error : new Error(String(error)),
     )
 
-    return []
+    return generateFallbackEvents("New York", limit)
   }
 }

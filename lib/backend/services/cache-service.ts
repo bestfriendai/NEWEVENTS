@@ -22,9 +22,25 @@ export interface CacheOptions {
 
 export class CacheService {
   private defaultTTL = 3600 // 1 hour in seconds
+  private supabaseClient: any = null
 
   private async getSupabase() {
-    return await createServerSupabaseClient()
+    if (!this.supabaseClient) {
+      try {
+        this.supabaseClient = await createServerSupabaseClient()
+      } catch (error) {
+        logger.error(
+          "Failed to create Supabase client",
+          {
+            component: "CacheService",
+            action: "get_supabase_error",
+          },
+          error instanceof Error ? error : new Error(String(error)),
+        )
+        throw error
+      }
+    }
+    return this.supabaseClient
   }
 
   /**
@@ -49,7 +65,8 @@ export class CacheService {
       }
 
       // Try database cache
-      const { data, error } = await this.supabase.from("event_cache").select("*").eq("cache_key", fullKey).single()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from("event_cache").select("*").eq("cache_key", fullKey).single()
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -61,7 +78,7 @@ export class CacheService {
           })
           return null
         }
-        throw new Error(error.message)
+        throw new Error(`Database error: ${error.message}`)
       }
 
       // Check if expired
@@ -101,6 +118,7 @@ export class CacheService {
         error instanceof Error ? error : new Error(String(error)),
       )
 
+      // Return null on error to allow fallback to fresh data
       return null
     }
   }
@@ -116,14 +134,15 @@ export class CacheService {
       const expiresAt = new Date(Date.now() + ttl * 1000)
 
       // Store in database
-      const { error } = await this.supabase.from("event_cache").upsert({
+      const supabase = await this.getSupabase()
+      const { error } = await supabase.from("event_cache").upsert({
         cache_key: fullKey,
         data,
         expires_at: expiresAt.toISOString(),
       })
 
       if (error) {
-        throw new Error(error.message)
+        throw new Error(`Database error: ${error.message}`)
       }
 
       // Store in memory if enabled
@@ -149,6 +168,7 @@ export class CacheService {
         error instanceof Error ? error : new Error(String(error)),
       )
 
+      // Return false but don't throw - caching is optional
       return false
     }
   }
@@ -165,10 +185,11 @@ export class CacheService {
       memoryCache.delete(fullKey)
 
       // Remove from database
-      const { error } = await this.supabase.from("event_cache").delete().eq("cache_key", fullKey)
+      const supabase = await this.getSupabase()
+      const { error } = await supabase.from("event_cache").delete().eq("cache_key", fullKey)
 
       if (error) {
-        throw new Error(error.message)
+        throw new Error(`Database error: ${error.message}`)
       }
 
       logger.debug("Cache deleted", {
@@ -206,10 +227,11 @@ export class CacheService {
       }
 
       // Clear database cache
-      const { error } = await this.supabase.from("event_cache").delete().like("cache_key", `${namespace}:%`)
+      const supabase = await this.getSupabase()
+      const { error } = await supabase.from("event_cache").delete().like("cache_key", `${namespace}:%`)
 
       if (error) {
-        throw new Error(error.message)
+        throw new Error(`Database error: ${error.message}`)
       }
 
       logger.info("Cache namespace cleared", {
@@ -248,8 +270,14 @@ export class CacheService {
       // Generate new data
       const data = await factory()
 
-      // Cache the result
-      await this.set(key, data, options)
+      // Cache the result (don't await to avoid blocking)
+      this.set(key, data, options).catch((error) => {
+        logger.warn("Failed to cache data after factory", {
+          component: "CacheService",
+          action: "getOrSet_cache_warning",
+          metadata: { key: `${options.namespace || "default"}:${key}` },
+        })
+      })
 
       return data
     } catch (error) {
@@ -273,11 +301,12 @@ export class CacheService {
   async cleanupExpired(): Promise<number> {
     try {
       const now = new Date().toISOString()
+      const supabase = await this.getSupabase()
 
-      const { data, error } = await this.supabase.from("event_cache").delete().lt("expires_at", now).select("cache_key")
+      const { data, error } = await supabase.from("event_cache").delete().lt("expires_at", now).select("cache_key")
 
       if (error) {
-        throw new Error(error.message)
+        throw new Error(`Database error: ${error.message}`)
       }
 
       const deletedCount = data?.length || 0
@@ -313,14 +342,13 @@ export class CacheService {
   }> {
     try {
       const now = new Date().toISOString()
+      const supabase = await this.getSupabase()
 
       // Get total entries
-      const { count: totalEntries } = await this.supabase
-        .from("event_cache")
-        .select("*", { count: "exact", head: true })
+      const { count: totalEntries } = await supabase.from("event_cache").select("*", { count: "exact", head: true })
 
       // Get expired entries
-      const { count: expiredEntries } = await this.supabase
+      const { count: expiredEntries } = await supabase
         .from("event_cache")
         .select("*", { count: "exact", head: true })
         .lt("expires_at", now)
