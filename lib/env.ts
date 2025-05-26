@@ -36,14 +36,15 @@ const serverEnvSchema = z.object({
 // Updated configuration with your provided API keys
 const DEFAULT_CONFIG = {
   // Public variables (safe for client)
-  NEXT_PUBLIC_SUPABASE_URL: "https://ejsllpjzxnbndrrfpjkz.supabase.co",
+  NEXT_PUBLIC_SUPABASE_URL: "https://hayrbdzsglfmidwrlawu.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5MTYxNDYsImV4cCI6MjA2MzQ5MjE0Nn0.uFthMUbM4dkOqlxGWC2tVoTjo_5b9VmvhnYdXWnlLXU",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhheXJiZHpzZ2xmbWlkd3JsYXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NzYwNjcsImV4cCI6MjA1OTA1MjA2N30.AfBRE4xY4TIMWndtxnXyyOqlV9l8BpNHbTHeZbVXpxU",
   NEXT_PUBLIC_MAPBOX_API_KEY:
     "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow",
 
   // Server-only variables with your provided keys
-  SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzkxNjE0NiwiZXhwIjoyMDYzNDkyMTQ2fQ.xY9lTBSgy6A7YPor5I3n26MN4w-8x86eb-XqQIP1dDs",
+  SUPABASE_SERVICE_ROLE_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzkxNjE0NiwiZXhwIjoyMDYzNDkyMTQ2fQ.xY9lTBSgy6A7YPor5I3n26MN4w-8x86eb-XqQIP1dDs",
   SUPABASE_JWT_SECRET: "TPyRzZHjqE7Hnrwy7cLadLWBwukoHMIxbWj8RxlH3cJbCdvcNpQaJwr5hJq1VMdQ3fleq8Is9Y30puos8/J4Lw==",
   RAPIDAPI_KEY: "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9",
   RAPIDAPI_HOST: "real-time-events-search.p.rapidapi.com",
@@ -54,6 +55,7 @@ const DEFAULT_CONFIG = {
   EVENTBRITE_CLIENT_SECRET: "QGVOJ2QGDI2TMBZKOW5IKKPMZOVP6FA2VXLNGWSI4FP43BNLSQ",
   EVENTBRITE_PRIVATE_TOKEN: "EUB5KUFLJH2SKVCHVD3E",
   EVENTBRITE_PUBLIC_TOKEN: "C4WQAR3XB7XX2AYOUEQ4",
+  PREDICTHQ_API_KEY: "", // Will be set from environment variable
   OPENROUTER_API_KEY: "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",
   LOG_LEVEL: "info" as const,
   NODE_ENV: "development" as const,
@@ -98,14 +100,14 @@ function getServerEnv(): z.infer<typeof serverEnvSchema> {
 
   if (_serverEnvCache === undefined) {
     try {
-      _serverEnvCache = serverEnvSchema.parse(process.env)
-    } catch (error) {
-      console.warn("Using default server configuration with provided API keys")
-      _serverEnvCache = {
+      _serverEnvCache = serverEnvSchema.parse({
+        // Public variables
         NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_CONFIG.NEXT_PUBLIC_SUPABASE_URL,
         NEXT_PUBLIC_SUPABASE_ANON_KEY:
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_CONFIG.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         NEXT_PUBLIC_MAPBOX_API_KEY: process.env.NEXT_PUBLIC_MAPBOX_API_KEY || DEFAULT_CONFIG.NEXT_PUBLIC_MAPBOX_API_KEY,
+
+        // Server-only variables - now using Vercel environment variables
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_CONFIG.SUPABASE_SERVICE_ROLE_KEY,
         SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || DEFAULT_CONFIG.SUPABASE_JWT_SECRET,
         RAPIDAPI_KEY: process.env.RAPIDAPI_KEY || DEFAULT_CONFIG.RAPIDAPI_KEY,
@@ -117,11 +119,14 @@ function getServerEnv(): z.infer<typeof serverEnvSchema> {
         EVENTBRITE_CLIENT_SECRET: process.env.EVENTBRITE_CLIENT_SECRET || DEFAULT_CONFIG.EVENTBRITE_CLIENT_SECRET,
         EVENTBRITE_PRIVATE_TOKEN: process.env.EVENTBRITE_PRIVATE_TOKEN || DEFAULT_CONFIG.EVENTBRITE_PRIVATE_TOKEN,
         EVENTBRITE_PUBLIC_TOKEN: process.env.EVENTBRITE_PUBLIC_TOKEN || DEFAULT_CONFIG.EVENTBRITE_PUBLIC_TOKEN,
-        PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY,
+        PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY || DEFAULT_CONFIG.PREDICTHQ_API_KEY,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || DEFAULT_CONFIG.OPENROUTER_API_KEY,
         LOG_LEVEL: (process.env.LOG_LEVEL as any) || DEFAULT_CONFIG.LOG_LEVEL,
         NODE_ENV: (process.env.NODE_ENV as any) || DEFAULT_CONFIG.NODE_ENV,
-      }
+      })
+    } catch (error) {
+      console.warn("Environment validation failed, using defaults:", error)
+      _serverEnvCache = DEFAULT_CONFIG as any
     }
   }
   return _serverEnvCache!
@@ -141,7 +146,7 @@ export const CLIENT_CONFIG = {
   },
 } as const
 
-// Server-only API configuration with your provided keys
+// Server-only API configuration with environment variables
 export const getServerConfig = () => {
   if (isClient) {
     throw new Error("Server configuration cannot be accessed on the client")
@@ -151,28 +156,40 @@ export const getServerConfig = () => {
   return {
     ticketmaster: {
       baseUrl: "https://app.ticketmaster.com/discovery/v2",
-      apiKey: serverEnv.TICKETMASTER_API_KEY || DEFAULT_CONFIG.TICKETMASTER_API_KEY,
-      secret: serverEnv.TICKETMASTER_SECRET || DEFAULT_CONFIG.TICKETMASTER_SECRET,
+      apiKey: serverEnv.TICKETMASTER_API_KEY,
+      secret: serverEnv.TICKETMASTER_SECRET,
     },
     eventbrite: {
       baseUrl: "https://www.eventbriteapi.com/v3",
-      apiKey: serverEnv.EVENTBRITE_API_KEY || DEFAULT_CONFIG.EVENTBRITE_API_KEY,
-      clientSecret: serverEnv.EVENTBRITE_CLIENT_SECRET || DEFAULT_CONFIG.EVENTBRITE_CLIENT_SECRET,
-      privateToken: serverEnv.EVENTBRITE_PRIVATE_TOKEN || DEFAULT_CONFIG.EVENTBRITE_PRIVATE_TOKEN,
-      publicToken: serverEnv.EVENTBRITE_PUBLIC_TOKEN || DEFAULT_CONFIG.EVENTBRITE_PUBLIC_TOKEN,
+      apiKey: serverEnv.EVENTBRITE_API_KEY,
+      clientSecret: serverEnv.EVENTBRITE_CLIENT_SECRET,
+      privateToken: serverEnv.EVENTBRITE_PRIVATE_TOKEN,
+      publicToken: serverEnv.EVENTBRITE_PUBLIC_TOKEN,
     },
     rapidapi: {
       baseUrl: "https://real-time-events-search.p.rapidapi.com",
-      apiKey: serverEnv.RAPIDAPI_KEY || DEFAULT_CONFIG.RAPIDAPI_KEY,
-      host: serverEnv.RAPIDAPI_HOST || DEFAULT_CONFIG.RAPIDAPI_HOST,
+      apiKey: serverEnv.RAPIDAPI_KEY,
+      host: serverEnv.RAPIDAPI_HOST,
+    },
+    predicthq: {
+      baseUrl: "https://api.predicthq.com/v1",
+      apiKey: serverEnv.PREDICTHQ_API_KEY,
     },
     tomtom: {
       baseUrl: "https://api.tomtom.com",
-      apiKey: serverEnv.TOMTOM_API_KEY || DEFAULT_CONFIG.TOMTOM_API_KEY,
+      apiKey: serverEnv.TOMTOM_API_KEY,
     },
     openrouter: {
       baseUrl: "https://openrouter.ai/api/v1",
-      apiKey: serverEnv.OPENROUTER_API_KEY || DEFAULT_CONFIG.OPENROUTER_API_KEY,
+      apiKey: serverEnv.OPENROUTER_API_KEY,
+    },
+    maps: {
+      mapbox: {
+        apiKey: getClientEnv().NEXT_PUBLIC_MAPBOX_API_KEY,
+      },
+      tomtom: {
+        apiKey: serverEnv.TOMTOM_API_KEY,
+      },
     },
   } as const
 }

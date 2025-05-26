@@ -13,7 +13,7 @@ This application is connected to Supabase for database and authentication servic
 
 The following environment variables are configured in `.env.local`:
 
-```bash
+\`\`\`bash
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL="https://ejsllpjzxnbndrrfpjkz.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
@@ -28,7 +28,7 @@ POSTGRES_USER="postgres"
 POSTGRES_HOST="db.ejsllpjzxnbndrrfpjkz.supabase.co"
 POSTGRES_PASSWORD="your-password"
 POSTGRES_DATABASE="postgres"
-```
+\`\`\`
 
 ### Testing the Connection
 
