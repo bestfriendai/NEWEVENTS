@@ -11,6 +11,7 @@ class Logger {
   private isDevelopment = process.env.NODE_ENV === "development"
   private logs: LogEntry[] = []
   private maxLogs = 1000
+  private timers: Map<string, number> = new Map()
 
   private log(level: LogLevel, message: string, data?: any) {
     const entry: LogEntry = {
@@ -64,6 +65,64 @@ class Logger {
   clearLogs() {
     this.logs = []
   }
+
+  time(label: string, data?: any): () => void {
+    const startTime = performance.now()
+    const timerId = `${label}-${Date.now()}-${Math.random()}`
+    this.timers.set(timerId, startTime)
+
+    this.debug(`Timer started: ${label}`, data)
+
+    return () => {
+      const endTime = performance.now()
+      const duration = endTime - startTime
+      this.timers.delete(timerId)
+
+      this.info(`Timer completed: ${label} (${duration.toFixed(2)}ms)`, {
+        ...data,
+        duration,
+        startTime,
+        endTime
+      })
+
+      return duration
+    }
+  }
+
+  timeEnd(label: string): number | null {
+    const timer = Array.from(this.timers.entries()).find(([id]) => id.startsWith(label))
+    if (!timer) {
+      this.warn(`Timer not found: ${label}`)
+      return null
+    }
+
+    const [timerId, startTime] = timer
+    const endTime = performance.now()
+    const duration = endTime - startTime
+    this.timers.delete(timerId)
+
+    this.info(`Timer ended: ${label} (${duration.toFixed(2)}ms)`, { duration })
+    return duration
+  }
 }
 
 export const logger = new Logger()
+
+// Performance measurement utility
+export async function measurePerformance<T>(
+  label: string,
+  fn: () => Promise<T> | T,
+  data?: any
+): Promise<T> {
+  const timerEnd = logger.time(label, data)
+
+  try {
+    const result = await fn()
+    timerEnd()
+    return result
+  } catch (error) {
+    timerEnd()
+    logger.error(`Performance measurement failed: ${label}`, { error: error instanceof Error ? error.message : String(error) })
+    throw error
+  }
+}

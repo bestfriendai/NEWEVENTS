@@ -7,21 +7,28 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
-import SimpleCobeGlobe from "@/components/simple-cobe-globe"
-import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap } from "lucide-react"
+import { MapPin, Calendar, Search, Sparkles, ArrowRight, Star, Users, Zap, Menu, X } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { useGSAP } from "@/lib/gsap-utils"
-import { ErrorBoundary } from "@/components/ui/error-boundary"
+import { motion, AnimatePresence } from "framer-motion"
+import dynamic from "next/dynamic"
+
+// Dynamically import the COBE globe to avoid SSR issues
+const SimpleCobeGlobe = dynamic(() => import("@/components/simple-cobe-globe"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center w-[600px] h-[600px]">
+      <div className="text-purple-400">Loading Globe...</div>
+    </div>
+  ),
+})
 
 export default function ClientPage() {
   const heroRef = useRef<HTMLElement>(null)
-  const globeRef = useRef<HTMLDivElement>(null)
-  const ctaButtonRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState("concerts")
   const [isClient, setIsClient] = useState(false)
-  const { safeGSAP, cleanup, createFadeIn, createScaleAnimation } = useGSAP()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Generate stable particle positions (fixed values to prevent hydration mismatch)
   const particlePositions = useState(() =>
@@ -37,75 +44,6 @@ export default function ClientPage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !isClient) return
-
-    // Animate hero elements
-    const heroElements = heroRef.current?.querySelectorAll(".animate-in")
-    if (heroElements && heroElements.length > 0) {
-      safeGSAP(() => {
-        import("gsap").then(({ gsap }) => {
-          gsap.fromTo(
-            heroElements,
-            { y: 30, opacity: 0 },
-            {
-              y: 0,
-              opacity: 1,
-              duration: 0.8,
-              stagger: 0.1,
-              ease: "power2.out",
-            },
-          )
-        })
-      })
-    }
-
-    // Animate globe container
-    const globeContainer = globeRef.current
-    if (globeContainer) {
-      createFadeIn(globeContainer, {
-        y: 20,
-        duration: 1,
-        delay: 0.3,
-        ease: "power2.out",
-      })
-    }
-
-    // Animate floating cards
-    const floatingCards = document.querySelectorAll(".floating-card")
-    if (floatingCards.length) {
-      safeGSAP(() => {
-        import("gsap").then(({ gsap }) => {
-          gsap.fromTo(
-            floatingCards,
-            { y: 20, opacity: 0 },
-            {
-              y: 0,
-              opacity: 1,
-              duration: 0.8,
-              stagger: 0.15,
-              ease: "back.out(1.7)",
-              delay: 0.8,
-            },
-          )
-        })
-      })
-    }
-
-    // Animate CTA button
-    const ctaButton = ctaButtonRef.current
-    if (ctaButton) {
-      createScaleAnimation(ctaButton, {
-        scale: 0.95,
-        duration: 0.6,
-        delay: 0.6,
-        ease: "back.out(1.7)",
-      })
-    }
-
-    return cleanup
-  }, [isClient, safeGSAP, createFadeIn, createScaleAnimation, cleanup])
 
   const features = [
     {
@@ -154,8 +92,9 @@ export default function ClientPage() {
   ]
 
   return (
-    <AppLayout>
-      {/* Hero Section with Simple COBE Globe */}
+    <>
+      <AppLayout>
+      {/* Hero Section */}
       <section
         ref={heroRef}
         className="relative overflow-hidden bg-gradient-to-b from-[#0A0B10] via-[#0F1419] to-[#0A0B10] pt-10 pb-16 md:pt-16 md:pb-24 lg:pt-20 lg:pb-32 min-h-[90vh] flex items-center"
@@ -203,7 +142,7 @@ export default function ClientPage() {
                 DateAI uses artificial intelligence to help you discover events that perfectly match your interests and
                 preferences around the globe.
               </p>
-              <div ref={ctaButtonRef} className="flex flex-wrap gap-4 justify-center">
+              <div className="flex flex-wrap gap-4 justify-center">
                 <Link href="/events">
                   <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105">
                     Explore Events
@@ -221,14 +160,13 @@ export default function ClientPage() {
               </div>
             </div>
 
-            {/* Globe Container */}
-            <div ref={globeRef} className="relative mx-auto max-w-4xl">
-              {/* Main Globe */}
+            {/* COBE Globe Container */}
+            <div className="relative mx-auto max-w-4xl">
               <div className="relative z-10 flex justify-center">
                 <div className="relative">
-                  <ErrorBoundary>
+                  <div className="w-[600px] h-[600px] max-w-full aspect-square rounded-full overflow-hidden">
                     <SimpleCobeGlobe />
-                  </ErrorBoundary>
+                  </div>
                   {/* Glow effect around globe */}
                   <div className="absolute inset-0 bg-gradient-radial from-purple-500/20 via-transparent to-transparent rounded-full blur-xl pointer-events-none"></div>
                 </div>
@@ -262,27 +200,9 @@ export default function ClientPage() {
             <div className="mt-12 md:mt-16 flex flex-col md:flex-row items-center justify-center gap-6 animate-in">
               <div className="flex items-center">
                 <div className="flex -space-x-2">
-                  <Image
-                    src="/avatar-1.png"
-                    alt="User"
-                    width={32}
-                    height={32}
-                    className="rounded-full border-2 border-[#0A0B10]"
-                  />
-                  <Image
-                    src="/avatar-2.png"
-                    alt="User"
-                    width={32}
-                    height={32}
-                    className="rounded-full border-2 border-[#0A0B10]"
-                  />
-                  <Image
-                    src="/avatar-3.png"
-                    alt="User"
-                    width={32}
-                    height={32}
-                    className="rounded-full border-2 border-[#0A0B10]"
-                  />
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full border-2 border-[#0A0B10]"></div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-blue-500 rounded-full border-2 border-[#0A0B10]"></div>
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full border-2 border-[#0A0B10]"></div>
                 </div>
                 <div className="ml-4">
                   <div className="flex items-center">
@@ -298,27 +218,9 @@ export default function ClientPage() {
               </div>
               <div className="h-8 border-l border-gray-700 hidden md:block"></div>
               <div className="flex items-center gap-6">
-                <Image
-                  src="/logo-1.png"
-                  alt="Company logo"
-                  width={80}
-                  height={20}
-                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
-                />
-                <Image
-                  src="/logo-2.png"
-                  alt="Company logo"
-                  width={80}
-                  height={20}
-                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
-                />
-                <Image
-                  src="/logo-3.png"
-                  alt="Company logo"
-                  width={80}
-                  height={20}
-                  className="opacity-70 grayscale hover:opacity-100 transition-opacity"
-                />
+                <div className="w-20 h-5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded opacity-70"></div>
+                <div className="w-20 h-5 bg-gradient-to-r from-pink-500/20 to-blue-500/20 rounded opacity-70"></div>
+                <div className="w-20 h-5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded opacity-70"></div>
               </div>
             </div>
           </div>
@@ -513,34 +415,25 @@ export default function ClientPage() {
             <div className="text-center mb-12 md:mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">What Our Users Say</h2>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-                Join thousands of satisfied users who have discovered amazing events through DateAI.
+                Join thousands of satisfied users who have discovered amazing events with DateAI.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {testimonials.map((testimonial, index) => (
                 <div
                   key={index}
-                  className="bg-[#12141D] rounded-xl p-6 border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105"
+                  className="bg-[#12141D] rounded-xl p-6 border border-gray-800 hover:border-purple-500/30 transition-all duration-300"
                 >
-                  <div className="flex items-center mb-1">
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                  </div>
-                  <p className="text-gray-300 mb-6">&quot;{testimonial.quote}&quot;</p>
+                  <p className="text-gray-300 mb-4 italic">"{testimonial.quote}"</p>
                   <div className="flex items-center">
-                    <Image
-                      src={testimonial.avatar || "/placeholder.svg"}
-                      alt={testimonial.author}
-                      width={40}
-                      height={40}
-                      className="rounded-full mr-4"
-                    />
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-white font-semibold text-sm">
+                        {testimonial.author.split(' ').map(n => n[0]).join('')}
+                      </span>
+                    </div>
                     <div>
-                      <h4 className="text-white font-medium">{testimonial.author}</h4>
+                      <p className="text-white font-medium">{testimonial.author}</p>
                       <p className="text-gray-400 text-sm">{testimonial.role}</p>
                     </div>
                   </div>
@@ -554,42 +447,165 @@ export default function ClientPage() {
       {/* CTA Section */}
       <section className="py-16 md:py-24 bg-[#12141D]">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="max-w-screen-xl mx-auto">
-            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl p-8 md:p-12 border border-purple-500/20 relative overflow-hidden backdrop-blur-sm">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-
-              <div className="relative max-w-3xl mx-auto text-center">
-                <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Discover Amazing Events?</h2>
-                <p className="text-lg text-gray-300 mb-8">
-                  Join thousands of users who are finding the perfect events for their next adventure.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/events">
-                    <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 w-full sm:w-auto">
-                      Start Exploring
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Link href="/create-event">
-                    <Button
-                      variant="outline"
-                      className="border-gray-700 text-white py-6 px-8 rounded-xl text-base font-medium hover:bg-white/5 w-full sm:w-auto backdrop-blur-sm"
-                    >
-                      Create Event
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+          <div className="max-w-screen-xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Discover Amazing Events?</h2>
+            <p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
+              Join thousands of users who have found their perfect events with DateAI.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/events">
+                <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 w-full sm:w-auto">
+                  Get Started Now
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/create-event">
+                <Button
+                  variant="outline"
+                  className="border-gray-700 text-white py-6 px-8 rounded-xl text-base font-medium hover:bg-white/5 backdrop-blur-sm transition-all duration-200 w-full sm:w-auto"
+                >
+                  Learn More
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
-    </AppLayout>
+      </AppLayout>
+
+      {/* Mobile menu button */}
+      {!sidebarOpen && (
+        <Button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 right-4 z-50 bg-purple-600 hover:bg-purple-700"
+          size="sm"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+      )}
+
+      {/* Sidebar */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-0 right-0 w-full md:w-96 h-full bg-[#12141D] border-l border-gray-700 flex flex-col shadow-2xl z-50"
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">DateAI Menu</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarOpen(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Search for events, venues, or categories..."
+                    className="flex-1 bg-gray-800 border border-gray-700 text-white placeholder-gray-400 px-3 py-2 rounded-md text-sm"
+                  />
+                  <Button className="bg-purple-600 hover:bg-purple-700">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Menu Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-6">
+                {/* Quick Actions */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Quick Actions</h3>
+                  <div className="space-y-2">
+                    <Link href="/create-event">
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                        <Calendar className="h-4 w-4 mr-3" />
+                        Create Event
+                      </Button>
+                    </Link>
+                    <Link href="/events">
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                        <Search className="h-4 w-4 mr-3" />
+                        Explore Events
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                      <Star className="h-4 w-4 mr-3" />
+                      Saved Events
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Categories</h3>
+                  <div className="space-y-2">
+                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                      <Calendar className="h-4 w-4 mr-3" />
+                      Concerts & Music
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                      <Users className="h-4 w-4 mr-3" />
+                      Social Events
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                      <Zap className="h-4 w-4 mr-3" />
+                      Sports & Fitness
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
+                      <MapPin className="h-4 w-4 mr-3" />
+                      Local Events
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Activity</h3>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-gray-800 rounded-lg">
+                      <p className="text-sm text-white">Music Festival</p>
+                      <p className="text-xs text-gray-400">New York, Tomorrow</p>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded-lg">
+                      <p className="text-sm text-white">Tech Conference</p>
+                      <p className="text-xs text-gray-400">San Francisco, Next Week</p>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded-lg">
+                      <p className="text-sm text-white">Art Exhibition</p>
+                      <p className="text-xs text-gray-400">London, This Weekend</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-700">
+              <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Get AI Recommendations
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
-// Floating Card Component
 interface FloatingCardProps {
   icon: React.ReactNode
   title: string
@@ -598,19 +614,18 @@ interface FloatingCardProps {
 
 function FloatingCard({ icon, title, subtitle }: FloatingCardProps) {
   return (
-    <div className="bg-[#12141D]/90 backdrop-blur-md rounded-xl p-3 border border-gray-800 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
-      <div className="flex items-center gap-3">
-        <div className="bg-[#1A1D25] rounded-lg p-2 flex items-center justify-center">{icon}</div>
+    <div className="bg-[#1A1D25]/90 backdrop-blur-md border border-gray-800/50 rounded-lg p-3 shadow-lg">
+      <div className="flex items-center space-x-2">
+        {icon}
         <div>
-          <p className="text-sm font-medium text-white">{title}</p>
-          <p className="text-xs text-gray-400">{subtitle}</p>
+          <p className="text-white text-sm font-medium">{title}</p>
+          <p className="text-gray-400 text-xs">{subtitle}</p>
         </div>
       </div>
     </div>
   )
 }
 
-// Event Card Component
 interface EventCardProps {
   title: string
   date: string
@@ -621,33 +636,21 @@ interface EventCardProps {
 
 function EventCard({ title, date, location, image, category }: EventCardProps) {
   return (
-    <div className="group relative rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
+    <div className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105">
       <div className="aspect-[3/2] w-full relative">
-        <Image
-          src={image || "/placeholder.svg"}
-          alt={title}
-          fill
-          style={{ objectFit: "cover" }}
-          className="transition-transform duration-500 group-hover:scale-110"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B10] via-[#0A0B10]/70 to-transparent"></div>
-      <div className="absolute top-4 left-4">
-        <span className="px-3 py-1 bg-purple-500/90 backdrop-blur-sm rounded-full text-xs font-medium text-white">
-          {category}
-        </span>
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-purple-300 transition-colors">{title}</h3>
-        <div className="flex items-center text-gray-400 text-sm mb-1">
-          <Calendar className="h-3.5 w-3.5 mr-1.5" />
-          {date}
+        <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto mb-2 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+            <p className="text-gray-400 text-xs">{category}</p>
+          </div>
         </div>
-        <div className="flex items-center text-gray-400 text-sm">
-          <MapPin className="h-3.5 w-3.5 mr-1.5" />
-          {location}
-        </div>
+      </div>
+      <div className="p-4">
+        <h3 className="text-white font-semibold mb-2">{title}</h3>
+        <p className="text-gray-400 text-sm mb-1">{date}</p>
+        <p className="text-gray-500 text-sm">{location}</p>
       </div>
     </div>
   )

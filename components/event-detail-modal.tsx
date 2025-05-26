@@ -8,10 +8,39 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, MapPin, Users, Heart, ExternalLink } from "lucide-react"
 import { EventMap } from "@/components/event-map"
 
-import type { EventDetail } from "@/types/event.types";
+// EventDetailProps interface definition
+export interface EventDetailProps {
+  id: number
+  title: string
+  description: string
+  date: string
+  time: string
+  location: string
+  address: string
+  category: string
+  price: string
+  image?: string
+  attendees: number
+  organizer: {
+    name: string
+    description?: string
+    website?: string
+    logo?: string
+  }
+  ticketLinks?: Array<{
+    source: string
+    link: string
+    price?: string
+  }>
+  isFavorite?: boolean
+  coordinates?: {
+    lat: number
+    lng: number
+  }
+}
 
 interface EventDetailModalProps {
-  event: EventDetail | null
+  event: EventDetailProps | null
   isOpen: boolean
   onClose: () => void
   onFavorite: (id: number) => void

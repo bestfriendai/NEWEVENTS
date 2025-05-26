@@ -38,7 +38,7 @@ export function EnhancedEventCard({
 
   // Hooks
   const { toggleFavorite, isFavorite } = useUserFavorites()
-  const { trackEvent } = useAnalytics()
+  const { trackEventView, trackEventFavorite, trackEventShare, trackTicketClick } = useAnalytics()
 
   const eventId = Number(event.id)
   const isEventFavorited = isFavorite(eventId)
@@ -59,13 +59,10 @@ export function EnhancedEventCard({
       const success = await toggleFavorite(eventId, event)
 
       if (success) {
-        await trackEvent(eventId, "favorite", {
-          action: isEventFavorited ? "remove" : "add",
-          source: "event_card",
-        })
+        await trackEventFavorite(eventId, !isEventFavorited)
       }
     },
-    [eventId, event, toggleFavorite, trackEvent, isEventFavorited],
+    [eventId, event, toggleFavorite, trackEventFavorite, isEventFavorited],
   )
 
   /**
@@ -76,7 +73,10 @@ export function EnhancedEventCard({
       e.stopPropagation()
 
       try {
-        if (navigator.share) {
+        const hasNativeShare = typeof navigator !== 'undefined' && 'share' in navigator
+        const shareMethod = hasNativeShare ? "native" : "clipboard"
+        
+        if (hasNativeShare) {
           await navigator.share({
             title: event.title,
             text: event.description,
@@ -88,10 +88,7 @@ export function EnhancedEventCard({
           // You could show a toast notification here
         }
 
-        await trackEvent(eventId, "share", {
-          method: navigator.share ? "native" : "clipboard",
-          source: "event_card",
-        })
+        await trackEventShare(eventId, shareMethod)
 
         logger.debug("Event shared", {
           component: "EnhancedEventCard",
@@ -106,19 +103,16 @@ export function EnhancedEventCard({
         })
       }
     },
-    [event, eventId, trackEvent],
+    [event, eventId, trackEventShare],
   )
 
   /**
    * Handle card click
    */
   const handleCardClick = useCallback(async () => {
-    await trackEvent(eventId, "view", {
-      source: "event_card",
-    })
-
+    await trackEventView(eventId)
     onEventClick?.(event)
-  }, [event, eventId, onEventClick, trackEvent])
+  }, [event, eventId, onEventClick, trackEventView])
 
   /**
    * Handle ticket link click
@@ -127,14 +121,11 @@ export function EnhancedEventCard({
     async (e: React.MouseEvent, ticketUrl: string) => {
       e.stopPropagation()
 
-      await trackEvent(eventId, "click_ticket", {
-        ticketUrl,
-        source: "event_card",
-      })
+      await trackTicketClick(eventId, "external")
 
       window.open(ticketUrl, "_blank", "noopener,noreferrer")
     },
-    [eventId, trackEvent],
+    [eventId, trackTicketClick],
   )
 
   /**
@@ -240,7 +231,7 @@ export function EnhancedEventCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={event.organizer.avatar || "/placeholder.svg"} alt={event.organizer.name} />
+                <AvatarImage src={event.organizer.logo || "/placeholder.svg"} alt={event.organizer.name} />
                 <AvatarFallback className="text-xs">{event.organizer.name.charAt(0)}</AvatarFallback>
               </Avatar>
               <span className="text-sm text-muted-foreground">{event.organizer.name}</span>
@@ -260,7 +251,7 @@ export function EnhancedEventCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={(e) => handleTicketClick(e, event.ticketLinks![0])}
+                onClick={(e) => handleTicketClick(e, event.ticketLinks![0].link)}
                 className="h-8"
               >
                 <ExternalLink className="h-3 w-3 mr-1" />

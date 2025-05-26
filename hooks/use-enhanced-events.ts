@@ -188,7 +188,7 @@ export function useEnhancedEvents(options: UseEnhancedEventsOptions = {}): UseEn
           metadata: { params: fetchParams, isLoadMore },
         })
 
-        const startTime = performance.now()
+        const startTime = window.performance.now()
         lastFetchRef.current = startTime
 
         // Make API request
@@ -251,15 +251,12 @@ export function useEnhancedEvents(options: UseEnhancedEventsOptions = {}): UseEn
           return
         }
 
-        logger.error(
-          "Error fetching events",
-          {
-            component: "useEnhancedEvents",
-            action: "fetch_error",
-            metadata: { params, isLoadMore },
-          },
-          error instanceof Error ? error : new Error(String(error)),
-        )
+        logger.error("Error fetching events", {
+          component: "useEnhancedEvents",
+          action: "fetch_error",
+          metadata: { params, isLoadMore },
+          error: error instanceof Error ? error.message : String(error),
+        })
 
         setIsError(true)
         setError(error instanceof Error ? error.message : "Failed to fetch events")
@@ -318,7 +315,8 @@ export function useEnhancedEvents(options: UseEnhancedEventsOptions = {}): UseEn
 
   // Auto-fetch on debounced search params change
   useEffect(() => {
-    if (autoFetch && Object.keys(debouncedSearchParams).length > 0) {
+    if (autoFetch) {
+      // Always fetch with at least empty params to get initial data
       fetchEvents(debouncedSearchParams, false)
     }
   }, [debouncedSearchParams, autoFetch, fetchEvents])

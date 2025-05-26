@@ -3,36 +3,56 @@ import { createServerSupabaseClient } from "@/lib/api/supabase-api"
 
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient()
+    // Test Supabase configuration
+    const { env } = await import("@/lib/env")
 
-    // Test the connection by getting the current timestamp using a simple query
-    const { data, error } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .limit(1)
-
-    if (error) {
-      console.error("Supabase connection error:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
+    if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json({
+        success: false,
+        message: "Supabase configuration missing",
+        data: {
+          hasUrl: !!env.NEXT_PUBLIC_SUPABASE_URL,
+          hasAnonKey: !!env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
           timestamp: new Date().toISOString()
-        },
-        { status: 500 }
-      )
+        }
+      }, { status: 500 })
+    }
+
+    // Test basic connectivity by making a simple request to the Supabase REST API
+    const response = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
+      method: 'GET',
+      headers: {
+        'apikey': env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      return NextResponse.json({
+        success: false,
+        message: `Supabase API error: ${response.status} ${response.statusText}`,
+        data: {
+          status: response.status,
+          statusText: response.statusText,
+          timestamp: new Date().toISOString()
+        }
+      }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
       message: "Supabase connection successful",
-      tablesFound: data?.length || 0,
-      sampleTable: data?.[0]?.table_name || null,
-      timestamp: new Date().toISOString(),
-      environment: {
-        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      data: {
+        connected: true,
+        status: response.status,
+        statusText: response.statusText,
+        timestamp: new Date().toISOString(),
+        environment: {
+          hasSupabaseUrl: !!env.NEXT_PUBLIC_SUPABASE_URL,
+          hasSupabaseKey: !!env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        }
       }
     })
   } catch (error) {

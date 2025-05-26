@@ -139,8 +139,7 @@ export function EventCard({
             </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
     )
   }
 
