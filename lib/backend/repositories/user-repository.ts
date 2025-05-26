@@ -42,7 +42,8 @@ export class UserRepository extends BaseRepository<UserEntity> {
    */
   async findByEmail(email: string): Promise<RepositoryResult<UserEntity>> {
     try {
-      const { data, error } = await this.supabase.from(this.tableName).select("*").eq("email", email).single()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from(this.tableName).select("*").eq("email", email).single()
 
       if (error) {
         return { data: null, error: error.message }
@@ -83,7 +84,8 @@ export class UserRepository extends BaseRepository<UserEntity> {
    */
   async getUserPreferences(userId: string): Promise<RepositoryResult<UserPreferencesEntity>> {
     try {
-      const { data, error } = await this.supabase.from("user_preferences").select("*").eq("user_id", userId).single()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from("user_preferences").select("*").eq("user_id", userId).single()
 
       if (error) {
         // If no preferences exist, return default preferences
@@ -119,8 +121,9 @@ export class UserRepository extends BaseRepository<UserEntity> {
     preferences: Partial<Omit<UserPreferencesEntity, "id" | "user_id" | "created_at" | "updated_at">>,
   ): Promise<RepositoryResult<UserPreferencesEntity>> {
     try {
+      const supabase = await this.getSupabase()
       // Try to update existing preferences
-      const { data, error } = await this.supabase
+      const { data, error } = await supabase
         .from("user_preferences")
         .upsert({
           user_id: userId,
@@ -152,8 +155,9 @@ export class UserRepository extends BaseRepository<UserEntity> {
    */
   async getUsersByLocation(lat: number, lng: number, radiusKm = 50): Promise<RepositoryListResult<UserEntity>> {
     try {
+      const supabase = await this.getSupabase()
       // Simple distance calculation - in production use PostGIS
-      const { data, error, count } = await this.supabase
+      const { data, error, count } = await supabase
         .from(this.tableName)
         .select("*", { count: "exact" })
         .not("location_lat", "is", null)

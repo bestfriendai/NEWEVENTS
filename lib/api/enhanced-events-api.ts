@@ -6,6 +6,7 @@
 import { logger } from "@/lib/utils/logger"
 import { memoryCache } from "@/lib/utils/cache"
 import type { EventDetailProps } from "@/components/event-detail-modal"
+import { env } from "@/lib/env"
 
 export interface EnhancedEventSearchParams {
   keyword?: string
@@ -47,33 +48,52 @@ export interface EventProvider {
 }
 
 class EnhancedEventsAPI {
-  private providers: EventProvider[] = [
-    {
-      name: "Ticketmaster",
-      priority: 1,
-      isEnabled: !!process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY,
-      rateLimit: { requestsPerMinute: 5000, currentCount: 0, resetTime: 0 },
-    },
-    {
-      name: "Eventbrite",
-      priority: 2,
-      isEnabled: !!process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY,
-      rateLimit: { requestsPerMinute: 1000, currentCount: 0, resetTime: 0 },
-    },
-    {
-      name: "PredictHQ",
-      priority: 3,
-      isEnabled: !!process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY,
-      rateLimit: { requestsPerMinute: 500, currentCount: 0, resetTime: 0 },
-    },
-  ]
-
+  private providers: EventProvider[]
   private performanceMetrics = {
     totalRequests: 0,
     totalTime: 0,
     apiCalls: 0,
     cacheHits: 0,
     errors: 0,
+  }
+
+  constructor() {
+    this.providers = [
+      {
+        name: "Ticketmaster",
+        priority: 1,
+        isEnabled: !!env.TICKETMASTER_API_KEY,
+        rateLimit: { requestsPerMinute: 5000, currentCount: 0, resetTime: 0 },
+      },
+      {
+        name: "Eventbrite",
+        priority: 2,
+        isEnabled: !!(env.EVENTBRITE_PRIVATE_TOKEN || env.EVENTBRITE_API_KEY),
+        rateLimit: { requestsPerMinute: 1000, currentCount: 0, resetTime: 0 },
+      },
+      {
+        name: "PredictHQ",
+        priority: 3,
+        isEnabled: !!env.PREDICTHQ_API_KEY,
+        rateLimit: { requestsPerMinute: 500, currentCount: 0, resetTime: 0 },
+      },
+    ]
+
+    logger.debug("Initialized EnhancedEventsAPI providers", {
+      component: "EnhancedEventsAPI",
+      action: "constructor",
+      metadata: {
+        providers: this.providers.map((p) => ({
+          name: p.name,
+          isEnabled: p.isEnabled,
+          hasKey: !!(p.name === "Ticketmaster"
+            ? env.TICKETMASTER_API_KEY
+            : p.name === "Eventbrite"
+              ? env.EVENTBRITE_PRIVATE_TOKEN || env.EVENTBRITE_API_KEY
+              : env.PREDICTHQ_API_KEY),
+        })),
+      },
+    })
   }
 
   /**
@@ -116,14 +136,64 @@ class EnhancedEventsAPI {
       // Get available providers
       const availableProviders = this.getAvailableProviders()
 
+      logger.info("Available providers for search in EnhancedEventsAPI", {
+        component: "EnhancedEventsAPI",
+        action: "providers_check",
+        metadata: {
+          providers: availableProviders.map((p) => p.name),
+          totalProviders: this.providers.length,
+          enabledCount: availableProviders.length,
+        },
+      })
+
       if (availableProviders.length === 0) {
-        throw new Error("No event providers available")
+        logger.error("No event providers are enabled or configured correctly in EnhancedEventsAPI", {
+          component: "EnhancedEventsAPI",
+          action: "no_providers_error",
+          metadata: {
+            allProviders: this.providers.map((p) => ({
+              name: p.name,
+              isEnabled: p.isEnabled,
+              hasKey: !!(p.name === "Ticketmaster"
+                ? env.TICKETMASTER_API_KEY
+                : p.name === "Eventbrite"
+                  ? env.EVENTBRITE_PRIVATE_TOKEN || env.EVENTBRITE_API_KEY
+                  : env.PREDICTHQ_API_KEY),
+            })),
+          },
+        })
+        throw new Error(
+          "No event providers available or enabled in EnhancedEventsAPI. Check server environment variables.",
+        )
       }
 
       // Search across providers in parallel
       const searchPromises = availableProviders.map((provider) => this.searchProvider(provider, params))
 
       const results = await Promise.allSettled(searchPromises)
+
+      // Log individual provider results for debugging
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          logger.warn(`Provider ${availableProviders[index].name} failed during Promise.allSettled`, {
+            component: "EnhancedEventsAPI",
+            action: "provider_promise_rejected",
+            metadata: {
+              provider: availableProviders[index].name,
+              reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
+            },
+          })
+        } else {
+          logger.info(`Provider ${availableProviders[index].name} succeeded`, {
+            component: "EnhancedEventsAPI",
+            action: "provider_promise_fulfilled",
+            metadata: {
+              provider: availableProviders[index].name,
+              eventCount: result.value.events.length,
+            },
+          })
+        }
+      })
 
       // Aggregate results
       const aggregatedResult = this.aggregateResults(results, params)
@@ -142,6 +212,8 @@ class EnhancedEventsAPI {
           eventCount: aggregatedResult.events.length,
           sources: aggregatedResult.sources,
           totalTime,
+          successfulProviders: results.filter((r) => r.status === "fulfilled").length,
+          failedProviders: results.filter((r) => r.status === "rejected").length,
         },
       })
 
@@ -159,10 +231,10 @@ class EnhancedEventsAPI {
       this.performanceMetrics.errors++
 
       logger.error(
-        "Enhanced event search failed",
+        "Critical error in EnhancedEventsAPI searchEvents",
         {
           component: "EnhancedEventsAPI",
-          action: "search_error",
+          action: "search_error_main_catch",
           metadata: { params },
         },
         error instanceof Error ? error : new Error(String(error)),
@@ -186,9 +258,9 @@ class EnhancedEventsAPI {
         throw new Error(`Rate limit exceeded for ${provider.name}`)
       }
 
-      logger.debug(`Searching ${provider.name}`, {
+      logger.debug(`Attempting to search with provider: ${provider.name}`, {
         component: "EnhancedEventsAPI",
-        action: "search_provider",
+        action: "search_provider_start",
         metadata: { provider: provider.name, params },
       })
 
@@ -205,21 +277,31 @@ class EnhancedEventsAPI {
           events = await this.searchPredictHQ(params)
           break
         default:
+          logger.warn(`Unknown provider encountered: ${provider.name}`)
           throw new Error(`Unknown provider: ${provider.name}`)
       }
 
       // Update rate limit
       this.updateRateLimit(provider)
 
-      return { events, source: provider.name }
-    } catch (error) {
-      logger.warn(`Provider ${provider.name} search failed`, {
+      logger.info(`Provider ${provider.name} search completed successfully`, {
         component: "EnhancedEventsAPI",
-        action: "provider_search_error",
-        metadata: { provider: provider.name, error: error instanceof Error ? error.message : String(error) },
+        action: "search_provider_success",
+        metadata: { provider: provider.name, eventCount: events.length },
       })
 
-      return { events: [], source: provider.name }
+      return { events, source: provider.name }
+    } catch (error) {
+      logger.error(`Provider ${provider.name} search failed within searchProvider`, {
+        component: "EnhancedEventsAPI",
+        action: "provider_search_error_detail",
+        metadata: {
+          provider: provider.name,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+        },
+      })
+      throw error // Re-throw the error to be caught by Promise.allSettled
     }
   }
 
@@ -227,8 +309,11 @@ class EnhancedEventsAPI {
    * Search Ticketmaster API
    */
   private async searchTicketmaster(params: EnhancedEventSearchParams): Promise<EventDetailProps[]> {
-    const apiKey = process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY
-    if (!apiKey) throw new Error("Ticketmaster API key not configured")
+    const apiKey = env.TICKETMASTER_API_KEY
+    if (!apiKey) {
+      logger.error("Ticketmaster API key is NOT configured for server-side use in searchTicketmaster")
+      throw new Error("Ticketmaster API key not configured")
+    }
 
     const searchParams = new URLSearchParams({
       apikey: apiKey,
@@ -239,62 +324,89 @@ class EnhancedEventsAPI {
       sort: "relevance,desc",
     })
 
-    if (params.startDateTime) {
-      searchParams.append("startDateTime", params.startDateTime)
-    }
-    if (params.endDateTime) {
-      searchParams.append("endDateTime", params.endDateTime)
-    }
-    if (params.categories && params.categories.length > 0) {
+    if (params.startDateTime) searchParams.append("startDateTime", params.startDateTime)
+    if (params.endDateTime) searchParams.append("endDateTime", params.endDateTime)
+    if (params.categories && params.categories.length > 0)
       searchParams.append("classificationName", params.categories[0])
-    }
 
-    const response = await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?${searchParams}`, {
-      headers: {
-        Accept: "application/json",
-      },
+    const fullUrl = `https://app.ticketmaster.com/discovery/v2/events.json?${searchParams}`
+    logger.debug("Fetching from Ticketmaster URL", {
+      component: "EnhancedEventsAPI",
+      action: "ticketmaster_fetch",
+      metadata: { url: fullUrl.replace(apiKey, "[REDACTED]") },
+    })
+
+    const response = await fetch(fullUrl, {
+      headers: { Accept: "application/json" },
     })
 
     if (!response.ok) {
-      throw new Error(`Ticketmaster API error: ${response.status}`)
+      const errorBody = await response.text()
+      logger.error("Ticketmaster API request FAILED", {
+        component: "EnhancedEventsAPI",
+        action: "ticketmaster_api_error",
+        metadata: {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody.substring(0, 500), // Limit error body length
+          url: fullUrl.replace(apiKey, "[REDACTED]"),
+        },
+      })
+      throw new Error(`Ticketmaster API error: ${response.status} - ${errorBody}`)
     }
 
     const data = await response.json()
-
     if (!data._embedded?.events) {
+      logger.info("No events found in Ticketmaster response", {
+        component: "EnhancedEventsAPI",
+        action: "ticketmaster_no_events",
+        metadata: { params: searchParams.toString().replace(apiKey, "[REDACTED]") },
+      })
       return []
     }
 
-    return data._embedded.events.map((event: any) => this.transformTicketmasterEvent(event))
+    const transformedEvents = data._embedded.events.map((event: any) => this.transformTicketmasterEvent(event))
+    logger.info(`Ticketmaster returned ${transformedEvents.length} events`, {
+      component: "EnhancedEventsAPI",
+      action: "ticketmaster_success",
+      metadata: { eventCount: transformedEvents.length },
+    })
+
+    return transformedEvents
   }
 
   /**
    * Search Eventbrite API
    */
   private async searchEventbrite(params: EnhancedEventSearchParams): Promise<EventDetailProps[]> {
-    const apiKey = process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY
-    if (!apiKey) throw new Error("Eventbrite API key not configured")
+    const apiKey = env.EVENTBRITE_PRIVATE_TOKEN || env.EVENTBRITE_API_KEY
+    if (!apiKey) {
+      logger.error("Eventbrite API key or Private Token is NOT configured for server-side use")
+      throw new Error("Eventbrite API key or Private Token not configured")
+    }
 
     const searchParams = new URLSearchParams({
-      token: apiKey,
       q: params.keyword || "",
       "location.address": params.location || "",
       "location.within": `${params.radius || 25}km`,
       expand: "venue,organizer,ticket_availability",
-      page: String((params.page || 0) + 1), // Eventbrite uses 1-based pagination
+      page: String((params.page || 0) + 1),
     })
 
-    if (params.startDateTime) {
-      searchParams.append("start_date.range_start", params.startDateTime)
-    }
-    if (params.endDateTime) {
-      searchParams.append("start_date.range_end", params.endDateTime)
-    }
+    if (params.startDateTime) searchParams.append("start_date.range_start", params.startDateTime)
+    if (params.endDateTime) searchParams.append("start_date.range_end", params.endDateTime)
     if (params.categories && params.categories.length > 0) {
       searchParams.append("categories", params.categories.join(","))
     }
 
-    const response = await fetch(`https://www.eventbriteapi.com/v3/events/search/?${searchParams}`, {
+    const fullUrl = `https://www.eventbriteapi.com/v3/events/search/?${searchParams}`
+    logger.debug("Fetching from Eventbrite URL", {
+      component: "EnhancedEventsAPI",
+      action: "eventbrite_fetch",
+      metadata: { url: fullUrl },
+    })
+
+    const response = await fetch(fullUrl, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
@@ -302,49 +414,77 @@ class EnhancedEventsAPI {
     })
 
     if (!response.ok) {
-      throw new Error(`Eventbrite API error: ${response.status}`)
+      const errorBody = await response.text()
+      logger.error("Eventbrite API request FAILED", {
+        component: "EnhancedEventsAPI",
+        action: "eventbrite_api_error",
+        metadata: {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody.substring(0, 500),
+          url: fullUrl,
+        },
+      })
+      throw new Error(`Eventbrite API error: ${response.status} - ${errorBody}`)
     }
 
     const data = await response.json()
-
     if (!data.events) {
+      logger.info("No events found in Eventbrite response", {
+        component: "EnhancedEventsAPI",
+        action: "eventbrite_no_events",
+        metadata: { params: searchParams.toString() },
+      })
       return []
     }
 
-    return data.events.map((event: any) => this.transformEventbriteEvent(event))
+    const transformedEvents = data.events.map((event: any) => this.transformEventbriteEvent(event))
+    logger.info(`Eventbrite returned ${transformedEvents.length} events`, {
+      component: "EnhancedEventsAPI",
+      action: "eventbrite_success",
+      metadata: { eventCount: transformedEvents.length },
+    })
+
+    return transformedEvents
   }
 
   /**
    * Search PredictHQ API
    */
   private async searchPredictHQ(params: EnhancedEventSearchParams): Promise<EventDetailProps[]> {
-    const apiKey = process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY
-    if (!apiKey) throw new Error("PredictHQ API key not configured")
+    const apiKey = env.PREDICTHQ_API_KEY
+    if (!apiKey) {
+      logger.error("PredictHQ API key is NOT configured for server-side use")
+      throw new Error("PredictHQ API key not configured")
+    }
 
     const searchParams = new URLSearchParams({
       q: params.keyword || "",
-      limit: String(Math.min(params.size || 20, 500)),
+      limit: String(Math.min(params.size || 20, 100)),
       offset: String((params.page || 0) * (params.size || 20)),
       sort: "rank",
     })
 
     if (params.location) {
-      // For simplicity, using a default location. In production, geocode the location first
-      searchParams.append("location", "40.7128,-74.0060") // NYC coordinates
-      searchParams.append("within", `${params.radius || 25}km`)
+      if (params.location.includes(",")) {
+        searchParams.append("within", `${params.radius || 25}km@${params.location}`)
+      } else {
+        searchParams.append("place.scope", params.location)
+        searchParams.append("place.exact", params.location)
+      }
     }
+    if (params.startDateTime) searchParams.append("active.gte", params.startDateTime)
+    if (params.endDateTime) searchParams.append("active.lte", params.endDateTime)
+    if (params.categories && params.categories.length > 0) searchParams.append("category", params.categories.join(","))
 
-    if (params.startDateTime) {
-      searchParams.append("active.gte", params.startDateTime)
-    }
-    if (params.endDateTime) {
-      searchParams.append("active.lte", params.endDateTime)
-    }
-    if (params.categories && params.categories.length > 0) {
-      searchParams.append("category", params.categories.join(","))
-    }
+    const fullUrl = `https://api.predicthq.com/v1/events/?${searchParams}`
+    logger.debug("Fetching from PredictHQ URL", {
+      component: "EnhancedEventsAPI",
+      action: "predicthq_fetch",
+      metadata: { url: fullUrl },
+    })
 
-    const response = await fetch(`https://api.predicthq.com/v1/events/?${searchParams}`, {
+    const response = await fetch(fullUrl, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
@@ -352,16 +492,38 @@ class EnhancedEventsAPI {
     })
 
     if (!response.ok) {
-      throw new Error(`PredictHQ API error: ${response.status}`)
+      const errorBody = await response.text()
+      logger.error("PredictHQ API request FAILED", {
+        component: "EnhancedEventsAPI",
+        action: "predicthq_api_error",
+        metadata: {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody.substring(0, 500),
+          url: fullUrl,
+        },
+      })
+      throw new Error(`PredictHQ API error: ${response.status} - ${errorBody}`)
     }
 
     const data = await response.json()
-
     if (!data.results) {
+      logger.info("No events found in PredictHQ response", {
+        component: "EnhancedEventsAPI",
+        action: "predicthq_no_events",
+        metadata: { params: searchParams.toString() },
+      })
       return []
     }
 
-    return data.results.map((event: any) => this.transformPredictHQEvent(event))
+    const transformedEvents = data.results.map((event: any) => this.transformPredictHQEvent(event))
+    logger.info(`PredictHQ returned ${transformedEvents.length} events`, {
+      component: "EnhancedEventsAPI",
+      action: "predicthq_success",
+      metadata: { eventCount: transformedEvents.length },
+    })
+
+    return transformedEvents
   }
 
   /**
@@ -398,7 +560,7 @@ class EnhancedEventsAPI {
         avatar:
           event._embedded?.attractions?.[0]?.images?.[0]?.url || `/avatar-${Math.floor(Math.random() * 6) + 1}.png`,
       },
-      attendees: Math.floor(Math.random() * 500) + 50, // Ticketmaster doesn't provide this
+      attendees: event.accessibility?.ticketLimit || Math.floor(Math.random() * 500) + 50,
       isFavorite: false,
       coordinates: venue?.location
         ? {
@@ -421,7 +583,7 @@ class EnhancedEventsAPI {
       id: `eb_${event.id}`,
       title: event.name?.text || "Untitled Event",
       description: event.description?.text || "No description available",
-      category: event.category?.name || "Event",
+      category: event.category_id ? "Event" : "Event",
       date: event.start?.local
         ? new Date(event.start.local).toLocaleDateString("en-US", {
             year: "numeric",
@@ -440,13 +602,15 @@ class EnhancedEventsAPI {
       address: venue
         ? `${venue.address?.address_1 || ""} ${venue.address?.city || ""} ${venue.address?.region || ""}`.trim()
         : "Address TBA",
-      price: event.ticket_availability?.is_free ? "Free" : "Price TBA",
+      price: event.ticket_availability?.is_free
+        ? "Free"
+        : event.ticket_availability?.minimum_ticket_price?.display || "Price TBA",
       image: event.logo?.url || `/event-${Math.floor(Math.random() * 12) + 1}.png`,
       organizer: {
         name: organizer?.name || "Event Organizer",
         avatar: organizer?.logo?.url || `/avatar-${Math.floor(Math.random() * 6) + 1}.png`,
       },
-      attendees: Math.floor(Math.random() * 500) + 50, // Eventbrite doesn't always provide this
+      attendees: event.capacity || Math.floor(Math.random() * 500) + 50,
       isFavorite: false,
       coordinates:
         venue?.latitude && venue?.longitude
@@ -482,9 +646,11 @@ class EnhancedEventsAPI {
             hour12: true,
           })
         : "Time TBA",
-      location: event.venue?.name || event.location?.[0] || "Venue TBA",
-      address: event.venue?.formatted_address || "Address TBA",
-      price: "Price TBA", // PredictHQ doesn't provide pricing
+      location:
+        event.entities?.find((e: any) => e.type === "venue")?.name ||
+        (event.location ? `${event.location[1]}, ${event.location[0]}` : "Venue TBA"),
+      address: event.entities?.find((e: any) => e.type === "venue")?.formatted_address || "Address TBA",
+      price: "Price TBA",
       image: `/event-${Math.floor(Math.random() * 12) + 1}.png`,
       organizer: {
         name: event.entities?.find((e: any) => e.type === "venue")?.name || "Event Organizer",
@@ -492,12 +658,13 @@ class EnhancedEventsAPI {
       },
       attendees: event.phq_attendance || Math.floor(Math.random() * 500) + 50,
       isFavorite: false,
-      coordinates: event.location
-        ? {
-            lat: event.location[1],
-            lng: event.location[0],
-          }
-        : undefined,
+      coordinates:
+        event.location && event.location.length >= 2
+          ? {
+              lat: event.location[1],
+              lng: event.location[0],
+            }
+          : undefined,
       ticketLinks: [],
     }
   }
@@ -512,29 +679,24 @@ class EnhancedEventsAPI {
     const allEvents: EventDetailProps[] = []
     const sources: string[] = []
 
-    // Collect all successful results
-    for (const result of results) {
+    results.forEach((result) => {
       if (result.status === "fulfilled" && result.value.events.length > 0) {
         allEvents.push(...result.value.events)
-        sources.push(result.value.source)
+        if (!sources.includes(result.value.source)) {
+          sources.push(result.value.source)
+        }
       }
-    }
+    })
 
-    // Remove duplicates based on title and location similarity
     const uniqueEvents = this.deduplicateEvents(allEvents)
-
-    // Apply user preferences for ranking
-    const rankedEvents = this.rankEventsByPreferences(uniqueEvents, params.userPreferences)
-
-    // Apply pagination
     const page = params.page || 0
     const size = params.size || 20
     const startIndex = page * size
-    const paginatedEvents = rankedEvents.slice(startIndex, startIndex + size)
+    const paginatedEvents = uniqueEvents.slice(startIndex, startIndex + size)
 
     return {
       events: paginatedEvents,
-      totalCount: rankedEvents.length,
+      totalCount: uniqueEvents.length,
       page,
       sources,
     }
@@ -544,110 +706,18 @@ class EnhancedEventsAPI {
    * Remove duplicate events
    */
   private deduplicateEvents(events: EventDetailProps[]): EventDetailProps[] {
-    const seen = new Set<string>()
-    const unique: EventDetailProps[] = []
-
+    const seen = new Map<string, EventDetailProps>()
     for (const event of events) {
-      // Create a key based on title and location
-      const key = `${event.title.toLowerCase().trim()}_${event.location.toLowerCase().trim()}`
+      const titleKey = (event.title || "").toLowerCase().trim().substring(0, 30)
+      const dateKey = (event.date || "").split(",")[0].trim()
+      const locationKey = (event.location || "").toLowerCase().trim().substring(0, 20)
+      const key = `${titleKey}_${dateKey}_${locationKey}`
 
       if (!seen.has(key)) {
-        seen.add(key)
-        unique.push(event)
+        seen.set(key, event)
       }
     }
-
-    return unique
-  }
-
-  /**
-   * Rank events based on user preferences
-   */
-  private rankEventsByPreferences(
-    events: EventDetailProps[],
-    preferences?: EnhancedEventSearchParams["userPreferences"],
-  ): EventDetailProps[] {
-    if (!preferences) {
-      return events.sort((a, b) => b.attendees - a.attendees) // Default: sort by popularity
-    }
-
-    return events.sort((a, b) => {
-      let scoreA = 0
-      let scoreB = 0
-
-      // Category preference
-      if (preferences.favoriteCategories.includes(a.category.toLowerCase())) {
-        scoreA += 10
-      }
-      if (preferences.favoriteCategories.includes(b.category.toLowerCase())) {
-        scoreB += 10
-      }
-
-      // Price preference
-      scoreA += this.calculatePriceScore(a.price, preferences.pricePreference)
-      scoreB += this.calculatePriceScore(b.price, preferences.pricePreference)
-
-      // Time preference
-      scoreA += this.calculateTimeScore(a.time, preferences.timePreference)
-      scoreB += this.calculateTimeScore(b.time, preferences.timePreference)
-
-      // Popularity (attendees)
-      scoreA += Math.log(a.attendees + 1)
-      scoreB += Math.log(b.attendees + 1)
-
-      return scoreB - scoreA
-    })
-  }
-
-  /**
-   * Calculate price preference score
-   */
-  private calculatePriceScore(price: string, preference: string): number {
-    if (preference === "any") return 0
-
-    const isFree = price.toLowerCase().includes("free")
-    const priceMatch = price.match(/\$(\d+)/)
-    const priceValue = priceMatch ? Number.parseInt(priceMatch[1]) : 0
-
-    switch (preference) {
-      case "free":
-        return isFree ? 5 : 0
-      case "low":
-        return priceValue <= 25 ? 5 : 0
-      case "medium":
-        return priceValue > 25 && priceValue <= 75 ? 5 : 0
-      case "high":
-        return priceValue > 75 ? 5 : 0
-      default:
-        return 0
-    }
-  }
-
-  /**
-   * Calculate time preference score
-   */
-  private calculateTimeScore(time: string, preference: string): number {
-    if (preference === "any") return 0
-
-    const timeMatch = time.match(/(\d+):(\d+)\s*(AM|PM)/i)
-    if (!timeMatch) return 0
-
-    const hour = Number.parseInt(timeMatch[1])
-    const isPM = timeMatch[3].toUpperCase() === "PM"
-    const hour24 = isPM && hour !== 12 ? hour + 12 : !isPM && hour === 12 ? 0 : hour
-
-    switch (preference) {
-      case "morning":
-        return hour24 >= 6 && hour24 < 12 ? 3 : 0
-      case "afternoon":
-        return hour24 >= 12 && hour24 < 17 ? 3 : 0
-      case "evening":
-        return hour24 >= 17 && hour24 < 21 ? 3 : 0
-      case "night":
-        return hour24 >= 21 || hour24 < 6 ? 3 : 0
-      default:
-        return 0
-    }
+    return Array.from(seen.values())
   }
 
   /**
@@ -663,10 +733,9 @@ class EnhancedEventsAPI {
   private checkRateLimit(provider: EventProvider): boolean {
     const now = Date.now()
 
-    // Reset counter if minute has passed
     if (now > provider.rateLimit.resetTime) {
       provider.rateLimit.currentCount = 0
-      provider.rateLimit.resetTime = now + 60000 // Next minute
+      provider.rateLimit.resetTime = now + 60000
     }
 
     return provider.rateLimit.currentCount < provider.rateLimit.requestsPerMinute

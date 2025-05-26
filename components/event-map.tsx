@@ -1,5 +1,6 @@
 "use client"
 
+import "mapbox-gl/dist/mapbox-gl.css"
 import { useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { geocodeAddress } from "@/lib/api/map-api"

@@ -77,7 +77,8 @@ export class EventRepository extends BaseRepository<EventEntity> {
         metadata: { options },
       })
 
-      let query = this.supabase.from(this.tableName).select("*", { count: "exact" })
+      const supabase = await this.getSupabase()
+      let query = supabase.from(this.tableName).select("*", { count: "exact" })
 
       // Apply basic filters
       if (options.category) {
@@ -200,11 +201,8 @@ export class EventRepository extends BaseRepository<EventEntity> {
    */
   async findByExternalId(externalId: string): Promise<RepositoryResult<EventEntity>> {
     try {
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .select("*")
-        .eq("external_id", externalId)
-        .single()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from(this.tableName).select("*").eq("external_id", externalId).single()
 
       if (error) {
         return { data: null, error: error.message }
@@ -246,9 +244,10 @@ export class EventRepository extends BaseRepository<EventEntity> {
    */
   async getUpcomingEvents(limit = 20): Promise<RepositoryListResult<EventEntity>> {
     try {
+      const supabase = await this.getSupabase()
       const now = new Date().toISOString()
 
-      const { data, error, count } = await this.supabase
+      const { data, error, count } = await supabase
         .from(this.tableName)
         .select("*", { count: "exact" })
         .gte("start_date", now)
@@ -316,7 +315,8 @@ export class EventRepository extends BaseRepository<EventEntity> {
         metadata: { count: events.length },
       })
 
-      const { data, error } = await this.supabase.from(this.tableName).insert(events).select()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from(this.tableName).insert(events).select()
 
       if (error) {
         logger.error(

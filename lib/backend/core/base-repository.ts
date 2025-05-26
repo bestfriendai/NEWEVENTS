@@ -227,12 +227,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
       })
 
       const supabase = await this.getSupabase()
-      const { data: result, error } = await supabase
-        .from(this.tableName)
-        .update(data)
-        .eq("id", id)
-        .select()
-        .single()
+      const { data: result, error } = await supabase.from(this.tableName).update(data).eq("id", id).select().single()
 
       if (error) {
         logger.error(

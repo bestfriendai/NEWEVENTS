@@ -54,7 +54,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
    */
   async removeFavorite(userId: string, eventId: number): Promise<RepositoryResult<boolean>> {
     try {
-      const { error } = await this.supabase.from(this.tableName).delete().eq("user_id", userId).eq("event_id", eventId)
+      const supabase = await this.getSupabase()
+      const { error } = await supabase.from(this.tableName).delete().eq("user_id", userId).eq("event_id", eventId)
 
       if (error) {
         return { data: null, error: error.message }
@@ -72,7 +73,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
    */
   async isFavorited(userId: string, eventId: number): Promise<RepositoryResult<boolean>> {
     try {
-      const { count, error } = await this.supabase
+      const supabase = await this.getSupabase()
+      const { count, error } = await supabase
         .from(this.tableName)
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
@@ -94,7 +96,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
    */
   async getUserFavorites(userId: string, limit = 50): Promise<RepositoryListResult<FavoriteWithEvent>> {
     try {
-      const { data, error, count } = await this.supabase
+      const supabase = await this.getSupabase()
+      const { data, error, count } = await supabase
         .from(this.tableName)
         .select(
           `
@@ -135,7 +138,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
    */
   async getUserFavoriteIds(userId: string): Promise<RepositoryResult<number[]>> {
     try {
-      const { data, error } = await this.supabase.from(this.tableName).select("event_id").eq("user_id", userId)
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from(this.tableName).select("event_id").eq("user_id", userId)
 
       if (error) {
         return { data: null, error: error.message }
@@ -163,7 +167,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
     limit = 20,
   ): Promise<RepositoryListResult<{ event_id: number; favorite_count: number }>> {
     try {
-      const { data, error } = await this.supabase.rpc("get_most_favorited_events", { limit_count: limit })
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.rpc("get_most_favorited_events", { limit_count: limit })
 
       if (error) {
         return { data: [], error: error.message, count: 0, hasMore: false }
@@ -208,7 +213,8 @@ export class FavoritesRepository extends BaseRepository<FavoriteEntity> {
    */
   private async findExisting(userId: string, eventId: number): Promise<RepositoryResult<FavoriteEntity>> {
     try {
-      const { data, error } = await this.supabase
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase
         .from(this.tableName)
         .select("*")
         .eq("user_id", userId)
