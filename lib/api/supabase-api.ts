@@ -3,9 +3,9 @@ import { env } from "@/lib/env"
 import { cookies } from "next/headers"
 
 // Function to create a Supabase client for server-side operations
-export function createServerSupabaseClient(): SupabaseClient {
-  const cookieStore = cookies()
-  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+export async function createServerSupabaseClient(): Promise<SupabaseClient> {
+  const cookieStore = await cookies()
+  return createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -20,7 +20,7 @@ export function createServerSupabaseClient(): SupabaseClient {
 }
 
 // Create Supabase client for client-side operations (default export)
-const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 // User interface
 export interface User {
@@ -224,7 +224,7 @@ export async function updateUserProfile(
 // Function to save a favorite event
 export async function saveFavoriteEvent(eventId: number): Promise<{ error: string | null }> {
   try {
-    const supabaseServer = createServerSupabaseClient()
+    const supabaseServer = await createServerSupabaseClient()
     const { data: { user }, error: userError } = await supabaseServer.auth.getUser()
 
     const authError = _handleSupabaseClientError(userError, "getting user for saving favorite")
@@ -252,7 +252,7 @@ export async function saveFavoriteEvent(eventId: number): Promise<{ error: strin
 // Function to remove a favorite event
 export async function removeFavoriteEvent(eventId: number): Promise<{ error: string | null }> {
   try {
-    const supabaseServer = createServerSupabaseClient()
+    const supabaseServer = await createServerSupabaseClient()
     const { data: { user }, error: userError } = await supabaseServer.auth.getUser()
 
     const authError = _handleSupabaseClientError(userError, "getting user for removing favorite")
@@ -280,9 +280,9 @@ export async function removeFavoriteEvent(eventId: number): Promise<{ error: str
 // Function to get favorite events
 export async function getFavoriteEvents(): Promise<{ eventIds: number[]; error: string | null }> {
   try {
-    const supabaseServer = createServerSupabaseClient()
+    const supabaseServer = await createServerSupabaseClient()
     const { data: { user }, error: userError } = await supabaseServer.auth.getUser()
-    
+
     const authError = _handleSupabaseClientError(userError, "getting user for fetching favorites")
     if (authError) {
       return { eventIds: [], ...authError }

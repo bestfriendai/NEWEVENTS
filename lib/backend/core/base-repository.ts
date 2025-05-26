@@ -35,12 +35,14 @@ export interface RepositoryListResult<T> {
 }
 
 export abstract class BaseRepository<T extends BaseEntity> {
-  protected supabase: SupabaseClient
   protected tableName: string
 
   constructor(tableName: string) {
     this.tableName = tableName
-    this.supabase = createServerSupabaseClient()
+  }
+
+  protected async getSupabase(): Promise<SupabaseClient> {
+    return await createServerSupabaseClient()
   }
 
   /**
@@ -54,7 +56,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
         metadata: { tableName: this.tableName, id },
       })
 
-      const { data, error } = await this.supabase.from(this.tableName).select("*").eq("id", id).single()
+      const supabase = await this.getSupabase()
+      const { data, error } = await supabase.from(this.tableName).select("*").eq("id", id).single()
 
       if (error) {
         logger.error(
@@ -98,7 +101,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
         metadata: { tableName: this.tableName, options },
       })
 
-      let query = this.supabase.from(this.tableName).select("*", { count: "exact" })
+      const supabase = await this.getSupabase()
+      let query = supabase.from(this.tableName).select("*", { count: "exact" })
 
       // Apply filters
       if (options.filters) {
@@ -177,7 +181,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
         metadata: { tableName: this.tableName },
       })
 
-      const { data: result, error } = await this.supabase.from(this.tableName).insert(data).select().single()
+      const supabase = await this.getSupabase()
+      const { data: result, error } = await supabase.from(this.tableName).insert(data).select().single()
 
       if (error) {
         logger.error(
@@ -221,7 +226,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
         metadata: { tableName: this.tableName, id },
       })
 
-      const { data: result, error } = await this.supabase
+      const supabase = await this.getSupabase()
+      const { data: result, error } = await supabase
         .from(this.tableName)
         .update(data)
         .eq("id", id)
@@ -270,7 +276,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
         metadata: { tableName: this.tableName, id },
       })
 
-      const { error } = await this.supabase.from(this.tableName).delete().eq("id", id)
+      const supabase = await this.getSupabase()
+      const { error } = await supabase.from(this.tableName).delete().eq("id", id)
 
       if (error) {
         logger.error(
@@ -308,7 +315,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
    */
   async count(filters?: Record<string, any>): Promise<RepositoryResult<number>> {
     try {
-      let query = this.supabase.from(this.tableName).select("*", { count: "exact", head: true })
+      const supabase = await this.getSupabase()
+      let query = supabase.from(this.tableName).select("*", { count: "exact", head: true })
 
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
@@ -336,7 +344,8 @@ export abstract class BaseRepository<T extends BaseEntity> {
    */
   async exists(id: string | number): Promise<RepositoryResult<boolean>> {
     try {
-      const { count, error } = await this.supabase
+      const supabase = await this.getSupabase()
+      const { count, error } = await supabase
         .from(this.tableName)
         .select("*", { count: "exact", head: true })
         .eq("id", id)

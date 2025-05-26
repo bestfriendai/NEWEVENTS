@@ -21,8 +21,11 @@ export interface CacheOptions {
 }
 
 export class CacheService {
-  private supabase = createServerSupabaseClient()
   private defaultTTL = 3600 // 1 hour in seconds
+
+  private async getSupabase() {
+    return await createServerSupabaseClient()
+  }
 
   /**
    * Get cached data

@@ -16,6 +16,8 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_MAPBOX_API_KEY: z.string().min(1, "Mapbox API key is required").optional(),
 
   // Server-only variables
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_JWT_SECRET: z.string().optional(),
   RAPIDAPI_KEY: z.string().optional(),
   RAPIDAPI_HOST: z.string().optional(),
   TICKETMASTER_API_KEY: z.string().optional(),
@@ -34,13 +36,15 @@ const serverEnvSchema = z.object({
 // Updated configuration with your provided API keys
 const DEFAULT_CONFIG = {
   // Public variables (safe for client)
-  NEXT_PUBLIC_SUPABASE_URL: "https://hayrbdzsglfmidwrlawu.supabase.co",
+  NEXT_PUBLIC_SUPABASE_URL: "https://ejsllpjzxnbndrrfpjkz.supabase.co",
   NEXT_PUBLIC_SUPABASE_ANON_KEY:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhheXJiZHpzZ2xmbWlkd3JsYXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM0NzYwNjcsImV4cCI6MjA1OTA1MjA2N30.AfBRE4xY4TIMWndtxnXyyOqlV9l8BpNHbTHeZbVXpxU",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5MTYxNDYsImV4cCI6MjA2MzQ5MjE0Nn0.uFthMUbM4dkOqlxGWC2tVoTjo_5b9VmvhnYdXWnlLXU",
   NEXT_PUBLIC_MAPBOX_API_KEY:
     "pk.eyJ1IjoidHJhcHBhdCIsImEiOiJjbTMzODBqYTYxbHcwMmpwdXpxeWljNXJ3In0.xKUEW2C1kjFBu7kr7Uxfow",
 
   // Server-only variables with your provided keys
+  SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzkxNjE0NiwiZXhwIjoyMDYzNDkyMTQ2fQ.xY9lTBSgy6A7YPor5I3n26MN4w-8x86eb-XqQIP1dDs",
+  SUPABASE_JWT_SECRET: "TPyRzZHjqE7Hnrwy7cLadLWBwukoHMIxbWj8RxlH3cJbCdvcNpQaJwr5hJq1VMdQ3fleq8Is9Y30puos8/J4Lw==",
   RAPIDAPI_KEY: "92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9",
   RAPIDAPI_HOST: "real-time-events-search.p.rapidapi.com",
   TOMTOM_API_KEY: "L6x6moNiYg0RSomE2RmDEqS8KW1pFBKz",
@@ -102,6 +106,8 @@ function getServerEnv(): z.infer<typeof serverEnvSchema> {
         NEXT_PUBLIC_SUPABASE_ANON_KEY:
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_CONFIG.NEXT_PUBLIC_SUPABASE_ANON_KEY,
         NEXT_PUBLIC_MAPBOX_API_KEY: process.env.NEXT_PUBLIC_MAPBOX_API_KEY || DEFAULT_CONFIG.NEXT_PUBLIC_MAPBOX_API_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_CONFIG.SUPABASE_SERVICE_ROLE_KEY,
+        SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || DEFAULT_CONFIG.SUPABASE_JWT_SECRET,
         RAPIDAPI_KEY: process.env.RAPIDAPI_KEY || DEFAULT_CONFIG.RAPIDAPI_KEY,
         RAPIDAPI_HOST: process.env.RAPIDAPI_HOST || DEFAULT_CONFIG.RAPIDAPI_HOST,
         TOMTOM_API_KEY: process.env.TOMTOM_API_KEY || DEFAULT_CONFIG.TOMTOM_API_KEY,
