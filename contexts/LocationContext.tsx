@@ -1,175 +1,81 @@
 "use client"
 
-import { createContext, useState, useContext, ReactNode, Dispatch, SetStateAction } from 'react'
-import { logger } from '@/lib/utils/logger'
+import type React from "react"
+import { createContext, useContext, useState, useCallback } from "react"
 
-export interface UserLocation {
-  lat: number
-  lng: number
-  name: string
+interface Location {
+  latitude: number
+  longitude: number
+  city?: string
+  address?: string
 }
 
 interface LocationContextType {
-  userLocation: UserLocation | null
-  setUserLocation: Dispatch<SetStateAction<UserLocation | null>>
-  isLocationLoading: boolean
-  setIsLocationLoading: Dispatch<SetStateAction<boolean>>
-  locationError: string | null
-  setLocationError: Dispatch<SetStateAction<string | null>>
+  location: Location | null
+  setLocation: (location: Location) => void
   getCurrentLocation: () => Promise<void>
-  searchLocation: (query: string) => Promise<void>
+  isLoading: boolean
+  error: string | null
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined)
 
-export const LocationProvider = ({ children }: { children: ReactNode }) => {
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
-  const [isLocationLoading, setIsLocationLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
+export function LocationProvider({ children }: { children: React.ReactNode }) {
+  const [location, setLocationState] = useState<Location | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const getCurrentLocation = async (): Promise<void> => {
+  const setLocation = useCallback((newLocation: Location) => {
+    setLocationState(newLocation)
+    setError(null)
+  }, [])
+
+  const getCurrentLocation = useCallback(async () => {
     if (!navigator.geolocation) {
-      const error = "Geolocation is not supported by this browser"
-      setLocationError(error)
-      logger.warn("Geolocation not supported", {
-        component: "LocationContext",
-        action: "geolocation_not_supported"
-      })
+      setError("Geolocation is not supported by this browser")
       return
     }
 
-    setIsLocationLoading(true)
-    setLocationError(null)
+    setIsLoading(true)
+    setError(null)
 
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 300000 // 5 minutes
+          maximumAge: 300000, // 5 minutes
         })
       })
 
-      const { latitude, longitude } = position.coords
-
-      // TODO: Implement reverse geocoding to get address name
-      const location: UserLocation = {
-        lat: latitude,
-        lng: longitude,
-        name: "Your Current Location"
+      const newLocation: Location = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
       }
 
-      setUserLocation(location)
-
-      logger.info("Current location obtained", {
-        component: "LocationContext",
-        action: "location_success",
-        metadata: {
-          lat: latitude,
-          lng: longitude,
-          accuracy: position.coords.accuracy
-        }
-      })
-
-    } catch (error) {
-      const errorMessage = error instanceof GeolocationPositionError
-        ? getGeolocationErrorMessage(error.code)
-        : "Failed to get current location"
-
-      setLocationError(errorMessage)
-
-      logger.error(`Failed to get current location: ${errorMessage}`, {
-        component: "LocationContext",
-        action: "location_error"
-      })
+      setLocationState(newLocation)
+    } catch (err) {
+      setError("Unable to retrieve your location")
     } finally {
-      setIsLocationLoading(false)
+      setIsLoading(false)
     }
-  }
+  }, [])
 
-  const searchLocation = async (query: string): Promise<void> => {
-    if (!query.trim()) {
-      setLocationError("Please enter a location")
-      return
-    }
-
-    setIsLocationLoading(true)
-    setLocationError(null)
-
-    try {
-      // TODO: Implement geocoding search using the geocoding utility
-      // For now, this is a placeholder
-      const { geocodeAddress } = await import('@/lib/utils/geocoding')
-      const result = await geocodeAddress(query)
-
-      if (result) {
-        const location: UserLocation = {
-          lat: result.lat,
-          lng: result.lng,
-          name: result.address
-        }
-
-        setUserLocation(location)
-
-        logger.info("Location search successful", {
-          component: "LocationContext",
-          action: "search_success",
-          metadata: { query, result: location }
-        })
-      } else {
-        throw new Error("Location not found")
-      }
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to search location"
-      setLocationError(errorMessage)
-
-      logger.error(`Location search failed: ${errorMessage}`, {
-        component: "LocationContext",
-        action: "search_error",
-        metadata: { query }
-      })
-    } finally {
-      setIsLocationLoading(false)
-    }
-  }
-
-  const value: LocationContextType = {
-    userLocation,
-    setUserLocation,
-    isLocationLoading,
-    setIsLocationLoading,
-    locationError,
-    setLocationError,
+  const value = {
+    location,
+    setLocation,
     getCurrentLocation,
-    searchLocation
+    isLoading,
+    error,
   }
 
-  return (
-    <LocationContext.Provider value={value}>
-      {children}
-    </LocationContext.Provider>
-  )
+  return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>
 }
 
-export const useLocationContext = () => {
+export function useLocation() {
   const context = useContext(LocationContext)
-  if (!context) {
-    throw new Error("useLocationContext must be used within a LocationProvider")
+  if (context === undefined) {
+    throw new Error("useLocation must be used within a LocationProvider")
   }
   return context
-}
-
-// Helper function to get user-friendly geolocation error messages
-function getGeolocationErrorMessage(code: number): string {
-  switch (code) {
-    case GeolocationPositionError.PERMISSION_DENIED:
-      return "Location access denied. Please enable location permissions and try again."
-    case GeolocationPositionError.POSITION_UNAVAILABLE:
-      return "Location information is unavailable. Please try again later."
-    case GeolocationPositionError.TIMEOUT:
-      return "Location request timed out. Please try again."
-    default:
-      return "An unknown error occurred while getting your location."
-  }
 }

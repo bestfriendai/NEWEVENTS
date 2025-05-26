@@ -1,390 +1,292 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { env } from "@/lib/env"
-import { SimpleMapFallback } from "@/components/simple-map-fallback"
-import { MapSkeleton } from "@/components/ui/event-skeleton"
+import { useEffect, useRef, useState } from "react"
+import { loadMapbox, createMap, createMarker, createPopup, cleanupMap } from "@/lib/mapbox-utils"
 import { logger } from "@/lib/utils/logger"
-import type { EventDetail } from "@/types/event.types"
 
-interface UserLocation {
-  lat: number
-  lng: number
+interface ProcessedEvent {
+  event_id: string
   name: string
+  category: string
+  venue: {
+    name: string
+    latitude: number
+    longitude: number
+  }
+  start_time: string
 }
 
 interface EventsMapProps {
-  userLocation: UserLocation | null
-  events: EventDetail[]
-  onEventSelect: (event: EventDetail) => void
-  className?: string
+  events: ProcessedEvent[]
+  center: [number, number]
+  selectedEvent: ProcessedEvent | null
+  onEventSelect: (event: ProcessedEvent) => void
+  onError?: () => void
 }
 
-export function EventsMap({ userLocation, events, onEventSelect, className }: EventsMapProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
-  const userMarkerRef = useRef<any>(null)
+const CATEGORY_COLORS = {
+  Concerts: "#8B5CF6",
+  "General Events": "#06B6D4",
+  "Day Parties": "#F59E0B",
+  "Club Events": "#EF4444",
+  Parties: "#10B981",
+}
+
+export default function EventsMap({ events, center, selectedEvent, onEventSelect, onError }: EventsMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null)
+  const map = useRef<any>(null)
+  const markers = useRef<any[]>([])
   const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainerRef.current || typeof window === "undefined") return
+    if (!mapContainer.current || map.current) return
 
-    const initializeMap = async () => {
+    const initMap = async () => {
       try {
-        setIsLoading(true)
-
-        // Load Mapbox GL JS dynamically
-        const script = document.createElement("script")
-        script.src = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"
-
-        script.onload = () => {
-          // Load CSS
-          const link = document.createElement("link")
-          link.href = "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
-          link.rel = "stylesheet"
-          document.head.appendChild(link)
-
-          try {
-            const mapboxgl = (window as any).mapboxgl
-            mapboxgl.accessToken = env.MAPBOX_API_KEY
-
-            mapRef.current = new mapboxgl.Map({
-              container: mapContainerRef.current,
-              style: "mapbox://styles/mapbox/dark-v11",
-              center: [-74.006, 40.7128], // Default to NYC
-              zoom: 10,
-              attributionControl: false
-            })
-
-            // Add navigation controls
-            mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
-
-            mapRef.current.on("load", () => {
-              setMapLoaded(true)
-              setIsLoading(false)
-
-              logger.info("Map loaded successfully", {
-                component: "EventsMap",
-                action: "map_load_success"
-              })
-            })
-
-            mapRef.current.on("error", () => {
-              const errorMessage = "Failed to load map"
-              setMapError(errorMessage)
-              setIsLoading(false)
-
-              logger.error("Map load error", {
-                component: "EventsMap",
-                action: "map_load_error"
-              }, new Error(errorMessage))
-            })
-
-          } catch (error) {
-            const errorMessage = "Failed to initialize Mapbox"
-            setMapError(errorMessage)
-            setIsLoading(false)
-
-            logger.error("Mapbox initialization error", {
-              component: "EventsMap",
-              action: "mapbox_init_error"
-            }, error instanceof Error ? error : new Error(errorMessage))
-          }
+        // Check if Mapbox API key is available
+        if (!process.env.NEXT_PUBLIC_MAPBOX_API_KEY) {
+          setError(
+            "Mapbox API key is not configured. Please add NEXT_PUBLIC_MAPBOX_API_KEY to your environment variables.",
+          )
+          return
         }
 
-        script.onerror = () => {
-          const errorMessage = "Failed to load Mapbox script"
-          setMapError(errorMessage)
-          setIsLoading(false)
+        const mapboxgl = await loadMapbox()
 
-          logger.error("Mapbox script load error", {
-            component: "EventsMap",
-            action: "script_load_error"
-          }, new Error(errorMessage))
-        }
+        map.current = await createMap(mapContainer.current!, {
+          style: "mapbox://styles/mapbox/dark-v11",
+          center: center[0] !== 0 && center[1] !== 0 ? center : [-74.006, 40.7128], // Default to NYC
+          zoom: 12,
+          attributionControl: false,
+        })
 
-        document.body.appendChild(script)
+        map.current.on("load", () => {
+          setMapLoaded(true)
+        })
 
-      } catch (error) {
-        const errorMessage = "Map initialization failed"
-        setMapError(errorMessage)
-        setIsLoading(false)
+        map.current.on("error", (e: any) => {
+          logger.error("Map error:", e)
+          setError("Failed to load map. Please check your Mapbox configuration.")
+        })
+      } catch (err) {
+        logger.error("Failed to initialize map:", err)
+        const errorMessage =
+          err instanceof Error && err.message.includes("API access token")
+            ? "Mapbox API key is missing or invalid. Please check your configuration."
+            : "Failed to initialize map. Please check your internet connection."
 
-        logger.error("Map initialization failed", {
-          component: "EventsMap",
-          action: "init_error"
-        }, error instanceof Error ? error : new Error(errorMessage))
+        setError(errorMessage)
+        onError?.()
       }
     }
 
-    initializeMap()
+    initMap()
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
+      if (map.current) {
+        cleanupMap(map.current)
+        map.current = null
       }
     }
   }, [])
 
-  // Update user location marker
+  // Update map center when location changes
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded || !userLocation) return
-
-    try {
-      // Remove existing user marker
-      if (userMarkerRef.current) {
-        userMarkerRef.current.remove()
-      }
-
-      // Create user location marker with pulse effect
-      const el = document.createElement("div")
-      el.className = "user-location-marker"
-      el.innerHTML = `
-        <div style="
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background-color: #3B82F6;
-          border: 3px solid white;
-          box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
-          position: relative;
-        ">
-          <div style="
-            position: absolute;
-            top: -3px;
-            left: -3px;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            background-color: rgba(59, 130, 246, 0.3);
-            animation: pulse 2s infinite;
-          "></div>
-        </div>
-      `
-
-      // Add pulse animation CSS if not already added
-      if (!document.getElementById('pulse-animation')) {
-        const style = document.createElement('style')
-        style.id = 'pulse-animation'
-        style.textContent = `
-          @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.5); opacity: 0.5; }
-            100% { transform: scale(2); opacity: 0; }
-          }
-        `
-        document.head.appendChild(style)
-      }
-
-      const mapboxgl = (window as any).mapboxgl
-      userMarkerRef.current = new mapboxgl.Marker(el)
-        .setLngLat([userLocation.lng, userLocation.lat])
-        .addTo(mapRef.current)
-
-      // Fly to user location
-      mapRef.current.flyTo({
-        center: [userLocation.lng, userLocation.lat],
+    if (map.current && mapLoaded && center[0] !== 0 && center[1] !== 0) {
+      map.current.flyTo({
+        center: center,
         zoom: 12,
-        duration: 2000,
+        duration: 1000,
       })
-
-      logger.info("User location marker updated", {
-        component: "EventsMap",
-        action: "user_marker_update",
-        metadata: { location: userLocation }
-      })
-
-    } catch (error) {
-      logger.error("Failed to update user location marker", {
-        component: "EventsMap",
-        action: "user_marker_error"
-      }, error instanceof Error ? error : new Error("Unknown error"))
     }
-  }, [userLocation, mapLoaded])
+  }, [center, mapLoaded])
 
-  // Update event markers using GeoJSON for better performance
+  // Update markers when events change
   useEffect(() => {
-    if (!mapRef.current || !mapLoaded) return
+    if (!map.current || !mapLoaded) return
 
-    try {
-      const validEvents = events.filter(event => event.coordinates)
+    // Clear existing markers
+    markers.current.forEach((marker) => marker.remove())
+    markers.current = []
 
-      // Create GeoJSON source for events
-      const geojsonData = {
-        type: 'FeatureCollection' as const,
-        features: validEvents.map(event => ({
-          type: 'Feature' as const,
-          geometry: {
-            type: 'Point' as const,
-            coordinates: [event.coordinates!.lng, event.coordinates!.lat]
-          },
-          properties: {
-            id: event.id,
-            title: event.title,
-            category: event.category,
-            price: event.price,
-            image: event.image
+    // Add new markers
+    const addMarkers = async () => {
+      try {
+        for (const event of events) {
+          if (!event.venue.latitude || !event.venue.longitude) continue
+
+          const color = CATEGORY_COLORS[event.category as keyof typeof CATEGORY_COLORS] || "#6B7280"
+
+          // Create custom marker element
+          const markerElement = document.createElement("div")
+          markerElement.className = "custom-marker"
+          markerElement.style.cssText = `
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: ${color};
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+          `
+
+          // Add hover effect
+          markerElement.addEventListener("mouseenter", () => {
+            markerElement.style.transform = "scale(1.5)"
+          })
+          markerElement.addEventListener("mouseleave", () => {
+            markerElement.style.transform = "scale(1)"
+          })
+
+          const marker = await createMarker({
+            element: markerElement,
+            anchor: "center",
+          })
+
+          marker.setLngLat([event.venue.longitude, event.venue.latitude])
+
+          // Create popup
+          const popup = await createPopup({
+            closeButton: false,
+            closeOnClick: false,
+            className: "event-popup",
+          })
+
+          const formatDate = (dateString: string) => {
+            try {
+              return new Date(dateString).toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            } catch {
+              return "Date TBD"
+            }
           }
-        }))
+
+          popup.setHTML(`
+            <div class="p-3 max-w-xs">
+              <div class="font-semibold text-sm mb-1">${event.name}</div>
+              <div class="text-xs text-gray-600 mb-1">${event.venue.name}</div>
+              <div class="text-xs text-gray-500">${formatDate(event.start_time)}</div>
+              <div class="mt-2">
+                <span class="inline-block px-2 py-1 text-xs rounded-full" style="background-color: ${color}20; color: ${color};">
+                  ${event.category}
+                </span>
+              </div>
+            </div>
+          `)
+
+          marker.setPopup(popup)
+
+          // Add click handler
+          markerElement.addEventListener("click", () => {
+            onEventSelect(event)
+          })
+
+          marker.addTo(map.current)
+          markers.current.push(marker)
+        }
+      } catch (err) {
+        logger.error("Failed to add markers:", err)
       }
-
-      // Remove existing source and layers
-      if (mapRef.current.getSource('events')) {
-        if (mapRef.current.getLayer('events-layer')) {
-          mapRef.current.removeLayer('events-layer')
-        }
-        mapRef.current.removeSource('events')
-      }
-
-      // Add new source
-      mapRef.current.addSource('events', {
-        type: 'geojson',
-        data: geojsonData,
-        cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 50
-      })
-
-      // Add cluster layer
-      mapRef.current.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'events',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': [
-            'step',
-            ['get', 'point_count'],
-            '#8B5CF6',
-            10,
-            '#7C3AED',
-            30,
-            '#6D28D9'
-          ],
-          'circle-radius': [
-            'step',
-            ['get', 'point_count'],
-            20,
-            10,
-            30,
-            30,
-            40
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#fff'
-        }
-      })
-
-      // Add cluster count labels
-      mapRef.current.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'events',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-          'text-size': 12
-        },
-        paint: {
-          'text-color': '#ffffff'
-        }
-      })
-
-      // Add individual event points
-      mapRef.current.addLayer({
-        id: 'events-layer',
-        type: 'circle',
-        source: 'events',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': '#8B5CF6',
-          'circle-radius': 8,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#fff'
-        }
-      })
-
-      // Add click handlers
-      mapRef.current.on('click', 'events-layer', (e: any) => {
-        const eventId = e.features[0].properties.id
-        const event = events.find(e => e.id === eventId)
-        if (event) {
-          onEventSelect(event)
-        }
-      })
-
-      mapRef.current.on('click', 'clusters', (e: any) => {
-        const features = mapRef.current.queryRenderedFeatures(e.point, {
-          layers: ['clusters']
-        })
-        const clusterId = features[0].properties.cluster_id
-        mapRef.current.getSource('events').getClusterExpansionZoom(
-          clusterId,
-          (err: any, zoom: number) => {
-            if (err) return
-
-            mapRef.current.easeTo({
-              center: features[0].geometry.coordinates,
-              zoom: zoom
-            })
-          }
-        )
-      })
-
-      // Change cursor on hover
-      mapRef.current.on('mouseenter', 'events-layer', () => {
-        mapRef.current.getCanvas().style.cursor = 'pointer'
-      })
-
-      mapRef.current.on('mouseleave', 'events-layer', () => {
-        mapRef.current.getCanvas().style.cursor = ''
-      })
-
-      logger.info("Event markers updated", {
-        component: "EventsMap",
-        action: "markers_update",
-        metadata: { eventCount: validEvents.length }
-      })
-
-    } catch (error) {
-      logger.error("Failed to update event markers", {
-        component: "EventsMap",
-        action: "markers_error"
-      }, error instanceof Error ? error : new Error("Unknown error"))
     }
+
+    addMarkers()
   }, [events, mapLoaded, onEventSelect])
 
-  // Show loading state
-  if (isLoading) {
-    return <MapSkeleton />
-  }
+  // Highlight selected event
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !selectedEvent) return
 
-  // Show error fallback
-  if (mapError) {
+    // Find and highlight the selected event marker
+    const selectedMarker = markers.current.find((marker, index) => {
+      const event = events[index]
+      return event && event.event_id === selectedEvent.event_id
+    })
+
+    if (selectedMarker) {
+      // Fly to the selected marker
+      map.current.flyTo({
+        center: [selectedEvent.venue.longitude, selectedEvent.venue.latitude],
+        zoom: 15,
+        duration: 1000,
+      })
+
+      // Show popup
+      selectedMarker.togglePopup()
+    }
+  }, [selectedEvent, mapLoaded, events])
+
+  if (error) {
     return (
-      <SimpleMapFallback
-        events={events}
-        onViewDetails={onEventSelect}
-        onToggleFavorite={(eventId: number) => {
-          // This is a placeholder - the favorites functionality will be handled by the context
-          logger.info("Favorite toggle from map fallback", {
-            component: "EventsMap",
-            action: "fallback_favorite_toggle",
-            metadata: { eventId }
-          })
-        }}
-      />
+      <div className="h-full flex items-center justify-center bg-gray-900 text-white p-6">
+        <div className="text-center max-w-md">
+          <div className="mb-4">
+            <svg className="w-16 h-16 mx-auto text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Map Unavailable</h3>
+          <p className="text-gray-300 mb-4">{error}</p>
+          <div className="space-y-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="block w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            >
+              Reload Page
+            </button>
+            <p className="text-xs text-gray-400">Events will still be available in the sidebar</p>
+          </div>
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className={`${className || 'h-[500px] rounded-xl border border-gray-800'} overflow-hidden`}>
-      <div ref={mapContainerRef} className="w-full h-full" />
+    <div className="relative h-full">
+      <div ref={mapContainer} className="h-full w-full" />
+
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
+            <p>Loading map...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      {mapLoaded && events.length > 0 && (
+        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
+          <h4 className="text-sm font-semibold mb-2">Event Categories</h4>
+          <div className="space-y-1">
+            {Object.entries(CATEGORY_COLORS).map(([category, color]) => {
+              const count = events.filter((e) => e.category === category).length
+              if (count === 0) return null
+
+              return (
+                <div key={category} className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full mr-2 border border-white" style={{ backgroundColor: color }} />
+                  <span>
+                    {category} ({count})
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

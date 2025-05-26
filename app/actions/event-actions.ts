@@ -1,17 +1,16 @@
 "use server"
 
 import { z } from "zod"
-import { unstable_cache } from "next/cache"
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import type { EventSearchParams } from "@/types";
-import { env } from "@/lib/env"
+import type { EventSearchParams } from "@/types"
 import { logger } from "@/lib/utils/logger"
-
-// Original EventSearchParams interface (lines 9-16) removed
+import { EventRepository, type EventSearchOptions } from "@/lib/backend/repositories/event-repository"
+import { cacheService } from "@/lib/backend/services/cache-service"
+import { searchEnhancedEvents } from "@/lib/api/enhanced-events-api"
 
 export interface EventSearchError {
   message: string
-  type: 'API_ERROR' | 'CONFIG_ERROR' | 'VALIDATION_ERROR' | 'NETWORK_ERROR' | 'UNKNOWN_ERROR'
+  type: "API_ERROR" | "CONFIG_ERROR" | "VALIDATION_ERROR" | "NETWORK_ERROR" | "UNKNOWN_ERROR"
   statusCode?: number
 }
 
@@ -20,358 +19,374 @@ export interface EventSearchResult {
   totalCount: number
   error?: EventSearchError
   source?: string
+  hasMore?: boolean
+  page?: number
 }
 
-// Zod schemas for API validation
-const RapidApiVenueSchema = z.object({
-  name: z.string().optional(),
-  full_address: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-}).optional().nullable()
+// Initialize repository
+const eventRepository = new EventRepository()
 
-const RapidApiEventSchema = z.object({
-  event_id: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  venue: RapidApiVenueSchema,
-  start_time: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  thumbnail: z.string().optional(),
-  ticket_links: z.array(z.any()).optional(),
-  publisher: z.string().optional(),
+// Zod schemas for validation
+const EventSearchParamsSchema = z.object({
+  keyword: z.string().optional(),
+  location: z.string().optional(),
+  radius: z.number().min(1).max(100).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  page: z.number().min(0).optional(),
+  size: z.number().min(1).max(100).optional(),
+  sort: z.string().optional(),
 })
 
-const RapidApiResponseSchema = z.object({
-  status: z.string(),
-  data: z.object({
-    events: z.array(RapidApiEventSchema).optional().nullable(),
-  }).optional().nullable(),
-})
-
-// Cached version of the core API fetching logic
-const getCachedEvents = unstable_cache(
-  async (params: EventSearchParams) => {
-    logger.info("Cache miss, fetching from API", {
-      component: "event-actions",
-      action: "cache_miss",
-      metadata: { params }
-    })
-    return await _fetchEventsFromApi(params)
-  },
-  ['events-search-results'],
-  {
-    tags: ['events'],
-    revalidate: 3600, // Revalidate every hour
-  }
-)
-
+/**
+ * Enhanced event fetching with multi-level caching and database integration
+ */
 export async function fetchEvents(params: EventSearchParams): Promise<EventSearchResult> {
   try {
-    logger.info("Fetching events", {
+    logger.info("Enhanced event fetching started", {
       component: "event-actions",
       action: "fetch_events_start",
-      metadata: { params }
+      metadata: { params },
     })
 
-    return await getCachedEvents(params)
-  } catch (error) {
-    logger.error("Error in fetchEvents", {
-      component: "event-actions",
-      action: "fetch_events_error",
-      metadata: { params }
-    }, error instanceof Error ? error : new Error("Unknown error"))
+    // Validate input parameters
+    const validationResult = EventSearchParamsSchema.safeParse(params)
+    if (!validationResult.success) {
+      logger.warn("Invalid search parameters", {
+        component: "event-actions",
+        action: "validation_error",
+        metadata: { errors: validationResult.error.flatten() },
+      })
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-    let errorType: EventSearchError['type'] = 'UNKNOWN_ERROR'
-
-    if (errorMessage.includes('RapidAPI key')) {
-      errorType = 'CONFIG_ERROR'
-    } else if (errorMessage.includes('network') || errorMessage.includes('timeout')) {
-      errorType = 'NETWORK_ERROR'
-    } else if (errorMessage.includes('API')) {
-      errorType = 'API_ERROR'
+      return {
+        events: [],
+        totalCount: 0,
+        error: {
+          message: "Invalid search parameters",
+          type: "VALIDATION_ERROR",
+        },
+      }
     }
 
-    // Return fallback events with structured error info
+    const validatedParams = validationResult.data
+
+    // Create cache key
+    const cacheKey = `events:search:${JSON.stringify(validatedParams)}`
+
+    // Try to get from cache first
+    const cachedResult = await cacheService.get<EventSearchResult>(cacheKey, {
+      ttl: 300, // 5 minutes
+      namespace: "events",
+    })
+
+    if (cachedResult) {
+      logger.info("Cache hit for event search", {
+        component: "event-actions",
+        action: "cache_hit",
+        metadata: { cacheKey },
+      })
+      return { ...cachedResult, source: `${cachedResult.source} (Cached)` }
+    }
+
+    // Try database first for better performance
+    const dbResult = await searchEventsFromDatabase(validatedParams)
+
+    if (dbResult.events.length > 0) {
+      // Cache the database result
+      await cacheService.set(cacheKey, dbResult, {
+        ttl: 600, // 10 minutes for database results
+        namespace: "events",
+      })
+
+      logger.info("Database search successful", {
+        component: "event-actions",
+        action: "database_search_success",
+        metadata: { eventCount: dbResult.events.length },
+      })
+
+      return { ...dbResult, source: "Database" }
+    }
+
+    // Fallback to external APIs
+    logger.info("Falling back to external API search", {
+      component: "event-actions",
+      action: "api_fallback",
+    })
+
+    const apiResult = await searchEventsFromAPI(validatedParams)
+
+    // Store API results in database for future use
+    if (apiResult.events.length > 0) {
+      await storeEventsInDatabase(apiResult.events)
+    }
+
+    // Cache the API result
+    await cacheService.set(cacheKey, apiResult, {
+      ttl: 300, // 5 minutes for API results
+      namespace: "events",
+    })
+
+    return apiResult
+  } catch (error) {
+    logger.error(
+      "Error in enhanced event fetching",
+      {
+        component: "event-actions",
+        action: "fetch_events_error",
+        metadata: { params },
+      },
+      error instanceof Error ? error : new Error("Unknown error"),
+    )
+
+    // Return fallback events on error
     const fallbackEvents = generateFallbackEvents(params.location || "New York", params.size || 20)
 
     return {
       events: fallbackEvents,
       totalCount: fallbackEvents.length,
       error: {
-        message: `${errorMessage}. Showing sample events.`,
-        type: errorType,
+        message: `${error instanceof Error ? error.message : "Unknown error"}. Showing sample events.`,
+        type: "UNKNOWN_ERROR",
       },
       source: "Fallback",
     }
   }
 }
 
-// Core API fetching logic (separated for caching)
-async function _fetchEventsFromApi(params: EventSearchParams): Promise<EventSearchResult> {
-  if (!env.RAPIDAPI_KEY) {
-    throw new Error("RapidAPI key not configured")
-  }
+/**
+ * Search events from database
+ */
+async function searchEventsFromDatabase(params: EventSearchParams): Promise<EventSearchResult> {
+  try {
+    const searchOptions: EventSearchOptions = {
+      limit: params.size || 20,
+      offset: (params.page || 0) * (params.size || 20),
+      orderBy: "popularity_score",
+      orderDirection: "desc",
+      isActive: true,
+    }
 
-  const query = params.keyword || "events"
-  const location = params.location || "New York"
-  const size = params.size || 20
+    // Add search filters
+    if (params.keyword) {
+      searchOptions.searchText = params.keyword
+    }
 
-  // Build query parameters with enhanced support
-  const queryParams = new URLSearchParams({
-    query: encodeURIComponent(query),
-    location: encodeURIComponent(location),
-    is_virtual: "false",
-    start: "0"
-  })
+    if (params.categories && params.categories.length > 0) {
+      searchOptions.category = params.categories[0] // For now, use first category
+    }
 
-  // Add date range if provided
-  if (params.startDate && params.endDate) {
-    queryParams.set("date", `${params.startDate}..${params.endDate}`)
-  } else if (params.startDate) {
-    queryParams.set("date", `${params.startDate}..${params.startDate}`)
-  } else {
-    queryParams.set("date", "any")
-  }
+    if (params.location) {
+      // In a real implementation, you'd geocode the location first
+      searchOptions.location = {
+        lat: 40.7128, // Default to NYC
+        lng: -74.006,
+        radius: params.radius || 25,
+      }
+    }
 
-  // Note: RapidAPI real-time-events-search doesn't explicitly support radius with city names
-  // This would need to be implemented if the API supports lat,lng location format
+    if (params.startDate && params.endDate) {
+      searchOptions.dateRange = {
+        start: params.startDate,
+        end: params.endDate,
+      }
+    }
 
-  const url = `https://real-time-events-search.p.rapidapi.com/search-events?${queryParams.toString()}`
+    const result = await eventRepository.searchEvents(searchOptions)
 
-  logger.debug("Making RapidAPI request", {
-    component: "event-actions",
-    action: "api_request",
-    metadata: { url: url.replace(env.RAPIDAPI_KEY, '[REDACTED]') }
-  })
+    if (result.error) {
+      throw new Error(result.error)
+    }
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "x-rapidapi-key": env.RAPIDAPI_KEY,
-      "x-rapidapi-host": env.RAPIDAPI_HOST,
-    },
-    signal: AbortSignal.timeout(15000), // 15 second timeout
-  })
+    // Transform database events to EventDetailProps format
+    const transformedEvents = result.data.map(transformDatabaseEventToEventDetail)
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    logger.error("API Error Response", {
-      component: "event-actions",
-      action: "api_error",
-      metadata: { status: response.status, statusText: response.statusText, errorText }
-    })
-    throw new Error(`RapidAPI request failed: ${response.status} ${response.statusText}`)
-  }
+    return {
+      events: transformedEvents,
+      totalCount: result.count,
+      hasMore: result.hasMore,
+      page: params.page || 0,
+    }
+  } catch (error) {
+    logger.error(
+      "Database search error",
+      {
+        component: "event-actions",
+        action: "database_search_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
 
-  const data = await response.json()
-
-  // Validate API response with Zod
-  const parsedResponse = RapidApiResponseSchema.safeParse(data)
-
-  if (!parsedResponse.success) {
-    logger.error("API Response Validation Error", {
-      component: "event-actions",
-      action: "validation_error",
-      metadata: { errors: parsedResponse.error.flatten() }
-    })
-    throw new Error("Invalid API response structure from RapidAPI")
-  }
-
-  const validatedData = parsedResponse.data
-
-  if (validatedData.status !== "OK") {
-    throw new Error(`API returned error status: ${validatedData.status}`)
-  }
-
-  if (!validatedData.data || !validatedData.data.events) {
-    logger.warn("No events data in response", {
-      component: "event-actions",
-      action: "no_events_data"
-    })
     return {
       events: [],
       totalCount: 0,
-      source: "RapidAPI",
+      hasMore: false,
+      page: 0,
     }
-  }
-
-  const events = transformRapidAPIEvents(validatedData.data.events, size)
-
-  logger.info("Successfully transformed events", {
-    component: "event-actions",
-    action: "transform_success",
-    metadata: { eventCount: events.length }
-  })
-
-  return {
-    events,
-    totalCount: events.length,
-    source: "RapidAPI",
   }
 }
 
-interface RapidAPIEvent {
-  event_id?: string | undefined
-  name?: string | undefined
-  description?: string | undefined
-  start_time?: string | undefined
-  venue?: {
-    name?: string | undefined
-    full_address?: string | undefined
-    latitude?: string | number | undefined
-    longitude?: string | number | undefined
-  } | null | undefined
-  tags?: string[] | undefined
-  thumbnail?: string | undefined
-  ticket_links?: unknown[] | undefined
-  publisher?: string | undefined
-}
-
-function transformRapidAPIEvents(events: RapidAPIEvent[], maxCount: number): EventDetailProps[] {
-  logger.debug("Transforming events", {
-    component: "event-actions",
-    action: "transform_start",
-    metadata: { eventCount: events.length, maxCount }
-  })
-
-  return events.slice(0, maxCount).map((event: RapidAPIEvent, index) => {
-    const venue = event.venue || {}
-    const startDate = event.start_time ? new Date(event.start_time) : new Date()
-
-    // Generate stable, deterministic coordinates if not available
-    let coordinates: { lat: number; lng: number } | undefined
-    if (venue.latitude && venue.longitude) {
-      const lat = Number(venue.latitude)
-      const lng = Number(venue.longitude)
-
-      // Validate coordinates are reasonable
-      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-        coordinates = { lat, lng }
-      }
+/**
+ * Search events from external APIs
+ */
+async function searchEventsFromAPI(params: EventSearchParams): Promise<EventSearchResult> {
+  try {
+    const enhancedParams = {
+      keyword: params.keyword,
+      location: params.location,
+      radius: params.radius,
+      startDateTime: params.startDate,
+      endDateTime: params.endDate,
+      categories: params.categories,
+      page: params.page,
+      size: params.size,
+      userPreferences: {
+        favoriteCategories: params.categories || [],
+        pricePreference: "any" as const,
+        timePreference: "any" as const,
+      },
     }
 
-    if (!coordinates) {
-      // Generate deterministic coordinates based on event data for consistency
-      const seed = event.event_id || event.name || `event-${index}`
-      const hash = seed.split('').reduce((a: number, b: string) => {
-        a = ((a << 5) - a) + b.charCodeAt(0)
-        return a & a
-      }, 0)
+    const result = await searchEnhancedEvents(enhancedParams)
 
-      // Use hash to generate consistent coordinates around NYC
-      const baseLat = 40.7128
-      const baseLng = -74.006
-      const latOffset = ((hash % 1000) / 1000 - 0.5) * 0.1 // ~5km radius
-      const lngOffset = (((hash >> 10) % 1000) / 1000 - 0.5) * 0.1
-
-      coordinates = {
-        lat: baseLat + latOffset,
-        lng: baseLng + lngOffset,
-      }
-
-      logger.debug("Generated fallback coordinates", {
+    return {
+      events: result.events,
+      totalCount: result.totalCount,
+      hasMore: (result.page + 1) * (params.size || 20) < result.totalCount,
+      page: result.page,
+      source: result.sources?.join(", ") || "API",
+    }
+  } catch (error) {
+    logger.error(
+      "API search error",
+      {
         component: "event-actions",
-        action: "fallback_coordinates",
-        metadata: { eventId: event.event_id, coordinates }
+        action: "api_search_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    throw error
+  }
+}
+
+/**
+ * Store events in database for future use
+ */
+async function storeEventsInDatabase(events: EventDetailProps[]): Promise<void> {
+  try {
+    const dbEvents = events.map(transformEventDetailToDatabaseEvent)
+
+    // Use bulk insert for better performance
+    const result = await eventRepository.bulkInsertEvents(dbEvents)
+
+    if (result.error) {
+      logger.warn("Failed to store some events in database", {
+        component: "event-actions",
+        action: "store_events_warning",
+        metadata: { error: result.error },
+      })
+    } else {
+      logger.info("Successfully stored events in database", {
+        component: "event-actions",
+        action: "store_events_success",
+        metadata: { count: result.data?.length || 0 },
       })
     }
-
-    // Generate stable ID using better hashing
-    let eventId: number
-    if (event.event_id) {
-      // Create a stable hash from event_id
-      eventId = Math.abs(event.event_id.split('').reduce((a: number, b: string) => {
-        a = ((a << 5) - a) + b.charCodeAt(0)
-        return a & a
-      }, 0))
-    } else {
-      // Fallback to hash of name + venue + date for uniqueness
-      const uniqueString = `${event.name || ''}-${venue.name || ''}-${event.start_time || ''}-${index}`
-      eventId = Math.abs(uniqueString.split('').reduce((a: number, b: string) => {
-        a = ((a << 5) - a) + b.charCodeAt(0)
-        return a & a
-      }, 0))
-    }
-
-    const transformedEvent: EventDetailProps = {
-      id: eventId,
-      title: event.name || `Event ${index + 1}`,
-      description: event.description || "No description available.",
-      category: extractCategory(event.tags || []),
-      date: startDate.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-      time: startDate.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-      location: venue.name || "Venue TBA",
-      address: venue.full_address || "Address TBA",
-      price: (event.ticket_links && event.ticket_links.length > 0) ? "Tickets Available" : "Price TBA",
-      image: event.thumbnail || `/event-${(index % 12) + 1}.png`,
-      organizer: {
-        name: venue.name || event.publisher || "Event Organizer",
-        avatar: `/avatar-${(index % 6) + 1}.png`,
+  } catch (error) {
+    logger.error(
+      "Error storing events in database",
+      {
+        component: "event-actions",
+        action: "store_events_error",
       },
-      attendees: Math.floor(Math.random() * 1000) + 50,
-      isFavorite: false,
-      coordinates,
-    }
-
-    logger.debug("Transformed event", {
-      component: "event-actions",
-      action: "transform_event",
-      metadata: {
-        index: index + 1,
-        title: transformedEvent.title,
-        id: transformedEvent.id,
-        hasCoordinates: !!coordinates
-      }
-    })
-
-    return transformedEvent
-  })
+      error instanceof Error ? error : new Error(String(error)),
+    )
+  }
 }
 
-function extractCategory(tags: string[]): string {
-  if (!tags || tags.length === 0) return "Event"
-
-  const categoryMap: { [key: string]: string } = {
-    music: "Music",
-    concert: "Music",
-    festival: "Music",
-    art: "Arts",
-    theater: "Arts",
-    exhibition: "Arts",
-    sport: "Sports",
-    game: "Sports",
-    food: "Food",
-    restaurant: "Food",
-    business: "Business",
-    conference: "Business",
-    networking: "Business",
+/**
+ * Transform database event to EventDetailProps
+ */
+function transformDatabaseEventToEventDetail(dbEvent: any): EventDetailProps {
+  return {
+    id: dbEvent.id,
+    title: dbEvent.title || "Untitled Event",
+    description: dbEvent.description || "No description available",
+    category: dbEvent.category || "Event",
+    date: dbEvent.start_date
+      ? new Date(dbEvent.start_date).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      : "Date TBA",
+    time: dbEvent.start_date
+      ? new Date(dbEvent.start_date).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "Time TBA",
+    location: dbEvent.location_name || "Location TBA",
+    address: dbEvent.location_address || "Address TBA",
+    price:
+      dbEvent.price_min && dbEvent.price_max
+        ? `$${dbEvent.price_min} - $${dbEvent.price_max}`
+        : dbEvent.price_min
+          ? `From $${dbEvent.price_min}`
+          : "Price TBA",
+    image: dbEvent.image_url || `/event-${(dbEvent.id % 12) + 1}.png`,
+    organizer: {
+      name: dbEvent.organizer_name || "Event Organizer",
+      avatar: dbEvent.organizer_avatar || `/avatar-${(dbEvent.id % 6) + 1}.png`,
+    },
+    attendees: dbEvent.attendee_count || 0,
+    isFavorite: false, // This would be determined by user context
+    coordinates:
+      dbEvent.location_lat && dbEvent.location_lng
+        ? {
+            lat: Number(dbEvent.location_lat),
+            lng: Number(dbEvent.location_lng),
+          }
+        : undefined,
+    ticketLinks: dbEvent.ticket_links || [],
   }
-
-  for (const tag of tags) {
-    const lowerTag = tag.toLowerCase()
-    for (const [key, value] of Object.entries(categoryMap)) {
-      if (lowerTag.includes(key)) return value
-    }
-  }
-
-  return (tags[0]?.charAt(0).toUpperCase() ?? "") + (tags[0]?.slice(1) ?? "") || "Event"
 }
 
+/**
+ * Transform EventDetailProps to database event
+ */
+function transformEventDetailToDatabaseEvent(event: EventDetailProps): any {
+  return {
+    external_id: `external_${event.id}`,
+    title: event.title,
+    description: event.description,
+    category: event.category,
+    start_date: event.date && event.time ? new Date(`${event.date} ${event.time}`).toISOString() : null,
+    location_name: event.location,
+    location_address: event.address,
+    location_lat: event.coordinates?.lat,
+    location_lng: event.coordinates?.lng,
+    image_url: event.image,
+    organizer_name: event.organizer.name,
+    organizer_avatar: event.organizer.avatar,
+    attendee_count: event.attendees,
+    ticket_links: event.ticketLinks || [],
+    source_provider: "api_import",
+    popularity_score: Math.random() * 100, // Simple popularity calculation
+    is_active: true,
+  }
+}
+
+/**
+ * Generate fallback events (keeping existing implementation)
+ */
 function generateFallbackEvents(location: string, count: number): EventDetailProps[] {
   logger.info("Generating fallback events", {
     component: "event-actions",
     action: "generate_fallback",
-    metadata: { location, count }
+    metadata: { location, count },
   })
 
   const categories = ["Music", "Arts", "Sports", "Food", "Business"]
@@ -410,4 +425,92 @@ function generateFallbackEvents(location: string, count: number): EventDetailPro
       },
     }
   })
+}
+
+/**
+ * Get featured events with caching
+ */
+export async function getFeaturedEvents(limit = 20): Promise<EventDetailProps[]> {
+  try {
+    const cacheKey = `featured_events:${limit}`
+
+    const cachedEvents = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        // Try database first
+        const dbResult = await eventRepository.getPopularEvents(limit)
+        if (dbResult.data.length > 0) {
+          return dbResult.data.map(transformDatabaseEventToEventDetail)
+        }
+
+        // Fallback to API
+        const apiResult = await searchEnhancedEvents({
+          keyword: "featured popular trending concerts festivals",
+          location: "New York",
+          size: limit,
+        })
+
+        return apiResult.events
+      },
+      { ttl: 1800, namespace: "events" }, // 30 minutes
+    )
+
+    return cachedEvents || []
+  } catch (error) {
+    logger.error(
+      "Error getting featured events",
+      {
+        component: "event-actions",
+        action: "get_featured_events_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return []
+  }
+}
+
+/**
+ * Get events by category with caching
+ */
+export async function getEventsByCategory(category: string, limit = 30): Promise<EventDetailProps[]> {
+  try {
+    const cacheKey = `category_events:${category}:${limit}`
+
+    const cachedEvents = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        // Try database first
+        const dbResult = await eventRepository.getEventsByCategory(category, limit)
+        if (dbResult.data.length > 0) {
+          return dbResult.data.map(transformDatabaseEventToEventDetail)
+        }
+
+        // Fallback to API
+        const apiResult = await searchEnhancedEvents({
+          keyword: category,
+          location: "New York",
+          size: limit,
+          categories: [category.toLowerCase()],
+        })
+
+        return apiResult.events
+      },
+      { ttl: 1800, namespace: "events" }, // 30 minutes
+    )
+
+    return cachedEvents || []
+  } catch (error) {
+    logger.error(
+      "Error getting events by category",
+      {
+        component: "event-actions",
+        action: "get_events_by_category_error",
+        metadata: { category },
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return []
+  }
 }

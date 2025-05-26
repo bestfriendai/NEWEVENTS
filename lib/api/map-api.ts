@@ -1,4 +1,4 @@
-import { env } from "@/lib/env"
+import { API_CONFIG } from "@/lib/env"
 
 // Interface for location data
 export interface LocationData {
@@ -8,127 +8,176 @@ export interface LocationData {
   address: string
 }
 
-// Function to geocode an address using Mapbox
+// Function to geocode an address using Mapbox (primary) or TomTom (fallback)
 export async function geocodeAddress(address: string): Promise<LocationData | null> {
   try {
-    if (!env.MAPBOX_API_KEY) {
-      console.warn("Mapbox API key is not defined, using fallback geocoding")
-      return await fallbackGeocode(address)
-    }
-
     if (!address || address.trim() === "") {
       console.error("Address is required for geocoding")
       return null
     }
 
-    const encodedAddress = encodeURIComponent(address.trim())
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${env.MAPBOX_API_KEY}`
+    // Try Mapbox first
+    if (API_CONFIG.mapbox.apiKey) {
+      try {
+        const encodedAddress = encodeURIComponent(address.trim())
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${API_CONFIG.mapbox.apiKey}`
 
-    // console.log("Geocoding address:", address)
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+        if (response.ok) {
+          const data = await response.json()
 
-    if (!response.ok) {
-      console.warn(`Mapbox geocoding API error: ${response.status} ${response.statusText}, using fallback`)
-      return await fallbackGeocode(address)
+          if (data.features && data.features.length > 0) {
+            const feature = data.features[0]
+            const [lng, lat] = feature.center
+
+            return {
+              lat,
+              lng,
+              name: feature.text || address,
+              address: feature.place_name || address,
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Mapbox geocoding failed, trying TomTom:", error)
+      }
     }
 
-    const data = await response.json()
+    // Fallback to TomTom
+    if (API_CONFIG.tomtom.apiKey) {
+      try {
+        const encodedAddress = encodeURIComponent(address.trim())
+        const url = `https://api.tomtom.com/search/2/geocode/${encodedAddress}.json?key=${API_CONFIG.tomtom.apiKey}`
 
-    if (!data.features || data.features.length === 0) {
-      console.warn("No geocoding results found for address:", address)
-      return await fallbackGeocode(address)
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          if (data.results && data.results.length > 0) {
+            const result = data.results[0]
+            const { lat, lon: lng } = result.position
+
+            return {
+              lat,
+              lng,
+              name: result.poi?.name || result.address?.freeformAddress || address,
+              address: result.address?.freeformAddress || address,
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("TomTom geocoding failed:", error)
+      }
     }
 
-    const feature = data.features[0]
-    const [lng, lat] = feature.center
-
-    const result: LocationData = {
-      lat,
-      lng,
-      name: feature.text || address,
-      address: feature.place_name || address,
-    }
-
-    // console.log("Geocoding successful:", result)
-    return result
+    // Final fallback to static coordinates
+    return await fallbackGeocode(address)
   } catch (error) {
     console.error("Error geocoding address:", error)
     return await fallbackGeocode(address)
   }
 }
 
-// Function to reverse geocode coordinates using Mapbox
+// Function to reverse geocode coordinates using Mapbox (primary) or TomTom (fallback)
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    if (!env.MAPBOX_API_KEY) {
-      console.warn("Mapbox API key is not defined, using fallback reverse geocoding")
-      return fallbackReverseGeocode(lat, lng)
-    }
-
     if (typeof lat !== "number" || typeof lng !== "number" || isNaN(lat) || isNaN(lng)) {
       console.error("Invalid coordinates for reverse geocoding:", { lat, lng })
       return "Unknown location"
     }
 
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${env.MAPBOX_API_KEY}`
+    // Try Mapbox first
+    if (API_CONFIG.mapbox.apiKey) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${API_CONFIG.mapbox.apiKey}`
 
-    // console.log("Reverse geocoding coordinates:", { lat, lng })
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+        if (response.ok) {
+          const data = await response.json()
 
-    if (!response.ok) {
-      console.warn(`Mapbox reverse geocoding API error: ${response.status} ${response.statusText}, using fallback`)
-      return fallbackReverseGeocode(lat, lng)
+          if (data.features && data.features.length > 0) {
+            const place = data.features.find(
+              (f: any) => f.place_type?.includes("place") || f.place_type?.includes("locality"),
+            )
+            const neighborhood = data.features.find((f: any) => f.place_type?.includes("neighborhood"))
+            const region = data.features.find((f: any) => f.place_type?.includes("region"))
+
+            if (place) {
+              return place.text
+            } else if (neighborhood) {
+              return neighborhood.text
+            } else if (region) {
+              return region.text
+            } else if (data.features[0]) {
+              return data.features[0].place_name || data.features[0].text || "Unknown location"
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Mapbox reverse geocoding failed, trying TomTom:", error)
+      }
     }
 
-    const data = await response.json()
+    // Fallback to TomTom
+    if (API_CONFIG.tomtom.apiKey) {
+      try {
+        const url = `https://api.tomtom.com/search/2/reverseGeocode/${lat},${lng}.json?key=${API_CONFIG.tomtom.apiKey}`
 
-    if (!data.features || data.features.length === 0) {
-      console.warn("No reverse geocoding results found for coordinates:", { lat, lng })
-      return fallbackReverseGeocode(lat, lng)
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          if (data.addresses && data.addresses.length > 0) {
+            const address = data.addresses[0]
+            return (
+              address.address?.municipality ||
+              address.address?.countrySubdivision ||
+              address.address?.country ||
+              "Unknown location"
+            )
+          }
+        }
+      } catch (error) {
+        console.warn("TomTom reverse geocoding failed:", error)
+      }
     }
 
-    // Try to get a meaningful place name
-    const place = data.features.find((f: any) => f.place_type?.includes("place") || f.place_type?.includes("locality"))
-    const neighborhood = data.features.find((f: any) => f.place_type?.includes("neighborhood"))
-    const region = data.features.find((f: any) => f.place_type?.includes("region"))
-
-    let locationName = "Unknown location"
-
-    if (place) {
-      locationName = place.text
-    } else if (neighborhood) {
-      locationName = neighborhood.text
-    } else if (region) {
-      locationName = region.text
-    } else if (data.features[0]) {
-      locationName = data.features[0].place_name || data.features[0].text || "Unknown location"
-    }
-
-    // console.log("Reverse geocoding successful:", locationName)
-    return locationName
+    return fallbackReverseGeocode(lat, lng)
   } catch (error) {
     console.error("Error reverse geocoding:", error)
     return fallbackReverseGeocode(lat, lng)
   }
 }
 
-// Function to get nearby places using Mapbox
+// Function to get nearby places using TomTom
 export async function getNearbyPlaces(lat: number, lng: number, category: string, limit = 10): Promise<LocationData[]> {
   try {
-    if (!env.MAPBOX_API_KEY) {
-      console.warn("Mapbox API key is not defined, returning empty results")
+    if (!API_CONFIG.tomtom.apiKey) {
+      console.warn("TomTom API key is not defined, returning empty results")
       return []
     }
 
@@ -138,7 +187,7 @@ export async function getNearbyPlaces(lat: number, lng: number, category: string
     }
 
     const encodedCategory = encodeURIComponent(category)
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedCategory}.json?proximity=${lng},${lat}&limit=${limit}&access_token=${env.MAPBOX_API_KEY}`
+    const url = `https://api.tomtom.com/search/2/poiSearch/${encodedCategory}.json?key=${API_CONFIG.tomtom.apiKey}&lat=${lat}&lon=${lng}&radius=5000&limit=${limit}`
 
     const response = await fetch(url, {
       method: "GET",
@@ -148,25 +197,22 @@ export async function getNearbyPlaces(lat: number, lng: number, category: string
     })
 
     if (!response.ok) {
-      console.warn(`Mapbox nearby places API error: ${response.status} ${response.statusText}`)
+      console.warn(`TomTom nearby places API error: ${response.status} ${response.statusText}`)
       return []
     }
 
     const data = await response.json()
 
-    if (!data.features || data.features.length === 0) {
+    if (!data.results || data.results.length === 0) {
       return []
     }
 
-    return data.features.map((feature: any) => {
-      const [featureLng, featureLat] = feature.center
-      return {
-        lat: featureLat,
-        lng: featureLng,
-        name: feature.text || "",
-        address: feature.place_name || "",
-      }
-    })
+    return data.results.map((result: any) => ({
+      lat: result.position.lat,
+      lng: result.position.lon,
+      name: result.poi?.name || result.address?.freeformAddress || "",
+      address: result.address?.freeformAddress || "",
+    }))
   } catch (error) {
     console.error("Error getting nearby places:", error)
     return []

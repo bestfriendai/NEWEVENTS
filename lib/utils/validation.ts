@@ -1,493 +1,189 @@
 /**
- * Runtime validation utilities for API responses and user input
+ * Enhanced Validation Utilities
+ * Provides comprehensive validation schemas and utilities
  */
 
-import { logger } from "@/lib/utils/logger"
-import DOMPurify from 'dompurify'
+import { z } from "zod"
 
-export interface ValidationResult {
-  isValid: boolean
-  errors: string[]
-  data?: unknown
-}
+// Common validation schemas
+export const EmailSchema = z.string().email("Invalid email address")
 
-export interface ValidationRule<T> {
-  validate: (value: T) => boolean
-  message: string
-}
+export const PasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
 
-export interface EventDetailOrganizer {
-  name: string;
-  avatar: string;
-}
+export const PhoneSchema = z.string().regex(/^\+?[\d\s\-$$$$]+$/, "Invalid phone number format")
 
-export interface EventDetailCoordinates {
-  lat: number;
-  lng: number;
-}
+export const URLSchema = z.string().url("Invalid URL format")
 
-export interface EventDetailType {
-  id: number;
-  title: string;
-  description: string;
-  category: string;
-  date: string;
-  time: string;
-  location: string;
-  address: string;
-  price: string; // Consider union: number | string if "Free" or "$10"
-  image: string; // URL
-  organizer: EventDetailOrganizer;
-  attendees: number;
-  isFavorite: boolean;
-  coordinates?: EventDetailCoordinates;
-}
+export const CoordinatesSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+})
 
-export interface SearchParamsType {
-  keyword?: string;
-  location?: string;
-  radius?: number;
-  startDateTime?: string;
-  endDateTime?: string;
-  categories?: string[]; // Assuming string array based on common usage
-  page?: number;
-  size?: number;
-  sort?: string;
-}
-/**
- * Basic validation functions
- */
-export const validators = {
-  required: <T>(value: T): true | string => {
-    if (value === null || value === undefined) return "Value is required"
-    if (typeof value === 'string' && value.trim().length === 0) return "Value is required"
-    if (Array.isArray(value) && value.length === 0) return "Value is required"
-    return true
-  },
+// Event validation schemas
+export const EventSearchSchema = z.object({
+  keyword: z.string().min(1).max(200).optional(),
+  location: z.string().min(1).max(200).optional(),
+  radius: z.number().min(1).max(100).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  categories: z.array(z.string().min(1).max(50)).max(10).optional(),
+  page: z.number().min(0).max(1000).optional(),
+  size: z.number().min(1).max(100).optional(),
+  sort: z.enum(["relevance", "date", "popularity", "price"]).optional(),
+})
 
-  string: (value: unknown): true | string => {
-    if (typeof value !== 'string') return "Value must be a string"
-    return true
-  },
+export const EventCreateSchema = z.object({
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  category: z.string().min(1).max(100).optional(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+  location: z.string().min(1).max(255),
+  address: z.string().max(500).optional(),
+  coordinates: CoordinatesSchema.optional(),
+  price: z
+    .object({
+      min: z.number().min(0).optional(),
+      max: z.number().min(0).optional(),
+      currency: z.string().length(3).default("USD"),
+    })
+    .optional(),
+  imageUrl: URLSchema.optional(),
+  organizer: z.object({
+    name: z.string().min(1).max(255),
+    email: EmailSchema.optional(),
+    phone: PhoneSchema.optional(),
+  }),
+  tags: z.array(z.string().min(1).max(50)).max(20).optional(),
+  ticketLinks: z.array(URLSchema).max(10).optional(),
+})
 
-  number: (value: unknown): true | string => {
-    const strValue = String(value).trim();
-    if (strValue === "") {
-        return "Numeric value cannot be an empty string";
-    }
-    const parsedValue = parseFloat(strValue);
-    if (isNaN(parsedValue)) {
-      return "Value must be a valid numeric representation";
-    }
-    return true;
-  },
+// User validation schemas
+export const UserProfileSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  email: EmailSchema,
+  phone: PhoneSchema.optional(),
+  location: z
+    .object({
+      name: z.string().min(1).max(255),
+      coordinates: CoordinatesSchema,
+    })
+    .optional(),
+  preferences: z
+    .object({
+      categories: z.array(z.string()).max(20).optional(),
+      priceRange: z.enum(["free", "low", "medium", "high", "any"]).optional(),
+      timePreference: z.enum(["morning", "afternoon", "evening", "night", "any"]).optional(),
+      radius: z.number().min(1).max(100).optional(),
+      notifications: z
+        .object({
+          email: z.boolean().default(true),
+          push: z.boolean().default(true),
+          sms: z.boolean().default(false),
+        })
+        .optional(),
+    })
+    .optional(),
+})
 
-  integer: (value: unknown): true | string => {
-    const strValue = String(value).trim();
-    if (strValue === "") {
-        return "Integer value cannot be an empty string";
-    }
-    const parsedValue = parseFloat(strValue);
+export const UserPreferencesSchema = z.object({
+  favoriteCategories: z.array(z.string()).max(20).default([]),
+  pricePreference: z.enum(["free", "low", "medium", "high", "any"]).default("any"),
+  timePreference: z.enum(["morning", "afternoon", "evening", "night", "any"]).default("any"),
+  radiusPreference: z.number().min(1).max(100).default(25),
+  notificationSettings: z
+    .object({
+      email: z.boolean().default(true),
+      push: z.boolean().default(true),
+      sms: z.boolean().default(false),
+      frequency: z.enum(["immediate", "daily", "weekly"]).default("daily"),
+    })
+    .default({}),
+})
 
-    if (isNaN(parsedValue)) {
-      return "Value must be a valid numeric representation for an integer";
-    }
-    if (!Number.isInteger(parsedValue)) {
-      return "Value must be a whole number (integer)";
-    }
-    return true;
-  },
+// API validation schemas
+export const PaginationSchema = z.object({
+  page: z.number().min(0).default(0),
+  size: z.number().min(1).max(100).default(20),
+  sort: z.string().optional(),
+  order: z.enum(["asc", "desc"]).default("desc"),
+})
 
-  boolean: (value: unknown): true | string => {
-    if (typeof value !== 'boolean') return "Value must be a boolean"
-    return true
-  },
+export const FilterSchema = z.object({
+  field: z.string().min(1),
+  operator: z.enum(["eq", "ne", "gt", "gte", "lt", "lte", "in", "like", "ilike"]),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+})
 
-  array: (value: unknown): true | string => {
-    if (!Array.isArray(value)) return "Value must be an array"
-    return true
-  },
-
-  object: (value: unknown): true | string => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return "Value must be an object"
-    return true
-  },
-
-  email: (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string by schema type validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(value)) return "Invalid email format"
-    return true
-  },
-
-  url: (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string
-    try {
-      new URL(value)
-      return true
-    } catch {
-      return "Invalid URL format"
-    }
-  },
-
-  // This internal helper is not directly exposed or used in schemas,
-  // but its logic will be incorporated into latitude/longitude.
-  // For direct use, it would also return true | string.
-  // coordinate: (value: number): true | string => {
-  //   if (!(typeof value === 'number' && !isNaN(value) && isFinite(value))) return "Coordinate must be a finite number";
-  //   return true;
-  // },
-
-  latitude: (value: number): true | string => {
-    if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) return "Latitude must be a finite number"
-    if (value < -90 || value > 90) return "Latitude must be between -90 and 90"
-    return true
-  },
-
-  longitude: (value: number): true | string => {
-    if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) return "Longitude must be a finite number"
-    if (value < -180 || value > 180) return "Longitude must be between -180 and 180"
-    return true
-  },
-
-  dateString: (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string
-    const date = new Date(value)
-    if (isNaN(date.getTime())) return "Invalid date format"
-    return true
-  },
-
-  positiveNumber: (value: number): true | string => {
-    // Assuming `value` is already confirmed to be a number
-    if (value <= 0) return "Value must be a positive number"
-    return true
-  },
-
-  nonNegativeNumber: (value: number): true | string => {
-    // Assuming `value` is already confirmed to be a number
-    if (value < 0) return "Value must be a non-negative number"
-    return true
-  },
-
-  minLength: (min: number) => (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string
-    if (value.length < min) return `Value must be at least ${min} characters long`
-    return true
-  },
-
-  maxLength: (max: number) => (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string
-    if (value.length > max) return `Value must be at most ${max} characters long`
-    return true
-  },
-
-  range: (min: number, max: number) => (value: number): true | string => {
-    // Assuming `value` is already confirmed to be a number
-    if (value < min || value > max) return `Value must be between ${min} and ${max}`
-    return true
-  },
-
-  oneOf: <T>(options: T[]) => (value: T): true | string => {
-    if (!options.includes(value)) return `Value must be one of: ${options.join(', ')}`
-    return true
-  },
-
-  pattern: (regex: RegExp) => (value: string): true | string => {
-    // Assuming `value` is already confirmed to be a string
-    if (!regex.test(value)) return "Value does not match the required pattern"
-    return true
-  }
-}
-
-/**
- * Schema-based validator
- */
-export interface ValidationSchema {
-  [key: string]: {
-    required?: boolean
-    type?: "string" | "number" | "boolean" | "array" | "object"
-    validator?: (value: unknown) => true | string
-    message?: string
-    nested?: ValidationSchema
-  }
-}
-
-export class SchemaValidator {
-  validate(data: Record<string, unknown>, schema: ValidationSchema): ValidationResult {
-    const errors: string[] = []
-
-    if (!validators.object(data)) {
-      return {
-        isValid: false,
-        errors: ["Data must be an object"],
-      }
-    }
-
-    for (const [key, rules] of Object.entries(schema)) {
-      const value = data[key]
-
-      // Check required fields
-      if (rules.required && !validators.required(value)) {
-        errors.push(`${key} is required`)
-        continue
-      }
-
-      // Skip validation if field is not required and not present
-      if (!rules.required && (value === undefined || value === null)) {
-        continue
-      }
-
-      // Type validation
-      if (rules.type) {
-        const typeValidator = validators[rules.type]
-        const typeValidationResult = typeValidator(value)
-        if (typeof typeValidationResult === 'string') {
-          errors.push(rules.message || typeValidationResult)
-          continue
-        }
-        // If typeValidationResult is true, validation passed.
-      }
-
-      // Custom validator
-      if (rules.validator) {
-        const customValidationResult = rules.validator(value)
-        if (typeof customValidationResult === 'string') {
-          errors.push(rules.message || customValidationResult)
-          continue
-        }
-        // If customValidationResult is true, validation passed.
-      }
-
-      // Nested object validation
-      if (rules.nested && validators.object(value)) {
-        const nestedResult = this.validate(value, rules.nested)
-        if (!nestedResult.isValid) {
-          errors.push(...nestedResult.errors.map((error) => `${key}.${error}`))
-        }
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      data: errors.length === 0 ? data : undefined,
-    }
-  }
-}
-
-/**
- * API response validators
- */
-
-const eventDetailValidationSchema: ValidationSchema = {
-  id: { required: true, type: "number" },
-  title: { required: true, type: "string", validator: validators.minLength(1) },
-  description: { required: true, type: "string" },
-  category: { required: true, type: "string" },
-  date: { required: true, type: "string", validator: validators.dateString },
-  time: { required: true, type: "string" },
-  location: { required: true, type: "string" },
-  address: { required: true, type: "string" },
-  price: { required: true, type: "string" },
-  image: { required: true, type: "string", validator: validators.url },
-  organizer: {
-    required: true,
-    type: "object",
-    nested: {
-      name: { required: true, type: "string" },
-      avatar: { required: true, type: "string" },
-    },
-  },
-  attendees: { required: true, type: "number", validator: validators.nonNegativeNumber },
-  isFavorite: { required: true, type: "boolean" },
-  coordinates: {
-    required: false,
-    type: "object",
-    nested: {
-      lat: { required: true, type: "number", validator: validators.latitude },
-      lng: { required: true, type: "number", validator: validators.longitude },
-    },
-  },
-}
-
-const searchParamsValidationSchema: ValidationSchema = {
-  keyword: { required: false, type: "string" },
-  location: { required: false, type: "string" },
-  radius: { required: false, type: "number", validator: validators.positiveNumber },
-  startDateTime: { required: false, type: "string", validator: validators.dateString },
-  endDateTime: { required: false, type: "string", validator: validators.dateString },
-  categories: { required: false, type: "array" },
-  page: { required: false, type: "number", validator: validators.nonNegativeNumber },
-  size: { required: false, type: "number", validator: validators.range(1, 100) },
-  sort: { required: false, type: "string" },
-}
-
-const coordinatesValidationSchema: ValidationSchema = {
-  lat: { required: true, type: "number", validator: validators.latitude },
-  lng: { required: true, type: "number", validator: validators.longitude },
-}
-
-const apiResponseValidationSchema: ValidationSchema = {
-  events: { required: true, type: "array" },
-  totalCount: { required: true, type: "number", validator: validators.nonNegativeNumber },
-  page: { required: true, type: "number", validator: validators.nonNegativeNumber },
-  totalPages: { required: true, type: "number", validator: validators.nonNegativeNumber },
-  sources: { required: false, type: "array" },
-}
-
-export const apiValidators = {
-  eventDetail: (data: unknown): ValidationResult => {
-    return schemaValidator.validate(data as Record<string, unknown>, eventDetailValidationSchema)
-  },
-
-  searchParams: (data: unknown): ValidationResult => {
-    return schemaValidator.validate(data as Record<string, unknown>, searchParamsValidationSchema)
-  },
-
-  coordinates: (data: unknown): ValidationResult => {
-    return schemaValidator.validate(data as Record<string, unknown>, coordinatesValidationSchema)
-  },
-
-  apiResponse: (data: unknown): ValidationResult => {
-    return schemaValidator.validate(data as Record<string, unknown>, apiResponseValidationSchema)
-  },
-}
-
-/**
- * Sanitization functions
- */
-export const sanitizers = {
-  string: (value: unknown): string => {
-    if (typeof value === "string") return value.trim()
-    return String(value || "")
-  },
-
-  number: (value: unknown): number => {
-    const num = Number(value)
-    return isNaN(num) ? 0 : num
-  },
-
-  boolean: (value: unknown): boolean => {
-    if (typeof value === "boolean") return value
-    if (typeof value === "string") {
-      return value.toLowerCase() === "true" || value === "1"
-    }
-    return Boolean(value)
-  },
-
-  array: (value: unknown): unknown[] => {
-    if (Array.isArray(value)) return value
-    if (value === null || value === undefined) return []
-    return [value]
-  },
-
-  coordinates: (lat: unknown, lng: unknown): { lat: number; lng: number } | null => {
-    const numLat = sanitizers.number(lat)
-    const numLng = sanitizers.number(lng)
-
-    const latValidation = validators.latitude(numLat)
-    const lngValidation = validators.longitude(numLng)
-
-    if (latValidation === true && lngValidation === true) {
-      return { lat: numLat, lng: numLng }
-    }
-
-    return null
-  },
-
-  url: (value: unknown): string => {
-    const str = sanitizers.string(value)
-    if (!str) return ""
-
-    // Add protocol if missing
-    if (str.startsWith("//")) return `https:${str}`
-    if (!str.startsWith("http://") && !str.startsWith("https://")) {
-      return `https://${str}`
-    }
-
-    return str
-  },
-
-  html: (value: unknown): string => {
-    const str = sanitizers.string(value)
-    // Ensure DOMPurify is used in a browser-like environment or with a JSDOM setup for server-side.
-    if (typeof window === 'undefined') {
-      // Fallback for non-browser environments if JSDOM isn't used.
-      logger.warn('DOMPurify is being used in a non-browser environment without JSDOM. Falling back to basic sanitization.', {
-        component: 'sanitizers.html',
-        action: 'sanitize_fallback'
-      })
-      // Basic escaping as a fallback
-      return str
-        .replace(/&/g, "&")
-        .replace(/</g, "<")
-        .replace(/>/g, ">")
-        .replace(/"/g, '"') 
-        .replace(/'/g, "&#x27;");
-    }
-    return DOMPurify.sanitize(str, { USE_PROFILES: { html: true } });
-  },
-}
-
-/**
- * Validation helper functions
- */
-export const validateAndSanitize = <T>(
+// Validation utility functions
+export function validateAndTransform<T>(
+  schema: z.ZodSchema<T>,
   data: unknown,
-  validator: (data: unknown) => ValidationResult,
-  sanitizer?: (data: unknown) => T,
-  componentName?: string,
-  actionName?: string
-): { isValid: boolean; data?: T; errors: string[] } => {
+): {
+  success: boolean
+  data?: T
+  errors?: string[]
+} {
   try {
-    // Sanitize first if sanitizer provided
-    const sanitizedData = sanitizer ? sanitizer(data) : data
-    
-    // Then validate
-    const result = validator(sanitizedData)
-    
-    if (result.isValid) {
+    const result = schema.safeParse(data)
+
+    if (result.success) {
       return {
-        isValid: true,
-        data: (result.data || sanitizedData) as T,
-        errors: []
+        success: true,
+        data: result.data,
       }
-    }
-    
-    return {
-      isValid: false,
-      errors: result.errors
+    } else {
+      return {
+        success: false,
+        errors: result.error.errors.map((err) => `${err.path.join(".")}: ${err.message}`),
+      }
     }
   } catch (error) {
-    logger.error('Validation error', {
-      component: componentName || 'validation',
-      action: actionName || 'validate_and_sanitize_error'
-    }, error instanceof Error ? error : new Error('Unknown validation error'))
-    
     return {
-      isValid: false,
-      errors: ['Validation failed due to unexpected error']
+      success: false,
+      errors: ["Validation failed with unexpected error"],
     }
   }
 }
 
-/**
- * Type guards for common types
- */
-export const isEventDetail = (data: unknown): data is EventDetailType => {
-  const result = apiValidators.eventDetail(data)
-  return result.isValid
+export function createValidationMiddleware<T>(schema: z.ZodSchema<T>) {
+  return (data: unknown) => {
+    const result = validateAndTransform(schema, data)
+    if (!result.success) {
+      throw new Error(`Validation failed: ${result.errors?.join(", ")}`)
+    }
+    return result.data!
+  }
 }
 
-export const isCoordinates = (data: unknown): data is { lat: number; lng: number } => {
-  const result = apiValidators.coordinates(data)
-  return result.isValid
+// Custom validation helpers
+export const isValidEventDate = (date: string): boolean => {
+  const eventDate = new Date(date)
+  const now = new Date()
+  return eventDate > now && eventDate.getFullYear() <= now.getFullYear() + 5
 }
 
-export const isValidSearchParams = (data: unknown): boolean => {
-  const result = apiValidators.searchParams(data)
-  return result.isValid
+export const isValidCoordinates = (lat: number, lng: number): boolean => {
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
 }
 
-// Create validator instance
-export const schemaValidator = new SchemaValidator()
+export const sanitizeSearchQuery = (query: string): string => {
+  return query
+    .trim()
+    .replace(/[<>]/g, "") // Remove potential HTML
+    .replace(/['"]/g, "") // Remove quotes
+    .substring(0, 200) // Limit length
+}
+
+export const normalizeCategory = (category: string): string => {
+  return category
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+}

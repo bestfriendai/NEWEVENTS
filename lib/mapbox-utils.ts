@@ -28,6 +28,10 @@ export function loadMapbox(): Promise<any> {
     // Check if already loaded
     if (window.mapboxgl) {
       mapboxLoaded = true
+      // Ensure access token is set
+      if (env.NEXT_PUBLIC_MAPBOX_API_KEY) {
+        window.mapboxgl.accessToken = env.NEXT_PUBLIC_MAPBOX_API_KEY
+      }
       resolve(window.mapboxgl)
       return
     }
@@ -46,9 +50,12 @@ export function loadMapbox(): Promise<any> {
     script.onload = () => {
       if ((window as any).mapboxgl) {
         mapboxLoaded = true
-        // Set the access token
-        if (env.MAPBOX_API_KEY) {
-          (window as any).mapboxgl.accessToken = env.MAPBOX_API_KEY
+        // Set the access token immediately after loading
+        if (env.NEXT_PUBLIC_MAPBOX_API_KEY) {
+          ;(window as any).mapboxgl.accessToken = env.NEXT_PUBLIC_MAPBOX_API_KEY
+        } else {
+          reject(new Error("Mapbox API key is not configured"))
+          return
         }
         resolve((window as any).mapboxgl)
       } else {
@@ -86,23 +93,29 @@ export function getMapbox(): any | null {
 /**
  * Create a map safely with error handling
  */
-export async function createMap(
-  container: HTMLElement | string,
-  options: any = {}
-): Promise<any> {
+export async function createMap(container: HTMLElement | string, options: any = {}): Promise<any> {
   try {
     const mapboxgl = await loadMapbox()
-    
+
+    // Double-check that the access token is set
+    if (!mapboxgl.accessToken && env.NEXT_PUBLIC_MAPBOX_API_KEY) {
+      mapboxgl.accessToken = env.NEXT_PUBLIC_MAPBOX_API_KEY
+    }
+
+    if (!mapboxgl.accessToken) {
+      throw new Error("Mapbox access token is not available")
+    }
+
     const defaultOptions = {
       style: "mapbox://styles/mapbox/dark-v11",
       center: [0, 20],
       zoom: 2,
-      ...options
+      ...options,
     }
 
     return new mapboxgl.Map({
       container,
-      ...defaultOptions
+      ...defaultOptions,
     })
   } catch (error) {
     console.error("Error creating map:", error)
@@ -146,7 +159,7 @@ export function useMapbox() {
     getMapbox,
     createMap,
     createMarker,
-    createPopup
+    createPopup,
   }
 }
 
