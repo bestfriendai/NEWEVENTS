@@ -3,6 +3,7 @@ import { searchTicketmasterEvents, getTicketmasterEventDetails } from "@/lib/api
 import { logger, measurePerformance, formatErrorMessage } from "@/lib/utils/logger"
 import { memoryCache } from "@/lib/utils/cache"
 import { serverEnv } from "@/lib/env"
+import { calculateDistance } from "@/lib/utils/event-utils"
 
 // Enhanced interface for search parameters
 export interface EventSearchParams {
@@ -700,7 +701,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       allEvents = applyFilters(allEvents, params)
 
       // Sort events
-      allEvents = sortEvents(allEvents, params.sort || "date")
+      allEvents = sortEvents(allEvents, params.sort || "date", params.coordinates)
 
       // Apply pagination
       const page = params.page || 0
@@ -808,6 +809,56 @@ function removeDuplicateEvents(events: EventDetailProps[]): EventDetailProps[] {
 function applyFilters(events: EventDetailProps[], params: EventSearchParams): EventDetailProps[] {
   let filtered = events
 
+  // Apply geographic filtering based on coordinates and radius
+  if (params.coordinates && params.radius) {
+    const { lat: userLat, lng: userLng } = params.coordinates
+    const radiusInMiles = params.radius
+
+    filtered = filtered.filter((event) => {
+      // Skip events without coordinates
+      if (!event.coordinates) {
+        logger.debug("Event missing coordinates, excluding from geographic filter", {
+          eventTitle: event.title,
+          eventLocation: event.location,
+        })
+        return false
+      }
+
+      const distance = calculateDistance(
+        userLat,
+        userLng,
+        event.coordinates.lat,
+        event.coordinates.lng
+      )
+
+      const withinRadius = distance <= radiusInMiles
+
+      if (!withinRadius) {
+        logger.debug("Event outside radius, filtering out", {
+          eventTitle: event.title,
+          distance: Math.round(distance * 10) / 10,
+          radius: radiusInMiles,
+          userLocation: { lat: userLat, lng: userLng },
+          eventLocation: event.coordinates,
+        })
+      }
+
+      return withinRadius
+    })
+
+    logger.info("Geographic filtering applied", {
+      component: "events-api",
+      action: "geographic_filter",
+      metadata: {
+        originalCount: events.length,
+        filteredCount: filtered.length,
+        userLocation: params.coordinates,
+        radius: radiusInMiles,
+        eventsRemoved: events.length - filtered.length,
+      },
+    })
+  }
+
   // Apply price range filtering
   if (params.priceRange) {
     filtered = filtered.filter((event) => {
@@ -840,7 +891,7 @@ function applyFilters(events: EventDetailProps[], params: EventSearchParams): Ev
 }
 
 // Sort events
-function sortEvents(events: EventDetailProps[], sortBy: string): EventDetailProps[] {
+function sortEvents(events: EventDetailProps[], sortBy: string, userLocation?: { lat: number; lng: number }): EventDetailProps[] {
   const sortedEvents = [...events]
 
   switch (sortBy) {
@@ -849,6 +900,21 @@ function sortEvents(events: EventDetailProps[], sortBy: string): EventDetailProp
         const dateA = new Date(a.date)
         const dateB = new Date(b.date)
         return dateA.getTime() - dateB.getTime()
+      })
+
+    case "distance":
+      if (!userLocation) {
+        logger.warn("Distance sorting requested but no user location provided")
+        return sortedEvents
+      }
+      return sortedEvents.sort((a, b) => {
+        const distanceA = a.coordinates
+          ? calculateDistance(userLocation.lat, userLocation.lng, a.coordinates.lat, a.coordinates.lng)
+          : Number.MAX_VALUE
+        const distanceB = b.coordinates
+          ? calculateDistance(userLocation.lat, userLocation.lng, b.coordinates.lat, b.coordinates.lng)
+          : Number.MAX_VALUE
+        return distanceA - distanceB
       })
 
     case "popularity":

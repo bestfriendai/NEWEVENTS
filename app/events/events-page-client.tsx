@@ -28,6 +28,24 @@ import type { EventDetailProps } from "@/components/event-detail-modal"
 import { logger } from "@/lib/utils/logger"
 import Image from "next/image"
 
+// Add CSS for pulse animation
+const pulseKeyframes = `
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.3;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0.3;
+    }
+  }
+`
+
 // Real Mapbox Map Component
 function MapboxMap({
   center,
@@ -35,6 +53,7 @@ function MapboxMap({
   events,
   selectedEventId,
   onEventSelect,
+  userLocation,
   className,
 }: {
   center: { lat: number; lng: number }
@@ -42,6 +61,7 @@ function MapboxMap({
   events: EventDetailProps[]
   selectedEventId: number | null
   onEventSelect: (event: EventDetailProps) => void
+  userLocation?: { lat: number; lng: number; name: string } | null
   className?: string
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -141,9 +161,6 @@ function MapboxMap({
     })
     markersRef.current = []
 
-    // Don't proceed if no events or mapbox not available
-    if (events.length === 0) return
-
     // Get Mapbox GL from the imported module or window
     let mapboxgl
     try {
@@ -155,7 +172,85 @@ function MapboxMap({
       return
     }
 
-    // Add new markers
+    // Add user location marker first (if available)
+    if (userLocation) {
+      try {
+        const userMarkerElement = document.createElement("div")
+        userMarkerElement.className = "user-location-marker"
+        userMarkerElement.innerHTML = `
+          <div style="
+            width: 24px;
+            height: 24px;
+            background-color: #3B82F6;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+          ">
+            <div style="
+              width: 8px;
+              height: 8px;
+              background-color: white;
+              border-radius: 50%;
+            "></div>
+            <div style="
+              position: absolute;
+              width: 24px;
+              height: 24px;
+              background-color: #3B82F6;
+              border-radius: 50%;
+              opacity: 0.3;
+              animation: pulse 2s infinite;
+            "></div>
+          </div>
+        `
+
+        const userMarker = new mapboxgl.Marker(userMarkerElement)
+          .setLngLat([userLocation.lng, userLocation.lat])
+          .addTo(mapRef.current)
+
+        // Add popup for user location
+        const userPopup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          closeOnClick: false,
+          className: "user-location-popup",
+        }).setHTML(`
+          <div style="padding: 8px; font-family: system-ui;">
+            <div style="font-weight: 600; font-size: 12px; color: #3B82F6; margin-bottom: 2px;">
+              📍 Your Location
+            </div>
+            <div style="font-size: 11px; color: #6b7280;">
+              ${userLocation.name}
+            </div>
+          </div>
+        `)
+
+        userMarkerElement.addEventListener("mouseenter", () => {
+          userPopup.setLngLat([userLocation.lng, userLocation.lat]).addTo(mapRef.current)
+        })
+
+        userMarkerElement.addEventListener("mouseleave", () => {
+          userPopup.remove()
+        })
+
+        markersRef.current.push(userMarker)
+      } catch (error) {
+        logger.error("Failed to create user location marker", {
+          component: "MapboxMap",
+          userLocation,
+          error
+        })
+      }
+    }
+
+    // Don't proceed if no events
+    if (events.length === 0) return
+
+    // Add event markers
     events.forEach((event, index) => {
       // Use provided coordinates or generate nearby coordinates
       let coordinates = event.coordinates
@@ -268,7 +363,7 @@ function MapboxMap({
         })
       }
     })
-  }, [events, selectedEventId, mapLoaded, onEventSelect, center])
+  }, [events, selectedEventId, mapLoaded, onEventSelect, center, userLocation])
 
   if (mapError) {
     return (
@@ -287,6 +382,9 @@ function MapboxMap({
 
   return (
     <div className={`relative ${className}`}>
+      {/* Inject CSS for animations */}
+      <style dangerouslySetInnerHTML={{ __html: pulseKeyframes }} />
+
       {!mapLoaded && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
           <div className="text-center text-white">
@@ -676,6 +774,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
           events={sortedEvents}
           selectedEventId={selectedEvent?.id || null}
           onEventSelect={handleEventSelect}
+          userLocation={initialLocation}
           className="h-full w-full"
         />
 
