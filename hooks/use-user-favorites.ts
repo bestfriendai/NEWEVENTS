@@ -16,6 +16,7 @@ export interface UseFavoritesResult {
   isLoading: boolean
   isError: boolean
   error: string | null
+  isAuthenticated: boolean
 
   // Actions
   toggleFavorite: (eventId: number, optimisticEvent?: EventDetailProps) => Promise<boolean>
@@ -31,6 +32,7 @@ export function useUserFavorites(): UseFavoritesResult {
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   // Refs for optimistic updates
   const optimisticUpdatesRef = useRef<Map<number, { action: "add" | "remove"; event?: EventDetailProps }>>(new Map())
@@ -52,12 +54,51 @@ export function useUserFavorites(): UseFavoritesResult {
       const result = await getUserFavorites(100) // Load up to 100 favorites
 
       if (!result.success) {
+        // Check if it's an authentication error
+        if (result.error?.includes("not authenticated") || result.error?.includes("User not found")) {
+          logger.info("User not authenticated for favorites", {
+            component: "useUserFavorites",
+            action: "load_favorites_not_authenticated",
+          })
+          setIsAuthenticated(false)
+          setFavorites([])
+          setFavoriteIds(new Set())
+          return // Don't treat this as an error
+        }
+
         throw new Error(result.error || "Failed to load favorites")
       }
 
+      setIsAuthenticated(true)
       const favoritesData = result.data || []
-      const favoriteEvents = favoritesData.map((fav: any) => fav.event).filter(Boolean)
-      const favoriteEventIds = new Set(favoriteEvents.map((event: EventDetailProps) => Number(event.id)))
+
+      // Handle the case where favorites data might be in different formats
+      let favoriteEvents: EventDetailProps[] = []
+
+      if (Array.isArray(favoritesData)) {
+        favoriteEvents = favoritesData
+          .map((fav: any) => {
+            // Handle different data structures
+            if (fav.event) {
+              return fav.event
+            } else if (fav.id && fav.title) {
+              return fav // Direct event object
+            }
+            return null
+          })
+          .filter(Boolean)
+      }
+
+      const favoriteEventIds = new Set(
+        favoriteEvents
+          .map((event: EventDetailProps) => {
+            // Handle both string and number IDs
+            const id =
+              typeof event.id === "string" ? Number.parseInt(event.id.replace(/^\w+_/, ""), 10) : Number(event.id)
+            return isNaN(id) ? 0 : id
+          })
+          .filter((id) => id > 0),
+      )
 
       setFavorites(favoriteEvents)
       setFavoriteIds(favoriteEventIds)
@@ -65,7 +106,7 @@ export function useUserFavorites(): UseFavoritesResult {
       logger.info("User favorites loaded", {
         component: "useUserFavorites",
         action: "load_favorites_success",
-        metadata: { count: favoriteEvents.length },
+        metadata: { count: favoriteEvents.length, isAuthenticated: true },
       })
     } catch (error) {
       logger.error(
@@ -73,12 +114,17 @@ export function useUserFavorites(): UseFavoritesResult {
         {
           component: "useUserFavorites",
           action: "load_favorites_error",
+          metadata: {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorType: error instanceof Error ? error.constructor.name : typeof error,
+          },
         },
         error instanceof Error ? error : new Error(String(error)),
       )
 
       setIsError(true)
       setError(error instanceof Error ? error.message : "Failed to load favorites")
+      setIsAuthenticated(false)
     } finally {
       setIsLoading(false)
     }
@@ -90,6 +136,16 @@ export function useUserFavorites(): UseFavoritesResult {
   const toggleFavorite = useCallback(
     async (eventId: number, optimisticEvent?: EventDetailProps): Promise<boolean> => {
       try {
+        // Check if user is authenticated first
+        if (!isAuthenticated) {
+          logger.warn("Attempted to toggle favorite without authentication", {
+            component: "useUserFavorites",
+            action: "toggle_favorite_not_authenticated",
+            metadata: { eventId },
+          })
+          return false
+        }
+
         const numericEventId = Number(eventId)
         const currentlyFavorited = favoriteIds.has(numericEventId)
         const action = currentlyFavorited ? "remove" : "add"
@@ -115,7 +171,13 @@ export function useUserFavorites(): UseFavoritesResult {
             newSet.delete(numericEventId)
             return newSet
           })
-          setFavorites((prev) => prev.filter((event) => Number(event.id) !== numericEventId))
+          setFavorites((prev) =>
+            prev.filter((event) => {
+              const id =
+                typeof event.id === "string" ? Number.parseInt(event.id.replace(/^\w+_/, ""), 10) : Number(event.id)
+              return id !== numericEventId
+            }),
+          )
         }
 
         // Make API call
@@ -130,7 +192,13 @@ export function useUserFavorites(): UseFavoritesResult {
               return newSet
             })
             if (optimisticEvent) {
-              setFavorites((prev) => prev.filter((event) => Number(event.id) !== numericEventId))
+              setFavorites((prev) =>
+                prev.filter((event) => {
+                  const id =
+                    typeof event.id === "string" ? Number.parseInt(event.id.replace(/^\w+_/, ""), 10) : Number(event.id)
+                  return id !== numericEventId
+                }),
+              )
             }
           } else {
             setFavoriteIds((prev) => new Set([...prev, numericEventId]))
@@ -169,7 +237,7 @@ export function useUserFavorites(): UseFavoritesResult {
         return false
       }
     },
-    [favoriteIds],
+    [favoriteIds, isAuthenticated],
   )
 
   /**
@@ -177,6 +245,8 @@ export function useUserFavorites(): UseFavoritesResult {
    */
   const isFavorite = useCallback(
     (eventId: number): boolean => {
+      if (!isAuthenticated) return false
+
       const numericEventId = Number(eventId)
 
       // Check for pending optimistic updates
@@ -187,7 +257,7 @@ export function useUserFavorites(): UseFavoritesResult {
 
       return favoriteIds.has(numericEventId)
     },
-    [favoriteIds],
+    [favoriteIds, isAuthenticated],
   )
 
   /**
@@ -205,12 +275,15 @@ export function useUserFavorites(): UseFavoritesResult {
     setFavoriteIds(new Set())
     setIsError(false)
     setError(null)
+    setIsAuthenticated(false)
     optimisticUpdatesRef.current.clear()
   }, [])
 
-  // Load favorites on mount
+  // Load favorites on mount, but don't fail if user is not authenticated
   useEffect(() => {
-    loadFavorites()
+    loadFavorites().catch(() => {
+      // Silently handle the error as it's already logged in loadFavorites
+    })
   }, [loadFavorites])
 
   return {
@@ -219,6 +292,7 @@ export function useUserFavorites(): UseFavoritesResult {
     isLoading,
     isError,
     error,
+    isAuthenticated,
     toggleFavorite,
     isFavorite,
     refreshFavorites,

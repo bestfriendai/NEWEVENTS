@@ -1,6 +1,9 @@
-import { env } from "@/lib/env"
+import { serverEnv, clientEnv } from "@/lib/env"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import type { TicketmasterEvent } from "@/types"
+import { logger, measurePerformance } from "@/lib/utils/logger"
+import { withRetry, formatErrorMessage } from "@/lib/utils"
+import { memoryCache } from "@/lib/utils/cache"
 
 export interface TicketmasterSearchParams {
   keyword?: string
@@ -14,97 +17,313 @@ export interface TicketmasterSearchParams {
   classificationName?: string
 }
 
-export async function searchTicketmasterEvents(params: TicketmasterSearchParams): Promise<{
+export interface TicketmasterSearchResult {
   events: EventDetailProps[]
   totalCount: number
   page: number
   totalPages: number
   error?: string
-}> {
-  try {
-    // console.log("Searching Ticketmaster events with params:", params)
+  cached?: boolean
+  responseTime?: number
+}
 
-    const queryParams = new URLSearchParams()
-    queryParams.append("apikey", env.TICKETMASTER_API_KEY || "")
+// Rate limiter for Ticketmaster API
+class TicketmasterRateLimiter {
+  private requests: number[] = []
+  private readonly maxRequestsPerSecond = 5
+  private readonly maxRequestsPerMinute = 200
+  private readonly maxRequestsPerDay = 5000
 
-    // Location handling
-    if (params.coordinates) {
-      queryParams.append("latlong", `${params.coordinates.lat},${params.coordinates.lng}`)
-      queryParams.append("radius", (params.radius || 50).toString()) // Increased radius
-      queryParams.append("unit", "miles")
-    } else if (params.location) {
-      queryParams.append("city", params.location)
+  async waitIfNeeded(): Promise<void> {
+    const now = Date.now()
+
+    // Remove old requests
+    this.requests = this.requests.filter((time) => now - time < 24 * 60 * 60 * 1000) // 24 hours
+
+    // Check daily limit
+    if (this.requests.length >= this.maxRequestsPerDay) {
+      const oldestRequest = Math.min(...this.requests)
+      const waitTime = 24 * 60 * 60 * 1000 - (now - oldestRequest)
+      if (waitTime > 0) {
+        logger.warn("Ticketmaster daily rate limit reached", {
+          component: "ticketmaster-api",
+          action: "daily_limit_reached",
+          metadata: { waitTime },
+        })
+        throw new Error(`Daily rate limit exceeded. Reset in ${Math.ceil(waitTime / 1000 / 60)} minutes`)
+      }
     }
 
-    // Search parameters
-    if (params.keyword) queryParams.append("keyword", params.keyword)
-    if (params.startDateTime) queryParams.append("startDateTime", params.startDateTime)
-    if (params.endDateTime) queryParams.append("endDateTime", params.endDateTime)
-    if (params.classificationName) queryParams.append("classificationName", params.classificationName)
+    // Check per-minute limit
+    const recentMinuteRequests = this.requests.filter((time) => now - time < 60 * 1000)
+    if (recentMinuteRequests.length >= this.maxRequestsPerMinute) {
+      const waitTime = 60 * 1000 - (now - Math.min(...recentMinuteRequests))
+      if (waitTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, waitTime))
+      }
+    }
 
-    // Pagination - get more events
-    queryParams.append("size", (params.size || 50).toString()) // Increased from 20 to 50
-    queryParams.append("page", (params.page || 0).toString())
+    // Check per-second limit
+    const recentSecondRequests = this.requests.filter((time) => now - time < 1000)
+    if (recentSecondRequests.length >= this.maxRequestsPerSecond) {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
 
-    // Sort by date and relevance
-    queryParams.append("sort", "relevance,desc")
+    this.requests.push(now)
+  }
 
-    // Include additional data
-    queryParams.append("includeSpellcheck", "yes")
+  getUsage(): { daily: number; minute: number; second: number } {
+    const now = Date.now()
+    return {
+      daily: this.requests.filter((time) => now - time < 24 * 60 * 60 * 1000).length,
+      minute: this.requests.filter((time) => now - time < 60 * 1000).length,
+      second: this.requests.filter((time) => now - time < 1000).length,
+    }
+  }
+}
 
-    const url = `https://app.ticketmaster.com/discovery/v2/events.json?${queryParams.toString()}`
-    // console.log("Ticketmaster API URL:", url)
+const rateLimiter = new TicketmasterRateLimiter()
 
-    const response = await fetch(url)
+export async function searchTicketmasterEvents(params: TicketmasterSearchParams): Promise<TicketmasterSearchResult> {
+  return measurePerformance("searchTicketmasterEvents", async () => {
+    const startTime = Date.now()
 
-    if (!response.ok) {
-      console.error("Ticketmaster API error:", response.status, response.statusText)
-      const errorText = await response.text()
-      console.error("Ticketmaster error details:", errorText)
+    try {
+      // Get API key from server or client environment
+      const apiKey = serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY
+
+      if (!apiKey) {
+        logger.warn("Ticketmaster API key not configured")
+        return {
+          events: [],
+          totalCount: 0,
+          page: params.page || 0,
+          totalPages: 0,
+          error: "Ticketmaster API key not configured",
+          responseTime: Date.now() - startTime,
+          cached: false,
+        }
+      }
+
+      // Validate parameters
+      if (params.size && params.size > 200) {
+        params.size = 200 // Ticketmaster's maximum
+      }
+
+      // Generate cache key
+      const cacheKey = `ticketmaster:${JSON.stringify(params)}`
+
+      // Check cache first
+      const cached = memoryCache.get<TicketmasterSearchResult>(cacheKey)
+      if (cached) {
+        logger.info("Ticketmaster search cache hit", {
+          component: "ticketmaster-api",
+          action: "cache_hit",
+          metadata: { cacheKey, eventCount: cached.events.length },
+        })
+        return { ...cached, cached: true }
+      }
+
+      // Check rate limits
+      await rateLimiter.waitIfNeeded()
+
+      logger.info("Searching Ticketmaster events", {
+        component: "ticketmaster-api",
+        action: "search_events",
+        metadata: { params },
+      })
+
+      const queryParams = new URLSearchParams()
+      queryParams.append("apikey", apiKey)
+
+      // Location handling with validation
+      if (params.coordinates) {
+        if (isValidCoordinates(params.coordinates)) {
+          queryParams.append("latlong", `${params.coordinates.lat},${params.coordinates.lng}`)
+          queryParams.append("radius", Math.min(params.radius || 50, 500).toString()) // Max 500 miles
+          queryParams.append("unit", "miles")
+        } else {
+          logger.warn("Invalid coordinates provided", {
+            component: "ticketmaster-api",
+            action: "invalid_coordinates",
+            metadata: { coordinates: params.coordinates },
+          })
+        }
+      } else if (params.location) {
+        queryParams.append("city", params.location.trim())
+      }
+
+      // Search parameters with validation
+      if (params.keyword) queryParams.append("keyword", params.keyword.trim())
+      if (params.startDateTime && isValidDateTime(params.startDateTime)) {
+        queryParams.append("startDateTime", params.startDateTime)
+      }
+      if (params.endDateTime && isValidDateTime(params.endDateTime)) {
+        queryParams.append("endDateTime", params.endDateTime)
+      }
+      if (params.classificationName) {
+        queryParams.append("classificationName", params.classificationName.trim())
+      }
+
+      // Pagination with validation
+      queryParams.append("size", Math.min(params.size || 50, 200).toString())
+      queryParams.append("page", Math.max(params.page || 0, 0).toString())
+
+      // Sort and additional options
+      queryParams.append("sort", "relevance,desc")
+      queryParams.append("includeSpellcheck", "yes")
+
+      const url = `https://app.ticketmaster.com/discovery/v2/events.json?${queryParams.toString()}`
+
+      const response = await withRetry(() => fetch(url), { maxAttempts: 3, baseDelay: 1000 })
+
+      const responseTime = Date.now() - startTime
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        const error = handleTicketmasterError(response.status, errorText)
+
+        logger.error("Ticketmaster API error", {
+          component: "ticketmaster-api",
+          action: "api_error",
+          metadata: { status: response.status, error, responseTime },
+        })
+
+        return {
+          events: [],
+          totalCount: 0,
+          page: params.page || 0,
+          totalPages: 0,
+          error,
+          responseTime,
+          cached: false,
+        }
+      }
+
+      const data = await response.json()
+
+      let result: TicketmasterSearchResult
+
+      if (data._embedded && data._embedded.events) {
+        const events = data._embedded.events
+          .map((event: unknown) => {
+            try {
+              return transformTicketmasterEvent(event)
+            } catch (error) {
+              logger.warn("Failed to transform Ticketmaster event", {
+                component: "ticketmaster-api",
+                action: "transform_error",
+                metadata: { eventId: (event as any)?.id },
+              })
+              return null
+            }
+          })
+          .filter(Boolean) as EventDetailProps[]
+
+        result = {
+          events,
+          totalCount: data.page?.totalElements || events.length,
+          page: data.page?.number || 0,
+          totalPages: data.page?.totalPages || 1,
+          responseTime,
+          cached: false,
+        }
+      } else {
+        result = {
+          events: [],
+          totalCount: 0,
+          page: params.page || 0,
+          totalPages: 0,
+          responseTime,
+          cached: false,
+        }
+      }
+
+      // Cache successful results for 10 minutes
+      if (result.events.length > 0) {
+        memoryCache.set(cacheKey, result, 10 * 60 * 1000)
+      }
+
+      logger.info("Ticketmaster search completed", {
+        component: "ticketmaster-api",
+        action: "search_success",
+        metadata: {
+          eventCount: result.events.length,
+          totalCount: result.totalCount,
+          responseTime,
+        },
+      })
+
+      return result
+    } catch (error) {
+      const responseTime = Date.now() - startTime
+      const errorMessage = formatErrorMessage(error)
+
+      logger.error(
+        "Ticketmaster search failed",
+        {
+          component: "ticketmaster-api",
+          action: "search_error",
+          metadata: { params, responseTime },
+        },
+        error instanceof Error ? error : new Error(errorMessage),
+      )
+
       return {
         events: [],
         totalCount: 0,
         page: params.page || 0,
         totalPages: 0,
-        error: `Ticketmaster API error: ${response.status}`,
+        error: errorMessage,
+        responseTime,
+        cached: false,
       }
     }
+  })
+}
 
-    const data = await response.json()
-    // console.log("Ticketmaster response:", data)
+// Enhanced error handling
+function handleTicketmasterError(status: number, errorText: string): string {
+  switch (status) {
+    case 401:
+      return "Invalid Ticketmaster API key - please check your credentials"
+    case 403:
+      return "Access forbidden - check your API permissions and subscription"
+    case 429:
+      return "Rate limit exceeded - please try again later"
+    case 500:
+      return "Ticketmaster server error - please try again"
+    case 503:
+      return "Ticketmaster service temporarily unavailable"
+    default:
+      return `Ticketmaster API error ${status}: ${errorText || "Unknown error"}`
+  }
+}
 
-    if (data._embedded && data._embedded.events) {
-      const events = data._embedded.events.map((event: unknown) => transformTicketmasterEvent(event))
+// Validation helpers
+function isValidCoordinates(coords: { lat: number; lng: number }): boolean {
+  return (
+    typeof coords.lat === "number" &&
+    typeof coords.lng === "number" &&
+    coords.lat >= -90 &&
+    coords.lat <= 90 &&
+    coords.lng >= -180 &&
+    coords.lng <= 180
+  )
+}
 
-      return {
-        events,
-        totalCount: data.page?.totalElements || events.length,
-        page: data.page?.number || 0,
-        totalPages: data.page?.totalPages || 1,
-      }
-    }
-
-    return {
-      events: [],
-      totalCount: 0,
-      page: params.page || 0,
-      totalPages: 0,
-    }
-  } catch (error) {
-    console.error("Ticketmaster search error:", error)
-    return {
-      events: [],
-      totalCount: 0,
-      page: params.page || 0,
-      totalPages: 0,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
-    }
+function isValidDateTime(dateTime: string): boolean {
+  try {
+    const date = new Date(dateTime)
+    return !isNaN(date.getTime()) && date.getTime() > Date.now() - 365 * 24 * 60 * 60 * 1000 // Not older than 1 year
+  } catch {
+    return false
   }
 }
 
 interface TicketmasterImage {
   url: string
-  ratio: 'large' | 'medium' | 'small'
+  ratio: "large" | "medium" | "small"
   width: number
   height: number
 }
@@ -120,15 +339,34 @@ function getBestImage(images: TicketmasterImage[]): string {
     return bSize - aSize
   })
 
-  // Return the best quality image
-  return sortedImages[0]?.url || "/community-event.png"
+  // Validate URL
+  const bestImage = sortedImages[0]
+  if (bestImage?.url && isValidImageUrl(bestImage.url)) {
+    return bestImage.url
+  }
+
+  return "/community-event.png"
+}
+
+function isValidImageUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url)
+    return (
+      parsedUrl.protocol === "https:" &&
+      (parsedUrl.hostname.includes("ticketmaster") ||
+        parsedUrl.hostname.includes("livenation") ||
+        parsedUrl.hostname.includes("tmol-prd"))
+    )
+  } catch {
+    return false
+  }
 }
 
 function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; link: string }> {
   const links: Array<{ source: string; link: string }> = []
 
   // Primary Ticketmaster link
-  if (event.url) {
+  if (event.url && isValidUrl(event.url)) {
     links.push({
       source: "Ticketmaster",
       link: event.url,
@@ -141,7 +379,7 @@ function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; l
     const saleStart = new Date(event.sales.public.startDateTime)
     const now = new Date()
 
-    if (now >= saleStart && event.url) {
+    if (now >= saleStart && event.url && isValidUrl(event.url)) {
       links.push({
         source: "Buy Tickets",
         link: event.url,
@@ -152,7 +390,7 @@ function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; l
   // Presale links
   if (event.sales?.presales) {
     event.sales.presales.forEach((presale) => {
-      if (presale.url) {
+      if (presale.url && isValidUrl(presale.url)) {
         links.push({
           source: `${presale.name || "Presale"}`,
           link: presale.url,
@@ -161,39 +399,51 @@ function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; l
     })
   }
 
-  // Venue box office link if available
-  if (event._embedded?.venues?.[0]) {
-    const venue = event._embedded.venues[0]
-    if (venue.address?.line1) {
-      // Add venue contact info as a "link"
-      links.push({
-        source: "Box Office",
-        link: `#venue-${venue.name}`,
-      })
-    }
-  }
-
   return links
+}
+
+function isValidUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:"
+  } catch {
+    return false
+  }
 }
 
 function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
   const eventData = apiEvent as TicketmasterEvent
-  
-  // Extract venue information
-  const venue = eventData._embedded?.venues?.[0]
-  const coordinates = venue?.location
-    ? { lat: Number.parseFloat(venue.location.latitude || "0"), lng: Number.parseFloat(venue.location.longitude || "0") }
-    : { lat: 0, lng: 0 }
 
-  // Extract price information
+  // Validate required fields
+  if (!eventData.id || !eventData.name) {
+    throw new Error("Invalid event data: missing required fields")
+  }
+
+  // Extract venue information with validation
+  const venue = eventData._embedded?.venues?.[0]
+  const coordinates =
+    venue?.location &&
+    isValidCoordinates({
+      lat: Number.parseFloat(venue.location.latitude || "0"),
+      lng: Number.parseFloat(venue.location.longitude || "0"),
+    })
+      ? {
+          lat: Number.parseFloat(venue.location.latitude || "0"),
+          lng: Number.parseFloat(venue.location.longitude || "0"),
+        }
+      : undefined
+
+  // Extract price information with validation
   const priceRanges = eventData.priceRanges || []
   let price = "Price TBA"
   if (priceRanges.length > 0) {
     const range = priceRanges[0]
-    if (range.min === range.max) {
-      price = `$${range.min}`
-    } else {
-      price = `$${range.min} - $${range.max}`
+    if (typeof range.min === "number" && typeof range.max === "number") {
+      if (range.min === range.max) {
+        price = `$${range.min.toFixed(2)}`
+      } else {
+        price = `$${range.min.toFixed(2)} - $${range.max.toFixed(2)}`
+      }
     }
   }
 
@@ -206,45 +456,71 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
     price = "Free"
   }
 
-  // Extract date and time
+  // Extract date and time with validation
   const dateInfo = eventData.dates?.start
   let formattedDate = "Date TBA"
   let formattedTime = "Time TBA"
 
-  if (dateInfo?.localDate) {
-    const date = new Date(dateInfo.localDate)
-    formattedDate = date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
+  if (dateInfo?.localDate && isValidDateTime(dateInfo.localDate)) {
+    try {
+      const date = new Date(dateInfo.localDate)
+      formattedDate = date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } catch {
+      formattedDate = "Date TBA"
+    }
   }
 
   if (dateInfo?.localTime) {
     try {
       const [hours, minutes] = dateInfo.localTime.split(":")
-      const date = new Date()
-      date.setHours(Number.parseInt(hours), Number.parseInt(minutes))
-      formattedTime = date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
+      const hoursNum = Number.parseInt(hours)
+      const minutesNum = Number.parseInt(minutes)
+
+      if (
+        !isNaN(hoursNum) &&
+        !isNaN(minutesNum) &&
+        hoursNum >= 0 &&
+        hoursNum < 24 &&
+        minutesNum >= 0 &&
+        minutesNum < 60
+      ) {
+        const date = new Date()
+        date.setHours(hoursNum, minutesNum)
+        formattedTime = date.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      }
     } catch {
       formattedTime = "Time TBA"
     }
   }
 
-  // Extract category
+  // Extract category with validation
   const classifications = eventData.classifications || []
   let category = "Event"
   if (classifications.length > 0) {
     const classification = classifications[0]
     category = classification.segment?.name || classification.genre?.name || "Event"
+    // Sanitize category
+    category = category.replace(/[<>]/g, "").trim() || "Event"
   }
 
-  // Generate numeric ID
-  const numericId = Number.parseInt(eventData.id.replace(/\D/g, "")) || Math.floor(Math.random() * 10000)
+  // Generate numeric ID safely
+  const numericId = (() => {
+    try {
+      const cleanId = eventData.id.replace(/\D/g, "")
+      const parsed = Number.parseInt(cleanId)
+      return !isNaN(parsed) && parsed > 0 ? parsed : Math.floor(Math.random() * 10000)
+    } catch {
+      return Math.floor(Math.random() * 10000)
+    }
+  })()
 
   // Get the best image
   const image = getBestImage(eventData.images || [])
@@ -252,29 +528,56 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
   // Extract ticket links
   const ticketLinks = extractTicketLinks(eventData)
 
-  // Enhanced description
-  let description = eventData.info || eventData.pleaseNote || ""
-  if (eventData.promoter && eventData.promoter.description) {
-    description += ` ${eventData.promoter.description}`
+  // Enhanced description with sanitization
+  let description = ""
+  if (eventData.info) description += eventData.info
+  if (eventData.pleaseNote) {
+    if (description) description += " "
+    description += eventData.pleaseNote
   }
+  if (eventData.promoter?.description) {
+    if (description) description += " "
+    description += eventData.promoter.description
+  }
+
+  // Sanitize description
+  description = description
+    .replace(/<[^>]*>/g, "") // Remove HTML tags
+    .replace(/&[^;]+;/g, " ") // Remove HTML entities
+    .trim()
+
   if (!description) {
     description = "No description available."
   }
 
+  // Sanitize venue and address information
+  const venueName = venue?.name?.replace(/[<>]/g, "").trim() || "Venue TBA"
+  const venueAddress =
+    [
+      venue?.address?.line1?.replace(/[<>]/g, "").trim(),
+      venue?.city?.name?.replace(/[<>]/g, "").trim(),
+      venue?.state?.stateCode?.replace(/[<>]/g, "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() || "Address TBA"
+
   return {
     id: numericId,
-    title: eventData.name || "Untitled Event",
-    description: description.trim(),
+    title: eventData.name.replace(/[<>]/g, "").trim() || "Untitled Event",
+    description: description.substring(0, 500), // Limit description length
     category,
     date: formattedDate,
     time: formattedTime,
-    location: venue.name || "Venue TBA",
-    address:
-      `${venue.address?.line1 || ""} ${venue.city?.name || ""} ${venue.state?.stateCode || ""}`.trim() || "Address TBA",
+    location: venueName,
+    address: venueAddress,
     price,
     image,
     organizer: {
-      name: eventData._embedded?.attractions?.[0]?.name || eventData.promoter?.name || "Event Organizer",
+      name:
+        eventData._embedded?.attractions?.[0]?.name?.replace(/[<>]/g, "").trim() ||
+        eventData.promoter?.name?.replace(/[<>]/g, "").trim() ||
+        "Event Organizer",
       avatar: eventData._embedded?.attractions?.[0]?.images?.[0]?.url || "/avatar-1.png",
     },
     attendees: Math.floor(Math.random() * 1000) + 50,
@@ -285,23 +588,96 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
 }
 
 export async function getTicketmasterEventDetails(eventId: string): Promise<EventDetailProps | null> {
-  try {
-    const queryParams = new URLSearchParams()
-    queryParams.append("apikey", env.TICKETMASTER_API_KEY || "")
+  return measurePerformance("getTicketmasterEventDetails", async () => {
+    try {
+      // Get API key from server or client environment
+      const apiKey = serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY
 
-    const response = await fetch(
-      `https://app.ticketmaster.com/discovery/v2/events/${eventId}.json?${queryParams.toString()}`,
-    )
+      if (!apiKey) {
+        logger.warn("Ticketmaster API key not configured")
+        return null
+      }
 
-    if (!response.ok) {
-      console.error("Ticketmaster event details error:", response.status, response.statusText)
+      // Validate event ID
+      if (!eventId || typeof eventId !== "string" || eventId.trim().length === 0) {
+        logger.warn("Invalid event ID provided", {
+          component: "ticketmaster-api",
+          action: "invalid_event_id",
+          metadata: { eventId },
+        })
+        return null
+      }
+
+      const cleanEventId = eventId.trim()
+      const cacheKey = `ticketmaster_event:${cleanEventId}`
+
+      // Check cache first
+      const cached = memoryCache.get<EventDetailProps>(cacheKey)
+      if (cached) {
+        logger.info("Ticketmaster event details cache hit", {
+          component: "ticketmaster-api",
+          action: "cache_hit",
+          metadata: { eventId: cleanEventId },
+        })
+        return cached
+      }
+
+      // Check rate limits
+      await rateLimiter.waitIfNeeded()
+
+      const queryParams = new URLSearchParams()
+      queryParams.append("apikey", apiKey)
+
+      const response = await withRetry(
+        () =>
+          fetch(
+            `https://app.ticketmaster.com/discovery/v2/events/${encodeURIComponent(cleanEventId)}.json?${queryParams.toString()}`,
+          ),
+        { maxAttempts: 3, baseDelay: 1000 },
+      )
+
+      if (!response.ok) {
+        const error = handleTicketmasterError(response.status, await response.text())
+        logger.error("Ticketmaster event details error", {
+          component: "ticketmaster-api",
+          action: "event_details_error",
+          metadata: { eventId: cleanEventId, status: response.status },
+        })
+        return null
+      }
+
+      const event = await response.json()
+      const eventDetail = transformTicketmasterEvent(event)
+
+      // Cache for 30 minutes
+      memoryCache.set(cacheKey, eventDetail, 30 * 60 * 1000)
+
+      logger.info("Ticketmaster event details retrieved", {
+        component: "ticketmaster-api",
+        action: "event_details_success",
+        metadata: { eventId: cleanEventId },
+      })
+
+      return eventDetail
+    } catch (error) {
+      logger.error(
+        "Error fetching Ticketmaster event details",
+        {
+          component: "ticketmaster-api",
+          action: "event_details_error",
+          metadata: { eventId },
+        },
+        error instanceof Error ? error : new Error(formatErrorMessage(error)),
+      )
       return null
     }
-
-    const event = await response.json()
-    return transformTicketmasterEvent(event)
-  } catch (error) {
-    console.error("Error fetching Ticketmaster event details:", error)
-    return null
-  }
+  })
 }
+
+// Export rate limiter usage for monitoring
+export function getTicketmasterUsage() {
+  return rateLimiter.getUsage()
+}
+
+// Export types
+export type { TicketmasterSearchResult }

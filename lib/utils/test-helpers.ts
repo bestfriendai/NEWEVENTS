@@ -282,20 +282,27 @@ export const performance = {
   now: (): number => {
     return Date.now()
   },
-  
-  measure: async <T>(name: string, fn: () => Promise<T> | T): Promise<{ result: T; duration: number }> => {
-    const start = Date.now()
-    const result = await fn()
-    const duration = Date.now() - start
+\
+  measure: async <T>(name: string, fn: () => Promise<T> | T): Promise<
+{
+  result: T
+  duration: number
+}
+> =>
+{
+  const start = Date.now()
+  const result = await fn()
+  const duration = Date.now() - start
 
-    logger.info(`Performance measurement: ${name}`, {
-      component: "performance",
-      action: "measure",
-      metadata: { name, duration },
-    })
+  logger.info(`Performance measurement: ${name}`, {
+    component: "performance",
+    action: "measure",
+    metadata: { name, duration },
+  })
 
-    return { result, duration }
-  },
+  return { result, duration }
+}
+,
 
   benchmark: async <T>(
     name: string,

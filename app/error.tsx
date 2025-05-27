@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, RefreshCw, Home } from "lucide-react"
-import { logger } from "@/lib/utils/logger"
+import { logger, formatErrorMessage } from "@/lib/utils/logger"
 
 export default function Error({
   error,
@@ -18,7 +18,7 @@ export default function Error({
     logger.error("Application error occurred", {
       component: "ErrorPage",
       action: "error_boundary_triggered",
-      error: error.message,
+      error: formatErrorMessage(error),
       digest: error.digest,
       stack: error.stack,
     })
@@ -39,7 +39,7 @@ export default function Error({
           </p>
 
           {process.env.NODE_ENV === "development" && (
-            <div className="bg-gray-800 p-3 rounded text-xs text-gray-300 font-mono">{error.message}</div>
+            <div className="bg-gray-800 p-3 rounded text-xs text-gray-300 font-mono">{formatErrorMessage(error)}</div>
           )}
 
           <div className="flex gap-2">

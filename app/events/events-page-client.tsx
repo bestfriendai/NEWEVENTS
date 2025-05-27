@@ -15,6 +15,7 @@ import {
   ExternalLink,
   X,
   Menu,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +23,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { fetchEvents, type EventSearchResult } from "@/app/actions/event-actions"
+import { fetchEvents, testEventAPIs, type EventSearchResult } from "@/app/actions/event-actions"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { logger } from "@/lib/utils/logger"
 import Image from "next/image"
@@ -233,7 +234,12 @@ function MapboxMap({
   )
 }
 
-export function EventsPageClient() {
+interface EventsPageClientProps {
+  initialLocation?: { lat: number; lng: number; name: string } | null
+  onLocationChange?: () => void
+}
+
+export function EventsPageClient({ initialLocation, onLocationChange }: EventsPageClientProps = {}) {
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -242,6 +248,18 @@ export function EventsPageClient() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 })
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [apiStatus, setApiStatus] = useState<any>(null)
+
+  // Test API status
+  const checkApiStatus = useCallback(async () => {
+    try {
+      const status = await testEventAPIs()
+      setApiStatus(status)
+      console.log("API Status:", status)
+    } catch (error) {
+      console.error("Failed to check API status:", error)
+    }
+  }, [])
 
   // Geocoding function
   const geocodeLocation = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
@@ -279,37 +297,29 @@ export function EventsPageClient() {
   }
 
   // Search for events
-  const handleLocationSearch = useCallback(async () => {
-    if (!locationQuery.trim()) return
-
+  const searchForEvents = useCallback(async (location: { lat: number; lng: number; name: string }) => {
     setIsLoading(true)
     setError(null)
     setSelectedEvent(null)
 
     try {
-      logger.info("Starting location search", { component: "EventsPageClient", query: locationQuery })
+      console.log("Searching for events near:", location)
 
-      // Geocode the location
-      const geocodedLocation = await geocodeLocation(locationQuery)
-
-      if (!geocodedLocation) {
-        throw new Error("Location not found. Please try a different search term.")
-      }
-
-      setMapCenter(geocodedLocation)
-      setCurrentLocationName(geocodedLocation.name)
-
-      // Fetch events
       const searchParams = {
-        location: `${geocodedLocation.lat},${geocodedLocation.lng}`,
+        coordinates: { lat: location.lat, lng: location.lng },
+        location: location.name,
         radius: 50,
         size: 50,
+        keyword: "events", // Add a general keyword to help find events
       }
 
+      console.log("Search parameters:", searchParams)
+
       const result: EventSearchResult = await fetchEvents(searchParams)
+      console.log("Search result:", result)
 
       if (result.error && result.events.length === 0) {
-        setError(`No events found near ${geocodedLocation.name}. ${result.error.message}`)
+        setError(`No events found near ${location.name}. ${result.error.message}`)
         setEvents([])
       } else {
         // Add coordinates to events that don't have them
@@ -320,8 +330,8 @@ export function EventsPageClient() {
             return {
               ...event,
               coordinates: {
-                lat: geocodedLocation.lat + latOffset,
-                lng: geocodedLocation.lng + lngOffset,
+                lat: location.lat + latOffset,
+                lng: location.lng + lngOffset,
               },
             }
           }
@@ -329,26 +339,50 @@ export function EventsPageClient() {
         })
 
         setEvents(eventsWithCoords)
-        logger.info("Events loaded successfully", {
-          component: "EventsPageClient",
-          eventCount: eventsWithCoords.length,
-          source: result.source,
-        })
+        console.log(`Found ${eventsWithCoords.length} events`)
+
+        if (eventsWithCoords.length === 0) {
+          setError(`No events found near ${location.name}. Try searching for a different location or check back later.`)
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to search for events"
       setError(message)
-      logger.error("Location search failed", { component: "EventsPageClient", error: message })
+      console.error("Event search failed:", err)
     } finally {
       setIsLoading(false)
     }
-  }, [locationQuery])
+  }, [])
+
+  // Search for events by location query
+  const handleLocationSearch = useCallback(async () => {
+    if (!locationQuery.trim()) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const geocodedLocation = await geocodeLocation(locationQuery)
+
+      if (!geocodedLocation) {
+        throw new Error("Location not found. Please try a different search term.")
+      }
+
+      setMapCenter(geocodedLocation)
+      setCurrentLocationName(geocodedLocation.name)
+
+      await searchForEvents(geocodedLocation)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to search for events"
+      setError(message)
+      setIsLoading(false)
+    }
+  }, [locationQuery, searchForEvents])
 
   // Get current location
   const handleCurrentLocation = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    setSelectedEvent(null)
 
     try {
       if (!navigator.geolocation) {
@@ -363,7 +397,8 @@ export function EventsPageClient() {
       })
 
       const { latitude, longitude } = position.coords
-      setMapCenter({ lat: latitude, lng: longitude })
+
+      let locationName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
 
       // Reverse geocode
       try {
@@ -373,55 +408,24 @@ export function EventsPageClient() {
         if (response.ok) {
           const data = await response.json()
           if (data.features && data.features.length > 0) {
-            setCurrentLocationName(data.features[0].place_name)
+            locationName = data.features[0].place_name
           }
         }
       } catch (e) {
-        setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
+        console.warn("Reverse geocoding failed")
       }
 
-      // Fetch events for current location
-      const searchParams = {
-        location: `${latitude},${longitude}`,
-        radius: 50,
-        size: 50,
-      }
+      const location = { lat: latitude, lng: longitude, name: locationName }
+      setMapCenter(location)
+      setCurrentLocationName(locationName)
 
-      const result: EventSearchResult = await fetchEvents(searchParams)
-
-      if (result.error && result.events.length === 0) {
-        setError(`No events found near your location. ${result.error.message}`)
-        setEvents([])
-      } else {
-        const eventsWithCoords = result.events.map((event) => {
-          if (!event.coordinates) {
-            const latOffset = (Math.random() - 0.5) * 0.05
-            const lngOffset = (Math.random() - 0.5) * 0.05
-            return {
-              ...event,
-              coordinates: {
-                lat: latitude + latOffset,
-                lng: longitude + lngOffset,
-              },
-            }
-          }
-          return event
-        })
-
-        setEvents(eventsWithCoords)
-        logger.info("Events loaded for current location", {
-          component: "EventsPageClient",
-          eventCount: eventsWithCoords.length,
-        })
-      }
+      await searchForEvents(location)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to get current location"
       setError(message)
-      logger.error("Current location failed", { component: "EventsPageClient", error: message })
-    } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [searchForEvents])
 
   const handleEventSelect = useCallback((event: EventDetailProps) => {
     setSelectedEvent(event)
@@ -453,6 +457,130 @@ export function EventsPageClient() {
     }
   })
 
+  // Initialize with provided location
+  useEffect(() => {
+    if (initialLocation) {
+      setMapCenter({ lat: initialLocation.lat, lng: initialLocation.lng })
+      setCurrentLocationName(initialLocation.name)
+      searchForEvents(initialLocation)
+    }
+  }, [initialLocation, searchForEvents])
+
+  // Check API status on mount
+  useEffect(() => {
+    checkApiStatus()
+  }, [checkApiStatus])
+
+  // Add location change button to the sidebar header
+  const renderLocationHeader = () => (
+    <div className="p-4 border-b border-gray-700">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-white">Find Events</h2>
+        <div className="flex items-center gap-2">
+          {onLocationChange && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLocationChange}
+              className="text-gray-400 hover:text-white"
+              title="Change location"
+            >
+              <MapPin className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarOpen(false)}
+            className="text-gray-400 hover:text-white lg:hidden"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Show current location */}
+      {currentLocationName !== "United States" && (
+        <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center text-sm text-purple-400">
+              <MapPin className="h-4 w-4 mr-2" />
+              <span>📍 {currentLocationName}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => searchForEvents({ lat: mapCenter.lat, lng: mapCenter.lng, name: currentLocationName })}
+              className="text-purple-400 hover:text-purple-300"
+              disabled={isLoading}
+            >
+              <RefreshCw className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Search Interface */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search different location..."
+            value={locationQuery}
+            onChange={(e) => setLocationQuery(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleLocationSearch()}
+            className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+            disabled={isLoading}
+          />
+          <Button
+            onClick={handleLocationSearch}
+            disabled={isLoading || !locationQuery.trim()}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Button
+          onClick={handleCurrentLocation}
+          variant="outline"
+          className="w-full border-gray-700 text-gray-300 hover:bg-gray-800"
+          disabled={isLoading}
+        >
+          <Navigation className="h-4 w-4 mr-2" />
+          Use Current Location
+        </Button>
+      </div>
+
+      {/* API Status */}
+      {apiStatus && (
+        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+          <div className="text-xs text-gray-400 mb-2">API Status:</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {Object.entries(apiStatus).map(([api, status]) => {
+              if (api === "errors") return null
+              return (
+                <div key={api} className="flex items-center justify-between">
+                  <span className="capitalize text-gray-400">{api}</span>
+                  <div className={`w-2 h-2 rounded-full ${status ? "bg-green-400" : "bg-red-400"}`} />
+                </div>
+              )
+            })}
+          </div>
+          {apiStatus.errors && apiStatus.errors.length > 0 && (
+            <div className="mt-2 text-xs text-red-400">Issues: {apiStatus.errors.join(", ")}</div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-sm">{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  )
+
   return (
     <div className="h-screen bg-[#0F1116] flex overflow-hidden">
       {/* Map Area */}
@@ -468,7 +596,7 @@ export function EventsPageClient() {
 
         <MapboxMap
           center={mapCenter}
-          zoom={events.length > 0 ? 12 : 4}
+          zoom={events.length > 0 ? 12 : 10}
           events={sortedEvents}
           selectedEventId={selectedEvent?.id || null}
           onEventSelect={handleEventSelect}
@@ -498,61 +626,7 @@ export function EventsPageClient() {
             className="w-full md:w-96 bg-[#12141D] border-l border-gray-700 flex flex-col shadow-2xl"
           >
             {/* Header */}
-            <div className="p-4 border-b border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">Find Events</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSidebarOpen(false)}
-                  className="text-gray-400 hover:text-white lg:hidden"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Search */}
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter city, zip, or address"
-                    value={locationQuery}
-                    onChange={(e) => setLocationQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleLocationSearch()}
-                    className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                    disabled={isLoading}
-                  />
-                  <Button
-                    onClick={handleLocationSearch}
-                    disabled={isLoading || !locationQuery.trim()}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <Button
-                  onClick={handleCurrentLocation}
-                  variant="outline"
-                  className="w-full border-gray-700 text-gray-300 hover:bg-gray-800"
-                  disabled={isLoading}
-                >
-                  <Navigation className="h-4 w-4 mr-2" />
-                  Use Current Location
-                </Button>
-              </div>
-
-              {currentLocationName !== "United States" && (
-                <div className="mt-3 text-sm text-purple-400">📍 {currentLocationName}</div>
-              )}
-
-              {error && (
-                <Alert variant="destructive" className="mt-3">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-sm">{error}</AlertDescription>
-                </Alert>
-              )}
-            </div>
+            {renderLocationHeader()}
 
             {/* Content */}
             <div className="flex-1 overflow-hidden">
@@ -701,11 +775,23 @@ export function EventsPageClient() {
 
                     <ScrollArea className="flex-1">
                       <div className="p-4">
-                        {sortedEvents.length === 0 ? (
+                        {sortedEvents.length === 0 && !isLoading ? (
                           <div className="text-center py-12 text-gray-500">
                             <MapPin className="h-16 w-16 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-white mb-2">Discover Events</h3>
-                            <p className="text-sm">Search for a location to find amazing events near you</p>
+                            <h3 className="text-lg font-medium text-white mb-2">No Events Found</h3>
+                            <p className="text-sm mb-4">
+                              {error ? "There was an issue finding events." : "No events found in this area."}
+                            </p>
+                            <Button
+                              onClick={() =>
+                                searchForEvents({ lat: mapCenter.lat, lng: mapCenter.lng, name: currentLocationName })
+                              }
+                              variant="outline"
+                              className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Try Again
+                            </Button>
                           </div>
                         ) : (
                           <div className="space-y-3">

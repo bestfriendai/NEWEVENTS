@@ -160,7 +160,7 @@ const nextConfig = {
     /maps/          # Map-related components
   /layouts/         # Layout components
   /forms/           # Form components
-  /providers/       # Context providers
+  /providers/         # Context providers
 \`\`\`
 
 #### 2.2 **Error Handling & Boundaries**
@@ -337,3 +337,16 @@ gantt
 ---
 
 *This plan prioritizes immediate security and build fixes while establishing a foundation for long-term code quality improvements. Each phase builds upon the previous one, ensuring a stable and maintainable codebase.*
+\`\`\`shell
+# Install dependencies
+npm install
+
+# Run linters and type checking
+npm run lint
+npm run typecheck
+
+# Run tests
+npm run test
+
+# Build the application
+npm run build

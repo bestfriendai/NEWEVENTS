@@ -82,7 +82,7 @@ class Logger {
         ...data,
         duration,
         startTime,
-        endTime
+        endTime,
       })
 
       return duration
@@ -109,11 +109,7 @@ class Logger {
 export const logger = new Logger()
 
 // Performance measurement utility
-export async function measurePerformance<T>(
-  label: string,
-  fn: () => Promise<T> | T,
-  data?: any
-): Promise<T> {
+export async function measurePerformance<T>(label: string, fn: () => Promise<T> | T, data?: any): Promise<T> {
   const timerEnd = logger.time(label, data)
 
   try {
@@ -122,7 +118,41 @@ export async function measurePerformance<T>(
     return result
   } catch (error) {
     timerEnd()
-    logger.error(`Performance measurement failed: ${label}`, { error: error instanceof Error ? error.message : String(error) })
+    logger.error(`Performance measurement failed: ${label}`, {
+      error: error instanceof Error ? error.message : String(error),
+    })
     throw error
   }
+}
+
+// Format error message utility
+export function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === "string") {
+    return error
+  }
+
+  if (error && typeof error === "object") {
+    // Handle objects with message property
+    if ("message" in error && typeof error.message === "string") {
+      return error.message
+    }
+
+    // Handle objects with error property
+    if ("error" in error && typeof error.error === "string") {
+      return error.error
+    }
+
+    // Try to stringify the object
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return "Unknown error object"
+    }
+  }
+
+  return "Unknown error occurred"
 }

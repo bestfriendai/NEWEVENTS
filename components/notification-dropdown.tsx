@@ -112,10 +112,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       const maxId = Math.max(...notifications.map((n) => n.id))
       return maxId + 1
     } catch (error) {
-      logger.error("Error getting next ID", {
-        component: "NotificationDropdown",
-        action: "get_next_id_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error getting next ID",
+        {
+          component: "NotificationDropdown",
+          action: "get_next_id_error",
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       return Date.now() // Fallback to timestamp
     }
   }, [notifications])
@@ -129,10 +133,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
           setIsOpen(false)
         }
       } catch (error) {
-        logger.error("Error in click outside handler", {
-          component: "NotificationDropdown",
-          action: "click_outside_error"
-        }, error instanceof Error ? error : new Error(String(error)))
+        logger.error(
+          "Error in click outside handler",
+          {
+            component: "NotificationDropdown",
+            action: "click_outside_error",
+          },
+          error instanceof Error ? error : new Error(String(error)),
+        )
         setError("Failed to handle click outside")
       }
     }
@@ -141,7 +149,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       document.addEventListener("mousedown", handleClickOutside)
       return () => document.removeEventListener("mousedown", handleClickOutside)
     }
-    
+
     // Return undefined for server-side rendering case
     return undefined
   }, [isOpen])
@@ -173,10 +181,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         }
       }
     } catch (error) {
-      logger.error("Error setting up notification timer", {
-        component: "NotificationDropdown",
-        action: "timer_setup_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error setting up notification timer",
+        {
+          component: "NotificationDropdown",
+          action: "timer_setup_error",
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to set up notifications")
       return undefined
     }
@@ -185,19 +197,27 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
   // Global error handlers
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logger.error("Unhandled promise rejection in NotificationDropdown", {
-        component: "NotificationDropdown",
-        action: "unhandled_rejection"
-      }, event.reason instanceof Error ? event.reason : new Error(String(event.reason)))
+      logger.error(
+        "Unhandled promise rejection in NotificationDropdown",
+        {
+          component: "NotificationDropdown",
+          action: "unhandled_rejection",
+        },
+        event.reason instanceof Error ? event.reason : new Error(String(event.reason)),
+      )
       setError("An unexpected error occurred")
       event.preventDefault() // Prevent the default browser behavior
     }
 
     const handleError = (event: ErrorEvent) => {
-      logger.error("Runtime error in NotificationDropdown", {
-        component: "NotificationDropdown",
-        action: "runtime_error"
-      }, event.error instanceof Error ? event.error : new Error(String(event.error)))
+      logger.error(
+        "Runtime error in NotificationDropdown",
+        {
+          component: "NotificationDropdown",
+          action: "runtime_error",
+        },
+        event.error instanceof Error ? event.error : new Error(String(event.error)),
+      )
       setError("A runtime error occurred")
     }
 
@@ -210,7 +230,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         window.removeEventListener("error", handleError)
       }
     }
-    
+
     // Return undefined for server-side rendering case
     return undefined
   }, [])
@@ -234,10 +254,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       }
       setError(null) // Clear any previous errors
     } catch (error) {
-      logger.error("Error toggling dropdown", {
-        component: "NotificationDropdown",
-        action: "toggle_dropdown_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error toggling dropdown",
+        {
+          component: "NotificationDropdown",
+          action: "toggle_dropdown_error",
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to toggle dropdown")
     }
   }, [isOpen, hasNewNotifications])
@@ -246,10 +270,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     try {
       setNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
     } catch (error) {
-      logger.error("Error marking all notifications as read", {
-        component: "NotificationDropdown",
-        action: "mark_all_read_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error marking all notifications as read",
+        {
+          component: "NotificationDropdown",
+          action: "mark_all_read_error",
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to mark all notifications as read")
     }
   }, [])
@@ -258,11 +286,15 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
     try {
       setNotifications((prev) => prev.filter((notification) => notification.id !== id))
     } catch (error) {
-      logger.error("Error removing notification", {
-        component: "NotificationDropdown",
-        action: "remove_notification_error",
-        metadata: { notificationId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error removing notification",
+        {
+          component: "NotificationDropdown",
+          action: "remove_notification_error",
+          metadata: { notificationId: id },
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to remove notification")
     }
   }, [])
@@ -279,11 +311,15 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
         ),
       )
     } catch (error) {
-      logger.error("Error handling notification action", {
-        component: "NotificationDropdown",
-        action: "notification_action_error",
-        metadata: { notificationId: id, actionType: action }
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error handling notification action",
+        {
+          component: "NotificationDropdown",
+          action: "notification_action_error",
+          metadata: { notificationId: id, actionType: action },
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to handle notification action")
     }
   }, [])
@@ -314,8 +350,8 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
           action: "notification_validation_warning",
           metadata: {
             originalCount: notifications.length,
-            validCount: validNotifications.length
-          }
+            validCount: validNotifications.length,
+          },
         })
       }
 
@@ -328,10 +364,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
       setIsLoading(false)
       return filtered
     } catch (error) {
-      logger.error("Error filtering notifications", {
-        component: "NotificationDropdown",
-        action: "filter_notifications_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error filtering notifications",
+        {
+          component: "NotificationDropdown",
+          action: "filter_notifications_error",
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       setError("Failed to filter notifications")
       setIsLoading(false)
       return []
@@ -357,11 +397,15 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
           return <Bell className="h-4 w-4 text-purple-400" />
       }
     } catch (error) {
-      logger.error("Error getting notification icon", {
-        component: "NotificationDropdown",
-        action: "get_icon_error",
-        metadata: { notificationType: type }
-      }, error instanceof Error ? error : new Error(String(error)))
+      logger.error(
+        "Error getting notification icon",
+        {
+          component: "NotificationDropdown",
+          action: "get_icon_error",
+          metadata: { notificationType: type },
+        },
+        error instanceof Error ? error : new Error(String(error)),
+      )
       return <Bell className="h-4 w-4 text-purple-400" />
     }
   }, [])
@@ -500,14 +544,14 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                   <AvatarImage
                                     src={notification.image || "/placeholder.svg"}
                                     alt={notification.title}
-                                    onError={(_e) => {
+                                    onError={(e) => {
                                       logger.warn("Failed to load notification image", {
                                         component: "NotificationDropdown",
                                         action: "image_load_error",
-                                        metadata: { imageUrl: notification.image }
+                                        metadata: { imageUrl: notification.image },
                                       })
                                       // Fallback to placeholder or remove src to show fallback
-                                      ;(e as React.SyntheticEvent<HTMLImageElement>).currentTarget.src = "/placeholder.svg"
+                                      ;(e.currentTarget as HTMLImageElement).src = "/placeholder.svg"
                                     }}
                                   />
                                   <AvatarFallback className="bg-purple-900 text-purple-200">
@@ -529,7 +573,9 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                     >
                                       {notification.title || "Untitled Notification"}
                                     </p>
-                                    <p className="text-xs text-gray-400 mt-0.5">{notification.message || "No message"}</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                      {notification.message || "No message"}
+                                    </p>
                                   </div>
                                   <Button
                                     variant="ghost"
@@ -545,25 +591,27 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                     <Clock className="mr-1 h-3 w-3" />
                                     {notification.time || "Unknown time"}
                                   </div>
-                                  {notification.actions && Array.isArray(notification.actions) && !notification.actionTaken && (
-                                    <div className="flex space-x-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-6 px-2 text-xs bg-[#2A2E38] hover:bg-[#343842] text-gray-300 border-gray-800"
-                                        onClick={() => handleAction(notification.id, "decline")}
-                                      >
-                                        Decline
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        className="h-6 px-2 text-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-                                        onClick={() => handleAction(notification.id, "accept")}
-                                      >
-                                        Accept
-                                      </Button>
-                                    </div>
-                                  )}
+                                  {notification.actions &&
+                                    Array.isArray(notification.actions) &&
+                                    !notification.actionTaken && (
+                                      <div className="flex space-x-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-6 px-2 text-xs bg-[#2A2E38] hover:bg-[#343842] text-gray-300 border-gray-800"
+                                          onClick={() => handleAction(notification.id, "decline")}
+                                        >
+                                          Decline
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          className="h-6 px-2 text-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                                          onClick={() => handleAction(notification.id, "accept")}
+                                        >
+                                          Accept
+                                        </Button>
+                                      </div>
+                                    )}
                                   {notification.actionTaken && (
                                     <Badge className="text-xs bg-[#22252F] text-gray-400">
                                       {notification.actionTaken === "accept" ? "Accepted" : "Declined"}
