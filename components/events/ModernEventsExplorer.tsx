@@ -32,198 +32,7 @@ import { CLIENT_CONFIG } from "@/lib/env"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 
-// Enhanced mock events with more realistic data
-const ENHANCED_EVENTS = [
-  {
-    id: "1",
-    title: "Electric Dreams Music Festival",
-    description:
-      "The ultimate electronic music experience featuring world-renowned DJs and immersive visual arts. Three days of non-stop beats in a stunning outdoor venue.",
-    category: "Music",
-    date: "2024-07-15",
-    time: "18:00",
-    endTime: "02:00",
-    location: "Central Park, New York",
-    address: "Central Park, Manhattan, NY 10024",
-    lat: 40.7829,
-    lng: -73.9654,
-    price: "$85-250",
-    originalPrice: "$120-300",
-    image: "/event-1.png",
-    attendees: 15000,
-    capacity: 20000,
-    organizer: {
-      name: "NYC Music Events",
-      avatar: "/avatar-1.png",
-      verified: true,
-    },
-    tags: ["Festival", "Outdoor", "Multi-day", "Electronic"],
-    venue: { name: "Central Park Great Lawn", capacity: 20000, type: "Outdoor" },
-    ticketLinks: [
-      { url: "https://tickets.example.com", provider: "Ticketmaster" },
-      { url: "https://eventbrite.com", provider: "Eventbrite" },
-    ],
-    rating: 4.8,
-    featured: true,
-    trending: true,
-    distance: "2.3 miles",
-  },
-  {
-    id: "2",
-    title: "TechCrunch Disrupt 2024",
-    description:
-      "Join the world's leading technology conference featuring groundbreaking startups, industry leaders, and the latest innovations shaping our future.",
-    category: "Technology",
-    date: "2024-08-22",
-    time: "09:00",
-    endTime: "18:00",
-    location: "Moscone Center, San Francisco",
-    address: "747 Howard St, San Francisco, CA 94103",
-    lat: 37.7749,
-    lng: -122.4194,
-    price: "$299-1299",
-    originalPrice: "$399-1599",
-    image: "/event-2.png",
-    attendees: 8000,
-    capacity: 10000,
-    organizer: {
-      name: "TechCrunch",
-      avatar: "/avatar-2.png",
-      verified: true,
-    },
-    tags: ["Conference", "Networking", "Innovation", "Startup"],
-    venue: { name: "Moscone Center", capacity: 10000, type: "Convention Center" },
-    ticketLinks: [{ url: "https://tickets.example.com", provider: "Eventbrite" }],
-    rating: 4.9,
-    featured: true,
-    trending: false,
-    distance: "1.8 miles",
-  },
-  {
-    id: "3",
-    title: "Contemporary Art Showcase",
-    description:
-      "Discover emerging artists and contemporary masterpieces in this exclusive gallery opening featuring works from local and international artists.",
-    category: "Arts",
-    date: "2024-06-30",
-    time: "19:00",
-    endTime: "23:00",
-    location: "LACMA, Los Angeles",
-    address: "5905 Wilshire Blvd, Los Angeles, CA 90036",
-    lat: 34.0639,
-    lng: -118.3592,
-    price: "Free",
-    originalPrice: "Free",
-    image: "/event-3.png",
-    attendees: 500,
-    capacity: 800,
-    organizer: {
-      name: "Los Angeles County Museum of Art",
-      avatar: "/avatar-3.png",
-      verified: true,
-    },
-    tags: ["Art", "Gallery", "Opening", "Contemporary"],
-    venue: { name: "LACMA", capacity: 800, type: "Museum" },
-    ticketLinks: [{ url: "https://tickets.example.com", provider: "LACMA" }],
-    rating: 4.6,
-    featured: false,
-    trending: true,
-    distance: "0.5 miles",
-  },
-  {
-    id: "4",
-    title: "Chicago Food & Wine Festival",
-    description:
-      "Taste the finest cuisine from Chicago's top chefs paired with exceptional wines from around the world. A culinary journey you won't forget.",
-    category: "Food",
-    date: "2024-09-10",
-    time: "16:00",
-    endTime: "22:00",
-    location: "Grant Park, Chicago",
-    address: "337 E Randolph St, Chicago, IL 60601",
-    lat: 41.8781,
-    lng: -87.6298,
-    price: "$125-300",
-    originalPrice: "$150-350",
-    image: "/event-4.png",
-    attendees: 5000,
-    capacity: 8000,
-    organizer: {
-      name: "Chicago Culinary Society",
-      avatar: "/avatar-4.png",
-      verified: true,
-    },
-    tags: ["Food", "Wine", "Festival", "Culinary"],
-    venue: { name: "Grant Park", capacity: 8000, type: "Park" },
-    ticketLinks: [{ url: "https://tickets.example.com", provider: "Eventbrite" }],
-    rating: 4.7,
-    featured: true,
-    trending: false,
-    distance: "3.2 miles",
-  },
-  {
-    id: "5",
-    title: "NBA Finals Watch Party",
-    description:
-      "Join thousands of basketball fans for the ultimate NBA Finals viewing experience with giant screens, food trucks, and live entertainment.",
-    category: "Sports",
-    date: "2024-06-20",
-    time: "20:00",
-    endTime: "23:30",
-    location: "Madison Square Garden, New York",
-    address: "4 Pennsylvania Plaza, New York, NY 10001",
-    lat: 40.7505,
-    lng: -73.9934,
-    price: "$45-150",
-    originalPrice: "$60-200",
-    image: "/event-5.png",
-    attendees: 12000,
-    capacity: 20000,
-    organizer: {
-      name: "MSG Entertainment",
-      avatar: "/avatar-5.png",
-      verified: true,
-    },
-    tags: ["Sports", "Basketball", "Watch Party", "Entertainment"],
-    venue: { name: "Madison Square Garden", capacity: 20000, type: "Arena" },
-    ticketLinks: [{ url: "https://tickets.example.com", provider: "Ticketmaster" }],
-    rating: 4.5,
-    featured: false,
-    trending: true,
-    distance: "1.1 miles",
-  },
-  {
-    id: "6",
-    title: "Startup Pitch Competition",
-    description:
-      "Watch the next generation of entrepreneurs pitch their innovative ideas to top investors. Network with founders, VCs, and industry leaders.",
-    category: "Business",
-    date: "2024-07-05",
-    time: "14:00",
-    endTime: "18:00",
-    location: "WeWork, Austin",
-    address: "600 Congress Ave, Austin, TX 78701",
-    lat: 30.2672,
-    lng: -97.7431,
-    price: "$25-75",
-    originalPrice: "$35-100",
-    image: "/event-6.png",
-    attendees: 300,
-    capacity: 500,
-    organizer: {
-      name: "Austin Startup Week",
-      avatar: "/avatar-6.png",
-      verified: false,
-    },
-    tags: ["Startup", "Pitch", "Networking", "Investment"],
-    venue: { name: "WeWork Congress", capacity: 500, type: "Coworking Space" },
-    ticketLinks: [{ url: "https://tickets.example.com", provider: "Eventbrite" }],
-    rating: 4.4,
-    featured: false,
-    trending: false,
-    distance: "4.7 miles",
-  },
-]
+// This component now uses real events passed via props
 
 const CATEGORIES = [
   { id: "All", label: "All Events", color: "bg-gradient-to-r from-purple-500 to-pink-500", icon: "🎪", count: 6 },
@@ -235,14 +44,17 @@ const CATEGORIES = [
   { id: "Business", label: "Business", color: "bg-gradient-to-r from-gray-600 to-slate-600", icon: "💼", count: 1 },
 ]
 
-export default function ModernEventsExplorer() {
+interface ModernEventsExplorerProps {
+  events?: any[]
+}
+
+export default function ModernEventsExplorer({ events = [] }: ModernEventsExplorerProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markers = useRef<mapboxgl.Marker[]>([])
 
   // State management
-  const [events] = useState(ENHANCED_EVENTS)
-  const [filteredEvents, setFilteredEvents] = useState(ENHANCED_EVENTS)
+  const [filteredEvents, setFilteredEvents] = useState(events)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
@@ -394,6 +206,11 @@ export default function ModernEventsExplorer() {
     }
   }, [filteredEvents, mapLoaded, mapError, viewMode])
 
+  // Update filtered events when events prop changes
+  useEffect(() => {
+    setFilteredEvents(events)
+  }, [events])
+
   // Filter events
   useEffect(() => {
     let filtered = events
@@ -402,10 +219,10 @@ export default function ModernEventsExplorer() {
     if (searchQuery) {
       filtered = filtered.filter(
         (event) =>
-          event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          event.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())),
+          event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          event.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (event.tags && event.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))),
       )
     }
 
@@ -416,7 +233,7 @@ export default function ModernEventsExplorer() {
 
     // Free events filter
     if (showFreeOnly) {
-      filtered = filtered.filter((event) => event.price.toLowerCase().includes("free"))
+      filtered = filtered.filter((event) => event.price?.toLowerCase().includes("free"))
     }
 
     // Featured events filter
@@ -428,13 +245,13 @@ export default function ModernEventsExplorer() {
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "date":
-          return new Date(a.date).getTime() - new Date(b.date).getTime()
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
         case "popularity":
-          return b.attendees - a.attendees
+          return (b.attendees || 0) - (a.attendees || 0)
         case "rating":
-          return b.rating - a.rating
+          return (b.rating || 0) - (a.rating || 0)
         case "distance":
-          return Number.parseFloat(a.distance) - Number.parseFloat(b.distance)
+          return Number.parseFloat(a.distance || "0") - Number.parseFloat(b.distance || "0")
         default:
           return 0
       }

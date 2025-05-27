@@ -142,53 +142,84 @@ export function EventsClient() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 })
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
 
-  // Mock events for testing
-  const generateMockEvents = (location: string, coordinates: { lat: number; lng: number }): SimpleEvent[] => {
-    const categories = ["Music", "Technology", "Food", "Sports", "Art", "Business"]
-    const venues = ["Convention Center", "Park", "Theater", "Stadium", "Gallery", "Hotel"]
+  // Fetch real events from API
+  const fetchEventsForLocation = async (lat: number, lng: number, locationName: string): Promise<SimpleEvent[]> => {
+    try {
+      const response = await fetch(`/api/events?lat=${lat}&lng=${lng}&radius=25&limit=20`)
+      const data = await response.json()
 
-    return Array.from({ length: 8 }, (_, i) => ({
-      id: i + 1,
-      title: `${categories[i % categories.length]} Event ${i + 1}`,
-      description: `Join us for an amazing ${categories[i % categories.length].toLowerCase()} experience in ${location}. This event will feature incredible activities and networking opportunities.`,
-      date: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      time: `${18 + (i % 6)}:00`,
-      location: `${venues[i % venues.length]}`,
-      address: `${100 + i} Main St, ${location}`,
-      category: categories[i % categories.length],
-      price: i % 3 === 0 ? "Free" : `$${25 + i * 15}`,
-      coordinates: {
-        lat: coordinates.lat + (Math.random() - 0.5) * 0.1,
-        lng: coordinates.lng + (Math.random() - 0.5) * 0.1,
-      },
-      attendees: 50 + Math.floor(Math.random() * 500),
-      isFavorite: false,
-      ticketLinks: [
-        { source: "Ticketmaster", link: "https://ticketmaster.com" },
-        { source: "Eventbrite", link: "https://eventbrite.com" },
-      ],
-      organizer: {
-        name: `Event Organizer ${i + 1}`,
-        avatar: `/avatar-${(i % 6) + 1}.png`,
-      },
-    }))
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch events")
+      }
+
+      // Transform API events to SimpleEvent format
+      return data.data.events.map((event: any) => ({
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        address: event.address,
+        category: event.category,
+        price: event.price,
+        coordinates: event.coordinates,
+        attendees: event.attendees,
+        isFavorite: event.isFavorite,
+        ticketLinks: [],
+        organizer: event.organizer,
+      }))
+    } catch (error) {
+      logger.error("Failed to fetch events", {
+        component: "EventsClient",
+        action: "fetchEventsForLocation",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+      throw error
+    }
   }
 
-  // Simple geocoding simulation
+  // Real geocoding using Mapbox
   const geocodeLocation = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
-    const locations: Record<string, { lat: number; lng: number; name: string }> = {
-      "new york": { lat: 40.7128, lng: -74.006, name: "New York, NY" },
-      "san francisco": { lat: 37.7749, lng: -122.4194, name: "San Francisco, CA" },
-      chicago: { lat: 41.8781, lng: -87.6298, name: "Chicago, IL" },
-      "los angeles": { lat: 34.0522, lng: -118.2437, name: "Los Angeles, CA" },
-      miami: { lat: 25.7617, lng: -80.1918, name: "Miami, FL" },
-      seattle: { lat: 47.6062, lng: -122.3321, name: "Seattle, WA" },
-      austin: { lat: 30.2672, lng: -97.7431, name: "Austin, TX" },
-      denver: { lat: 39.7392, lng: -104.9903, name: "Denver, CO" },
-    }
+    try {
+      const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
+      if (!mapboxKey) {
+        throw new Error("Mapbox API key not configured")
+      }
 
-    const key = query.toLowerCase().trim()
-    return locations[key] || null
+      const encodedQuery = encodeURIComponent(query.trim())
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${mapboxKey}&limit=1&types=place,locality,neighborhood,address`
+      )
+
+      if (!response.ok) {
+        throw new Error(`Geocoding failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const features = data.features || []
+
+      if (features.length === 0) {
+        return null
+      }
+
+      const feature = features[0]
+      const [lng, lat] = feature.center
+
+      return {
+        lat,
+        lng,
+        name: feature.place_name,
+      }
+    } catch (error) {
+      logger.error("Geocoding failed", {
+        component: "EventsClient",
+        action: "geocodeLocation",
+        query,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+      return null
+    }
   }
 
   const handleLocationSearch = useCallback(async () => {
@@ -201,28 +232,27 @@ export function EventsClient() {
     try {
       logger.info("Starting location search", { component: "EventsClient", query: locationQuery })
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
       // Geocode the location
       const geocodedLocation = await geocodeLocation(locationQuery)
 
       if (!geocodedLocation) {
-        throw new Error(
-          "Location not found. Try: New York, San Francisco, Chicago, Los Angeles, Miami, Seattle, Austin, or Denver",
-        )
+        throw new Error("Location not found. Please try a different search term.")
       }
 
       setMapCenter(geocodedLocation)
       setCurrentLocationName(geocodedLocation.name)
 
-      // Generate mock events for this location
-      const mockEvents = generateMockEvents(geocodedLocation.name, geocodedLocation)
-      setEvents(mockEvents)
+      // Fetch real events for this location
+      const realEvents = await fetchEventsForLocation(
+        geocodedLocation.lat,
+        geocodedLocation.lng,
+        geocodedLocation.name
+      )
+      setEvents(realEvents)
 
       logger.info("Events loaded successfully", {
         component: "EventsClient",
-        eventCount: mockEvents.length,
+        eventCount: realEvents.length,
         location: geocodedLocation.name,
       })
     } catch (err) {
@@ -255,15 +285,38 @@ export function EventsClient() {
 
       const { latitude, longitude } = position.coords
       setMapCenter({ lat: latitude, lng: longitude })
-      setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
 
-      // Generate mock events for current location
-      const mockEvents = generateMockEvents("Your Location", { lat: latitude, lng: longitude })
-      setEvents(mockEvents)
+      // Try to reverse geocode to get a readable location name
+      try {
+        const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
+        if (mapboxKey) {
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxKey}&limit=1`
+          )
+          if (response.ok) {
+            const data = await response.json()
+            if (data.features && data.features.length > 0) {
+              setCurrentLocationName(data.features[0].place_name)
+            } else {
+              setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
+            }
+          } else {
+            setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
+          }
+        } else {
+          setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
+        }
+      } catch {
+        setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
+      }
+
+      // Fetch real events for current location
+      const realEvents = await fetchEventsForLocation(latitude, longitude, "Your Location")
+      setEvents(realEvents)
 
       logger.info("Events loaded for current location", {
         component: "EventsClient",
-        eventCount: mockEvents.length,
+        eventCount: realEvents.length,
         coordinates: { latitude, longitude },
       })
     } catch (err) {
@@ -438,7 +491,7 @@ export function EventsClient() {
           <div className="space-y-3">
             <div className="flex gap-2">
               <Input
-                placeholder="Try: New York, San Francisco, Chicago..."
+                placeholder="Enter any city, address, or location..."
                 value={locationQuery}
                 onChange={(e) => setLocationQuery(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleLocationSearch()}
@@ -498,7 +551,7 @@ export function EventsClient() {
               <MapPin className="h-12 w-12 mx-auto mb-3" />
               <p>Search for a location to discover events</p>
               <p className="text-sm mt-2 text-gray-400">
-                Try: New York, San Francisco, Chicago, Los Angeles, Miami, Seattle, Austin, or Denver
+                Enter any city, address, or use your current location
               </p>
             </div>
           )}

@@ -71,8 +71,6 @@ function MapboxMap({
         ;(window as any).mapboxgl = mapboxgl
 
         if (mapContainerRef.current && !mapRef.current) {
-          console.log("Creating map instance...")
-
           // Create map
           mapRef.current = new mapboxgl.Map({
             container: mapContainerRef.current,
@@ -88,28 +86,21 @@ function MapboxMap({
 
           // Map events
           mapRef.current.on("load", () => {
-            console.log("Map loaded successfully")
             setMapLoaded(true)
             try {
               mapRef.current.setFog({})
             } catch (e) {
-              console.warn("Fog effect not supported")
+              // Fog effect not supported, continue without it
             }
             logger.info("Mapbox map loaded", { component: "MapboxMap" })
           })
 
           mapRef.current.on("error", (e: any) => {
-            console.error("Mapbox error:", e)
             logger.error("Mapbox error", { component: "MapboxMap", error: e })
             setMapError("Map failed to load")
           })
-
-          mapRef.current.on("style.load", () => {
-            console.log("Map style loaded")
-          })
         }
       } catch (error) {
-        console.error("Failed to initialize map:", error)
         logger.error("Failed to initialize map", { component: "MapboxMap", error })
         setMapError("Failed to load map. Check your Mapbox configuration.")
       }
@@ -119,7 +110,6 @@ function MapboxMap({
 
     return () => {
       if (mapRef.current) {
-        console.log("Cleaning up map...")
         mapRef.current.remove()
         mapRef.current = null
       }
@@ -146,7 +136,7 @@ function MapboxMap({
       try {
         marker.remove()
       } catch (e) {
-        console.warn("Error removing marker:", e)
+        // Ignore marker removal errors
       }
     })
     markersRef.current = []
@@ -159,15 +149,11 @@ function MapboxMap({
     try {
       mapboxgl = (window as any).mapboxgl
       if (!mapboxgl) {
-        console.warn("Mapbox GL not available on window")
         return
       }
     } catch (e) {
-      console.warn("Error accessing Mapbox GL:", e)
       return
     }
-
-    console.log(`Creating ${events.length} markers`)
 
     // Add new markers
     events.forEach((event, index) => {
@@ -181,7 +167,6 @@ function MapboxMap({
           lat: center.lat + latOffset,
           lng: center.lng + lngOffset,
         }
-        console.log(`Generated coordinates for ${event.title}:`, coordinates)
       }
 
       try {
@@ -235,7 +220,6 @@ function MapboxMap({
         // Add click handler
         el.addEventListener("click", (e) => {
           e.stopPropagation()
-          console.log("Marker clicked:", event.title)
           onEventSelect(event)
         })
 
@@ -276,13 +260,14 @@ function MapboxMap({
         })
 
         markersRef.current.push(marker)
-        console.log(`Created marker ${index + 1}/${events.length} for ${event.title}`)
       } catch (error) {
-        console.error(`Failed to create marker for event ${event.title}:`, error)
+        logger.error("Failed to create marker", {
+          component: "MapboxMap",
+          eventTitle: event.title,
+          error
+        })
       }
     })
-
-    console.log(`Successfully created ${markersRef.current.length} markers`)
   }, [events, selectedEventId, mapLoaded, onEventSelect, center])
 
   if (mapError) {
@@ -346,9 +331,11 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     try {
       const status = await testEventAPIs()
       setApiStatus(status)
-      console.log("API Status:", status)
     } catch (error) {
-      console.error("Failed to check API status:", error)
+      logger.error("Failed to check API status", {
+        component: "EventsPageClient",
+        error
+      })
     }
   }, [])
 
@@ -394,8 +381,6 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     setSelectedEvent(null)
 
     try {
-      console.log("Searching for events near:", location)
-
       const searchParams = {
         coordinates: { lat: location.lat, lng: location.lng },
         location: location.name,
@@ -404,10 +389,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
         keyword: "events", // Add a general keyword to help find events
       }
 
-      console.log("Search parameters:", searchParams)
-
       const result: EventSearchResult = await fetchEvents(searchParams)
-      console.log("Search result:", result)
 
       if (result.error && result.events.length === 0) {
         setError(`No events found near ${location.name}. ${result.error.message}`)
@@ -430,7 +412,6 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
         })
 
         setEvents(eventsWithCoords)
-        console.log(`Found ${eventsWithCoords.length} events`)
 
         if (eventsWithCoords.length === 0) {
           setError(`No events found near ${location.name}. Try searching for a different location or check back later.`)
@@ -439,7 +420,11 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to search for events"
       setError(message)
-      console.error("Event search failed:", err)
+      logger.error("Event search failed", {
+        component: "EventsPageClient",
+        location: location.name,
+        error: err
+      })
     } finally {
       setIsLoading(false)
     }
@@ -503,7 +488,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
           }
         }
       } catch (e) {
-        console.warn("Reverse geocoding failed")
+        // Reverse geocoding failed, use coordinates
       }
 
       const location = { lat: latitude, lng: longitude, name: locationName }

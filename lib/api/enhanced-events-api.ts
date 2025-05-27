@@ -30,69 +30,9 @@ export interface EnhancedEventSearchResult {
   responseTime?: number
 }
 
-// Mock event data for testing
-const mockEvents: EventDetailProps[] = [
-  {
-    id: 1,
-    title: "Summer Music Festival",
-    description: "Join us for an amazing outdoor music festival featuring top artists from around the world.",
-    category: "Music",
-    date: "July 15, 2024",
-    time: "6:00 PM",
-    location: "Central Park",
-    address: "Central Park, New York, NY",
-    price: "$75 - $150",
-    image: "/event-1.png",
-    organizer: {
-      name: "Music Events Co",
-      avatar: "/avatar-1.png",
-    },
-    attendees: 2500,
-    isFavorite: false,
-    coordinates: { lat: 40.7829, lng: -73.9654 },
-    ticketLinks: [{ source: "Ticketmaster", link: "https://ticketmaster.com" }],
-  },
-  {
-    id: 2,
-    title: "Tech Conference 2024",
-    description: "The biggest tech conference of the year with industry leaders and innovative startups.",
-    category: "Technology",
-    date: "August 22, 2024",
-    time: "9:00 AM",
-    location: "Convention Center",
-    address: "123 Convention Ave, San Francisco, CA",
-    price: "$200 - $500",
-    image: "/event-2.png",
-    organizer: {
-      name: "Tech Events Inc",
-      avatar: "/avatar-2.png",
-    },
-    attendees: 5000,
-    isFavorite: false,
-    coordinates: { lat: 37.7749, lng: -122.4194 },
-    ticketLinks: [{ source: "Eventbrite", link: "https://eventbrite.com" }],
-  },
-  {
-    id: 3,
-    title: "Food & Wine Festival",
-    description: "Taste the best cuisine from local restaurants and wineries in this amazing food festival.",
-    category: "Food",
-    date: "September 10, 2024",
-    time: "12:00 PM",
-    location: "Waterfront Park",
-    address: "456 Harbor St, Seattle, WA",
-    price: "$50 - $100",
-    image: "/event-3.png",
-    organizer: {
-      name: "Culinary Events",
-      avatar: "/avatar-3.png",
-    },
-    attendees: 1200,
-    isFavorite: false,
-    coordinates: { lat: 47.6062, lng: -122.3321 },
-    ticketLinks: [{ source: "Local Tickets", link: "https://localtickets.com" }],
-  },
-]
+import { eventsService } from "@/lib/services/events-service"
+
+// This API now uses real data from Supabase
 
 // Enhanced search that combines multiple sources
 export async function searchEnhancedEvents(params: EnhancedEventSearchParams): Promise<EnhancedEventSearchResult> {
@@ -120,8 +60,23 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         return cached
       }
 
-      // For now, use mock data - in production this would call real APIs
-      let filteredEvents = [...mockEvents]
+      // Use real events service to search for events
+      const searchParams = {
+        lat: params.coordinates?.lat,
+        lng: params.coordinates?.lng,
+        radius: params.radius || 25,
+        category: params.categories?.[0], // Use first category if provided
+        limit: (params.page || 0) * (params.size || 20) + (params.size || 20), // Get enough for pagination
+        offset: 0,
+      }
+
+      const eventsResult = await eventsService.searchEvents(searchParams)
+
+      if (eventsResult.error) {
+        throw new Error(eventsResult.error)
+      }
+
+      let filteredEvents = eventsResult.events
 
       // Apply keyword filtering
       if (params.keyword) {
@@ -139,13 +94,6 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         const location = params.location.toLowerCase()
         filteredEvents = filteredEvents.filter(
           (event) => event.location.toLowerCase().includes(location) || event.address.toLowerCase().includes(location),
-        )
-      }
-
-      // Apply category filtering
-      if (params.categories && params.categories.length > 0) {
-        filteredEvents = filteredEvents.filter((event) =>
-          params.categories!.some((cat) => event.category.toLowerCase().includes(cat.toLowerCase())),
         )
       }
 
@@ -170,7 +118,7 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         totalCount: sortedEvents.length,
         page,
         totalPages: Math.ceil(sortedEvents.length / size),
-        sources: ["Mock Data"], // In production: ["Ticketmaster", "RapidAPI", etc.]
+        sources: ["Supabase Database"],
         responseTime,
       }
 
@@ -306,8 +254,9 @@ export async function getFeaturedEvents(): Promise<EventDetailProps[]> {
         return cached
       }
 
-      // For now, return first 3 mock events as featured
-      const featuredEvents = mockEvents.slice(0, 3)
+      // Get upcoming events as featured events
+      const upcomingResult = await eventsService.getUpcomingEvents(3)
+      const featuredEvents = upcomingResult.events
 
       // Cache for 30 minutes
       memoryCache.set("featured_events", featuredEvents, 30 * 60 * 1000)
@@ -339,8 +288,9 @@ export async function getEventsByCategory(category: string): Promise<EventDetail
         return cached
       }
 
-      // Filter mock events by category
-      const categoryEvents = mockEvents.filter((event) => event.category.toLowerCase().includes(category.toLowerCase()))
+      // Get events by category from the service
+      const categoryResult = await eventsService.getEventsByCategory(category, 20)
+      const categoryEvents = categoryResult.events
 
       // Cache for 15 minutes
       memoryCache.set(cacheKey, categoryEvents, 15 * 60 * 1000)

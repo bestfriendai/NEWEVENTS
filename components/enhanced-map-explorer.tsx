@@ -1010,119 +1010,24 @@ logger.info("Events processed with coordinates", {
 })
 
 
-      if (eventsWithCoordinates.length === 0) {
-        // If no events were returned, generate mock events
-        logger.info("No events returned, generating mock events", {
-          component: "EnhancedMapExplorer",
-          action: "generate_mock_events"
-        })
-        const mockEvents = generateMockEventsAroundLocation(lat, lng, radius, 20)
-        setEvents(mockEvents)
-        setFilteredEvents(mockEvents)
-      } else {
-        setEvents(eventsWithCoordinates)
-        setFilteredEvents(eventsWithCoordinates)
-      }
+      setEvents(eventsWithCoordinates)
+      setFilteredEvents(eventsWithCoordinates)
     } catch (error) {
       logger.error("Error loading events", {
         component: "EnhancedMapExplorer",
         action: "load_events_error",
         metadata: { lat, lng, radius }
       }, error instanceof Error ? error : new Error(String(error)))
-      // Generate mock events around the location
-      logger.info("Error loading events, generating mock events", {
-        component: "EnhancedMapExplorer",
-        action: "fallback_mock_events"
-      })
-      const mockEvents = generateMockEventsAroundLocation(lat, lng, radius, 20)
-      setEvents(mockEvents)
-      setFilteredEvents(mockEvents)
+
+      // Set empty events on error
+      setEvents([])
+      setFilteredEvents([])
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  // Generate mock events around a location
-  const generateMockEventsAroundLocation = (
-    lat: number,
-    lng: number,
-    radius: number,
-    count: number,
-  ): EventDetail[] => {
-    const events: EventDetail[] = []
-    const categories = ["Music", "Arts", "Sports", "Food", "Business"]
-    const locations = [
-      "Park",
-      "Arena",
-      "Theater",
-      "Stadium",
-      "Hall",
-      "Center",
-      "Venue",
-      "Club",
-      "Gallery",
-      "Restaurant",
-    ]
-
-    for (let i = 0; i < count; i++) {
-      // Generate random coordinates within the radius
-      const randomAngle = Math.random() * Math.PI * 2
-      const randomRadius = Math.sqrt(Math.random()) * radius * 0.01 // Convert km to degrees (approximate)
-      const eventLat = lat + randomRadius * Math.cos(randomAngle)
-      const eventLng = lng + randomRadius * Math.sin(randomAngle)
-
-      // Generate random date within next 30 days
-      const today = new Date()
-      const futureDate = new Date(today)
-      futureDate.setDate(today.getDate() + Math.floor(Math.random() * 30))
-      const formattedDate = futureDate.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-
-      // Generate random time
-      const hours = Math.floor(Math.random() * 12) + 1
-      const minutes = Math.floor(Math.random() * 4) * 15
-      const period = Math.random() > 0.5 ? "PM" : "AM"
-      const formattedTime = `${hours}:${minutes.toString().padStart(2, "0")} ${period}`
-
-      // Generate random category
-      const category = categories[Math.floor(Math.random() * categories.length)]
-
-      // Generate random location
-      const location = locations[Math.floor(Math.random() * locations.length)]
-
-      // Generate random price
-      const price = Math.random() > 0.3 ? `$${Math.floor(Math.random() * 100) + 10}` : "Free"
-
-      // Generate random attendees
-      const attendees = Math.floor(Math.random() * 1000) + 50
-
-      // Create event
-      events.push({
-        id: 1000 + i,
-        title: `${category} Event ${i + 1}`,
-        description: `This is a mock ${category?.toLowerCase() || 'general'} event near your location.`,
-        category: category || 'general',
-        date: formattedDate,
-        time: formattedTime,
-        location: `${location} ${i + 1}`,
-        address: `Near your location`,
-        price,
-        image: "/community-event.png",
-        organizer: {
-          name: "Local Organizer",
-          avatar: "/avatar-1.png",
-        },
-        attendees,
-        isFavorite: Math.random() > 0.8,
-        coordinates: { lat: eventLat, lng: eventLng },
-      })
-    }
-
-    return events
-  }
+  // This component now uses real events from the API
 
 
   // Filter events based on search, category, and other filters

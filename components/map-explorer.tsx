@@ -15,237 +15,7 @@ import { API_CONFIG } from "@/lib/env"
 import { cn } from "@/lib/utils"
 import type { EventDetail } from "@/types/event.types"
 
-// Mock events data
-const MOCK_EVENTS: EventDetail[] = [
-  {
-    id: 1001,
-    title: "Summer Music Festival",
-    description: "A three-day music festival featuring top artists from around the world.",
-    category: "Music",
-    date: "July 15-17, 2024",
-    time: "12:00 PM - 11:00 PM",
-    location: "Central Park",
-    address: "New York, NY",
-    price: "$150",
-    image: "/community-event.png",
-    organizer: {
-      name: "NYC Events",
-      avatar: "/avatar-1.png",
-    },
-    attendees: 5000,
-    isFavorite: false,
-    coordinates: { lat: 40.7829, lng: -73.9654 },
-  },
-  {
-    id: 1002,
-    title: "Tech Conference 2024",
-    description: "The biggest tech conference of the year with keynotes, workshops, and networking.",
-    category: "Business",
-    date: "August 10-12, 2024",
-    time: "9:00 AM - 6:00 PM",
-    location: "Moscone Center",
-    address: "San Francisco, CA",
-    price: "$499",
-    image: "/community-event.png",
-    organizer: {
-      name: "TechEvents Inc",
-      avatar: "/avatar-2.png",
-    },
-    attendees: 3000,
-    isFavorite: true,
-    coordinates: { lat: 37.7749, lng: -122.4194 },
-  },
-  {
-    id: 1003,
-    title: "London Art Exhibition",
-    description: "A showcase of contemporary art from emerging artists.",
-    category: "Arts",
-    date: "September 5-15, 2024",
-    time: "10:00 AM - 8:00 PM",
-    location: "Tate Modern",
-    address: "London, UK",
-    price: "£20",
-    image: "/community-event.png",
-    organizer: {
-      name: "London Arts Council",
-      avatar: "/avatar-3.png",
-    },
-    attendees: 1500,
-    isFavorite: false,
-    coordinates: { lat: 51.5074, lng: -0.1278 },
-  },
-  {
-    id: 1004,
-    title: "Tokyo Food Festival",
-    description: "Experience the best of Japanese cuisine with top chefs and food vendors.",
-    category: "Food",
-    date: "October 1-3, 2024",
-    time: "11:00 AM - 9:00 PM",
-    location: "Yoyogi Park",
-    address: "Tokyo, Japan",
-    price: "¥3000",
-    image: "/community-event.png",
-    organizer: {
-      name: "Tokyo Culinary Association",
-      avatar: "/avatar-4.png",
-    },
-    attendees: 8000,
-    isFavorite: false,
-    coordinates: { lat: 35.6762, lng: 139.6503 },
-  },
-  {
-    id: 1005,
-    title: "Sydney Marathon",
-    description: "Annual marathon through the streets of Sydney with views of the harbor and opera house.",
-    category: "Sports",
-    date: "September 20, 2024",
-    time: "6:00 AM - 2:00 PM",
-    location: "Sydney Harbor",
-    address: "Sydney, Australia",
-    price: "AU$120",
-    image: "/community-event.png",
-    organizer: {
-      name: "Sydney Athletics",
-      avatar: "/avatar-5.png",
-    },
-    attendees: 12000,
-    isFavorite: true,
-    coordinates: { lat: -33.8688, lng: 151.2093 },
-  },
-  {
-    id: 1006,
-    title: "Berlin Electronic Music Night",
-    description: "A night of electronic music with world-renowned DJs in Berlin's famous club scene.",
-    category: "Music",
-    date: "August 25, 2024",
-    time: "11:00 PM - 6:00 AM",
-    location: "Berghain",
-    address: "Berlin, Germany",
-    price: "€30",
-    image: "/community-event.png",
-    organizer: {
-      name: "Berlin Nightlife",
-      avatar: "/avatar-6.png",
-    },
-    attendees: 1200,
-    isFavorite: false,
-    coordinates: { lat: 52.52, lng: 13.405 },
-  },
-  {
-    id: 1007,
-    title: "Rio Carnival 2025",
-    description: "The world's biggest carnival with parades, music, and dancing.",
-    category: "Arts",
-    date: "February 28 - March 5, 2025",
-    time: "All Day",
-    location: "Sambadrome",
-    address: "Rio de Janeiro, Brazil",
-    price: "R$200",
-    image: "/community-event.png",
-    organizer: {
-      name: "Rio Carnival Committee",
-      avatar: "/avatar-1.png",
-    },
-    attendees: 50000,
-    isFavorite: false,
-    coordinates: { lat: -22.9068, lng: -43.1729 },
-  },
-  {
-    id: 1008,
-    title: "Cape Town Wine Festival",
-    description: "Sample the finest wines from South Africa's renowned wine regions.",
-    category: "Food",
-    date: "November 12-14, 2024",
-    time: "12:00 PM - 8:00 PM",
-    location: "V&A Waterfront",
-    address: "Cape Town, South Africa",
-    price: "R350",
-    image: "/community-event.png",
-    organizer: {
-      name: "South African Wine Guild",
-      avatar: "/avatar-2.png",
-    },
-    attendees: 2500,
-    isFavorite: true,
-    coordinates: { lat: -33.9249, lng: 18.4241 },
-  },
-  {
-    id: 1009,
-    title: "Dubai Business Expo",
-    description: "Connect with global business leaders and explore new opportunities.",
-    category: "Business",
-    date: "October 20-22, 2024",
-    time: "9:00 AM - 7:00 PM",
-    location: "Dubai World Trade Centre",
-    address: "Dubai, UAE",
-    price: "AED 500",
-    image: "/community-event.png",
-    organizer: {
-      name: "Dubai Chamber of Commerce",
-      avatar: "/avatar-3.png",
-    },
-    attendees: 7000,
-    isFavorite: false,
-    coordinates: { lat: 25.2048, lng: 55.2708 },
-  },
-  {
-    id: 1010,
-    title: "Paris Fashion Week",
-    description: "The world's most prestigious fashion event showcasing next season's trends.",
-    category: "Arts",
-    date: "September 26 - October 4, 2024",
-    time: "Various Times",
-    location: "Various Venues",
-    address: "Paris, France",
-    price: "By Invitation",
-    image: "/community-event.png",
-    organizer: {
-      name: "Fédération de la Haute Couture",
-      avatar: "/avatar-4.png",
-    },
-    attendees: 4500,
-    isFavorite: false,
-    coordinates: { lat: 48.8566, lng: 2.3522 },
-  },
-  {
-    id: 1011,
-    title: "Mumbai Cricket Tournament",
-    description: "Annual cricket tournament featuring top teams from across India.",
-    category: "Sports",
-    date: "November 5-15, 2024",
-    time: "2:00 PM - 10:00 PM",
-    location: "Wankhede Stadium",
-    address: "Mumbai, India",
-    price: "₹1000",
-    image: "/community-event.png",
-    organizer: {
-      name: "Indian Cricket Association",
-      avatar: "/avatar-5.png",
-    },
-    attendees: 30000,
-    isFavorite: true,
-    coordinates: { lat: 19.076, lng: 72.8777 },
-  },
-  {
-    id: 1012,
-    title: "Mexico City Food Tour",
-    description: "Guided tour of Mexico City's best street food and local cuisine.",
-    category: "Food",
-    date: "Every Saturday",
-    time: "11:00 AM - 3:00 PM",
-    location: "Historic Center",
-    address: "Mexico City, Mexico",
-    price: "MX$800",
-    image: "/community-event.png",
-    organizer: {
-      name: "Mexican Culinary Tours",
-      avatar: "/avatar-6.png",
-    },
-    attendees: 20,
-    isFavorite: false,
-    coordinates: { lat: 19.4326, lng: -99.1332 },
-  },
-]
+// This component now uses real events passed via props
 
 // Categories for filtering
 const CATEGORIES = [
@@ -257,13 +27,16 @@ const CATEGORIES = [
   { id: "business", label: "Business" },
 ]
 
-export function MapExplorer() {
+interface MapExplorerProps {
+  events?: EventDetail[]
+}
+
+export function MapExplorer({ events = [] }: MapExplorerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [events, setEvents] = useState<EventDetail[]>(MOCK_EVENTS)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(MOCK_EVENTS)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(events)
   const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -473,6 +246,11 @@ export function MapExplorer() {
       addMarkersToMap()
     }
   }, [filteredEvents, mapboxLoaded, showSidebar])
+
+  // Update filtered events when events prop changes
+  useEffect(() => {
+    setFilteredEvents(events)
+  }, [events])
 
   // Filter events based on search and category
   useEffect(() => {

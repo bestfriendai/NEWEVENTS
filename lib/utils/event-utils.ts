@@ -89,74 +89,54 @@ export function formatTime(startTime: string, endTime?: string): string {
 }
 
 /**
- * Generates mock events around a location
+ * Transform database event entity to UI event props
  */
-export function generateMockEventsAroundLocation(
-  lat: number,
-  lng: number,
-  radius: number,
-  count: number,
-): EventDetailProps[] {
-  const events: EventDetailProps[] = []
-  const categories = ["Music", "Arts", "Sports", "Food", "Business"]
-  const locations = ["Park", "Arena", "Theater", "Stadium", "Hall", "Center", "Venue", "Club", "Gallery", "Restaurant"]
-
-  for (let i = 0; i < count; i++) {
-    // Generate random coordinates within the radius
-    const randomAngle = Math.random() * Math.PI * 2
-    const randomRadius = Math.sqrt(Math.random()) * radius * 0.01 // Convert km to degrees (approximate)
-    const eventLat = lat + randomRadius * Math.cos(randomAngle)
-    const eventLng = lng + randomRadius * Math.sin(randomAngle)
-
-    // Generate random date within next 30 days
-    const today = new Date()
-    const futureDate = new Date(today)
-    futureDate.setDate(today.getDate() + Math.floor(Math.random() * 30))
-    const formattedDate = futureDate.toLocaleDateString("en-US", {
+export function transformEventEntityToProps(entity: any): EventDetailProps {
+  return {
+    id: entity.id,
+    title: entity.title || "Untitled Event",
+    description: entity.description || "No description available",
+    category: entity.category || "Event",
+    date: entity.start_date ? new Date(entity.start_date).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
-    })
+    }) : "TBD",
+    time: entity.start_date ? new Date(entity.start_date).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }) : "TBD",
+    location: entity.location_name || "TBD",
+    address: entity.location_address || "Address TBD",
+    price: formatEventPrice(entity.price_min, entity.price_max, entity.price_currency),
+    image: entity.image_url || "/community-event.png",
+    organizer: {
+      name: entity.organizer_name || "Event Organizer",
+      avatar: entity.organizer_avatar || "/avatar-1.png",
+    },
+    attendees: entity.attendee_count || 0,
+    isFavorite: false, // TODO: Implement user favorites
+    coordinates: {
+      lat: entity.location_lat || 0,
+      lng: entity.location_lng || 0,
+    },
+  }
+}
 
-    // Generate random time
-    const hours = Math.floor(Math.random() * 12) + 1
-    const minutes = Math.floor(Math.random() * 4) * 15
-    const period = Math.random() > 0.5 ? "PM" : "AM"
-    const formattedTime = `${hours}:${minutes.toString().padStart(2, "0")} ${period}`
+/**
+ * Format event price for display
+ */
+function formatEventPrice(minPrice?: number, maxPrice?: number, currency = "USD"): string {
+  if (!minPrice && !maxPrice) return "Free"
+  if (minPrice === 0 && maxPrice === 0) return "Free"
 
-    // Generate random category
-    const category = categories[Math.floor(Math.random() * categories.length)] || 'Event'
+  const symbol = currency === "USD" ? "$" : currency
 
-    // Generate random location
-    const location = locations[Math.floor(Math.random() * locations.length)]
-
-    // Generate random price
-    const price = Math.random() > 0.3 ? `$${Math.floor(Math.random() * 100) + 10}` : "Free"
-
-    // Generate random attendees
-    const attendees = Math.floor(Math.random() * 1000) + 50
-
-    // Create event
-    events.push({
-      id: 1000 + i,
-      title: `${category} Event ${i + 1}`,
-      description: `This is a mock ${category.toLowerCase()} event near your location.`,
-      category,
-      date: formattedDate,
-      time: formattedTime,
-      location: `${location} ${i + 1}`,
-      address: `Near your location`,
-      price,
-      image: "/community-event.png",
-      organizer: {
-        name: "Local Organizer",
-        avatar: "/avatar-1.png",
-      },
-      attendees,
-      isFavorite: Math.random() > 0.8,
-      coordinates: { lat: eventLat, lng: eventLng },
-    })
+  if (minPrice && maxPrice && minPrice !== maxPrice) {
+    return `${symbol}${minPrice}-${maxPrice}`
   }
 
-  return events
+  const price = minPrice || maxPrice || 0
+  return `${symbol}${price}`
 }
