@@ -46,7 +46,6 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
 
       return null
     } catch (error) {
-      console.error("Geocoding error:", error)
       return null
     }
   }
@@ -60,13 +59,11 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
     try {
       const location = await geocodeLocation(locationQuery)
       if (location) {
-        console.log("Location found:", location)
         onLocationSet(location)
       } else {
         setError("Location not found. Please try a different search term.")
       }
     } catch (err) {
-      console.error("Location search error:", err)
       setError("Failed to search for location. Please try again.")
     } finally {
       setIsLoading(false)
@@ -92,7 +89,6 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
       })
 
       const { latitude, longitude } = position.coords
-      console.log("Current position:", { latitude, longitude })
 
       // Reverse geocode to get location name
       let locationName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
@@ -111,7 +107,7 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
           }
         }
       } catch (e) {
-        console.warn("Reverse geocoding failed, using coordinates")
+        // Reverse geocoding failed, use coordinates
       }
 
       const location = {
@@ -120,10 +116,8 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
         name: locationName,
       }
 
-      console.log("Setting current location:", location)
       onLocationSet(location)
     } catch (err) {
-      console.error("Geolocation error:", err)
       let errorMessage = "Unable to get your current location."
 
       if (err instanceof GeolocationPositionError) {

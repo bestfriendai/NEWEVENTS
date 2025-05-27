@@ -98,7 +98,6 @@ export default function ModernEventsExplorer({ events = [] }: ModernEventsExplor
       })
 
       map.current.on("error", (e) => {
-        console.error("Mapbox error:", e)
         setMapError("Failed to load map")
       })
 
@@ -113,7 +112,6 @@ export default function ModernEventsExplorer({ events = [] }: ModernEventsExplor
         "top-right",
       )
     } catch (error) {
-      console.error("Error initializing Mapbox:", error)
       setMapError("Failed to initialize map")
     }
 
