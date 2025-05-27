@@ -2,7 +2,7 @@ import { serverEnv, clientEnv } from "@/lib/env"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import type { TicketmasterEvent } from "@/types"
 import { logger, measurePerformance } from "@/lib/utils/logger"
-import { withRetry, formatErrorMessage } from "@/lib/utils"
+import { withRetry, formatErrorMessage } from "@/lib/utils/index"
 import { memoryCache } from "@/lib/utils/cache"
 
 export interface TicketmasterSearchParams {

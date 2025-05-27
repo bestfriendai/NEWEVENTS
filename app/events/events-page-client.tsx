@@ -423,6 +423,8 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [apiStatus, setApiStatus] = useState<any>(null)
+  const [searchRadius, setSearchRadius] = useState(25) // Default 25 mile radius
+  const [sortBy, setSortBy] = useState("date")
 
   // Test API status
   const checkApiStatus = useCallback(async () => {
@@ -482,7 +484,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
       const searchParams = {
         coordinates: { lat: location.lat, lng: location.lng },
         location: location.name,
-        radius: 50,
+        radius: searchRadius,
         size: 50,
         keyword: "events", // Add a general keyword to help find events
       }
@@ -620,16 +622,55 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     [selectedEvent],
   )
 
-  // Sort events by date
+  // Sort events based on selected criteria
   const sortedEvents = [...events].sort((a, b) => {
     try {
-      const dateA = new Date(`${a.date} ${a.time || "00:00"}`).getTime()
-      const dateB = new Date(`${b.date} ${b.time || "00:00"}`).getTime()
-      return dateA - dateB
+      switch (sortBy) {
+        case "date":
+          const dateA = new Date(`${a.date} ${a.time || "00:00"}`).getTime()
+          const dateB = new Date(`${b.date} ${b.time || "00:00"}`).getTime()
+          return dateA - dateB
+
+        case "distance":
+          if (!mapCenter || !a.coordinates || !b.coordinates) return 0
+          const distanceA = calculateDistance(mapCenter.lat, mapCenter.lng, a.coordinates.lat, a.coordinates.lng)
+          const distanceB = calculateDistance(mapCenter.lat, mapCenter.lng, b.coordinates.lat, b.coordinates.lng)
+          return distanceA - distanceB
+
+        case "popularity":
+          return (b.attendees || 0) - (a.attendees || 0)
+
+        case "price":
+          const priceA = extractPriceValue(a.price)
+          const priceB = extractPriceValue(b.price)
+          return priceA - priceB
+
+        default:
+          return 0
+      }
     } catch {
       return 0
     }
   })
+
+  // Helper function to extract numeric price value
+  const extractPriceValue = (price: string): number => {
+    if (price.toLowerCase().includes("free")) return 0
+    const match = price.match(/\$(\d+(?:\.\d{2})?)/)
+    return match ? parseFloat(match[1]) : 999999
+  }
+
+  // Helper function to calculate distance in miles using haversine formula
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 3959 // Earth's radius in miles
+    const dLat = (lat2 - lat1) * (Math.PI / 180)
+    const dLng = (lng2 - lng1) * (Math.PI / 180)
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
 
   // Initialize with provided location
   useEffect(() => {
@@ -723,6 +764,48 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
           <Navigation className="h-4 w-4 mr-2" />
           Use Current Location
         </Button>
+
+        {/* Search Radius Selector */}
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-400">Search Radius</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={searchRadius}
+              onChange={(e) => setSearchRadius(Number(e.target.value))}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+            >
+              <option value={10}>10 miles</option>
+              <option value={25}>25 miles</option>
+              <option value={50}>50 miles</option>
+              <option value={100}>100 miles</option>
+            </select>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => searchForEvents({ lat: mapCenter.lat, lng: mapCenter.lng, name: currentLocationName })}
+              className="text-purple-400 hover:text-purple-300 p-1"
+              disabled={isLoading}
+              title="Refresh with new radius"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Sort Options */}
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-400">Sort By</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+          >
+            <option value="date">Date</option>
+            <option value="distance">Distance</option>
+            <option value="popularity">Popularity</option>
+            <option value="price">Price</option>
+          </select>
+        </div>
       </div>
 
       {/* API Status */}
@@ -1015,6 +1098,13 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
                                         <div className="flex items-center">
                                           <MapPin className="h-3 w-3 mr-1" />
                                           <span className="truncate">{event.location}</span>
+                                          {sortBy === "distance" && event.coordinates && mapCenter && (
+                                            <span className="ml-2 text-xs text-purple-400">
+                                              {Math.round(
+                                                calculateDistance(mapCenter.lat, mapCenter.lng, event.coordinates.lat, event.coordinates.lng) * 10
+                                              ) / 10} mi
+                                            </span>
+                                          )}
                                         </div>
                                         <div className="flex items-center justify-between">
                                           <span className="font-medium text-purple-400">{event.price}</span>

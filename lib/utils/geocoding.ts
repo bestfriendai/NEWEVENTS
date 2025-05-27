@@ -3,7 +3,7 @@
  */
 
 import { logger } from "@/lib/utils/logger"
-import { withRetry, formatErrorMessage } from "@/lib/utils"
+import { withRetry, formatErrorMessage } from "@/lib/utils/index"
 import { getProviderConfig, checkRateLimit } from "@/lib/utils/api-config"
 
 export interface LocationData {
@@ -410,6 +410,7 @@ export const geocodingManager = new GeocodingManager()
 
 // Convenience functions
 export const geocodeAddress = (address: string) => geocodingManager.geocode(address)
+export const geocodeLocation = geocodeAddress // Alias for backward compatibility
 export const reverseGeocode = (lat: number, lng: number) => geocodingManager.reverseGeocode(lat, lng)
 export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) =>
   geocodingManager.calculateDistance(lat1, lon1, lat2, lon2)
