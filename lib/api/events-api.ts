@@ -339,7 +339,7 @@ async function searchPredictHQEvents(params: EventSearchParams): Promise<EventDe
   try {
     // Check if API key is available
     if (!serverEnv.PREDICTHQ_API_KEY) {
-      logger.warn("PredictHQ API key not configured")
+      logger.info("PredictHQ API key not configured - skipping PredictHQ search")
       return []
     }
 
@@ -370,11 +370,11 @@ async function searchPredictHQEvents(params: EventSearchParams): Promise<EventDe
 
     if (!response.ok) {
       if (response.status === 401) {
-        logger.error("PredictHQ authentication failed - check API key")
+        logger.warn("PredictHQ authentication failed - API key may be invalid or expired")
         return []
       }
       if (response.status === 403) {
-        logger.error("PredictHQ access forbidden - check subscription")
+        logger.warn("PredictHQ access forbidden - check subscription or API permissions")
         return []
       }
       if (response.status === 429) {
@@ -383,7 +383,7 @@ async function searchPredictHQEvents(params: EventSearchParams): Promise<EventDe
       }
 
       const errorText = await response.text().catch(() => "Unknown error")
-      logger.error(`PredictHQ API error: ${response.status} - ${errorText}`)
+      logger.warn(`PredictHQ API error: ${response.status} - ${errorText}`)
       return []
     }
 
@@ -395,13 +395,13 @@ async function searchPredictHQEvents(params: EventSearchParams): Promise<EventDe
     }
 
     if (data.error) {
-      logger.error(`PredictHQ returned error: ${data.error}`)
+      logger.warn(`PredictHQ returned error: ${data.error}`)
     }
 
     logger.info("PredictHQ returned no events")
     return []
   } catch (error) {
-    logger.error("PredictHQ search failed", {
+    logger.warn("PredictHQ search failed", {
       error: formatErrorMessage(error),
       hasApiKey: !!serverEnv.PREDICTHQ_API_KEY,
     })
@@ -602,7 +602,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       // Search from multiple sources in parallel with individual error handling
       const searchPromises = []
       const sources: string[] = []
-      const errors: string[] = []
+      const warnings: string[] = []
 
       // Ticketmaster search
       if (rateLimiter.checkTicketmasterLimit()) {
@@ -620,11 +620,11 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           })
             .then((result) => {
               if (result.events.length > 0) sources.push("Ticketmaster")
-              if (result.error) errors.push(`Ticketmaster: ${result.error}`)
+              if (result.error) warnings.push(`Ticketmaster: ${result.error}`)
               return result.events
             })
             .catch((error) => {
-              errors.push(`Ticketmaster: ${formatErrorMessage(error)}`)
+              warnings.push(`Ticketmaster: ${formatErrorMessage(error)}`)
               return []
             }),
         )
@@ -641,7 +641,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
             return events
           })
           .catch((error) => {
-            errors.push(`RapidAPI: ${formatErrorMessage(error)}`)
+            warnings.push(`RapidAPI: ${formatErrorMessage(error)}`)
             return []
           }),
       )
@@ -657,26 +657,30 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
             return events
           })
           .catch((error) => {
-            errors.push(`Eventbrite: ${formatErrorMessage(error)}`)
+            warnings.push(`Eventbrite: ${formatErrorMessage(error)}`)
             return []
           }),
       )
 
-      // PredictHQ search
-      searchPromises.push(
-        searchPredictHQEvents({
-          ...params,
-          size: Math.floor((params.size || 20) / 4),
-        })
-          .then((events) => {
-            if (events.length > 0) sources.push("PredictHQ")
-            return events
+      // PredictHQ search - only if API key is available
+      if (serverEnv.PREDICTHQ_API_KEY) {
+        searchPromises.push(
+          searchPredictHQEvents({
+            ...params,
+            size: Math.floor((params.size || 20) / 4),
           })
-          .catch((error) => {
-            errors.push(`PredictHQ: ${formatErrorMessage(error)}`)
-            return []
-          }),
-      )
+            .then((events) => {
+              if (events.length > 0) sources.push("PredictHQ")
+              return events
+            })
+            .catch((error) => {
+              warnings.push(`PredictHQ: ${formatErrorMessage(error)}`)
+              return []
+            }),
+        )
+      } else {
+        logger.info("PredictHQ API key not configured - skipping PredictHQ search")
+      }
 
       // Wait for all searches to complete
       const results = await Promise.allSettled(searchPromises)
@@ -718,7 +722,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         responseTime,
         cached: false,
         filters,
-        error: errors.length > 0 ? `Some APIs failed: ${errors.join("; ")}` : undefined,
+        error: warnings.length > 0 ? `Some APIs had issues: ${warnings.join("; ")}` : undefined,
       }
 
       // Cache the result for 5 minutes (shorter for real data)
@@ -733,7 +737,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           eventCount: result.events.length,
           totalCount: result.totalCount,
           sources,
-          errors: errors.length,
+          warnings: warnings.length,
           responseTime,
           apiStatus: {
             ticketmaster: sources.includes("Ticketmaster"),
@@ -745,13 +749,15 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       })
 
       // If no events found from any API, provide fallback events
-      if (result.events.length === 0 && errors.length > 0) {
+      if (result.events.length === 0) {
         logger.info("No events found from APIs, using fallback events")
         const fallbackEvents = generateFallbackEvents(params.size || 20)
         result.events = fallbackEvents.slice(0, params.size || 20)
         result.totalCount = fallbackEvents.length
         result.sources = ["Fallback"]
-        result.error = `All APIs failed: ${errors.join("; ")} - Showing sample events`
+        if (warnings.length > 0) {
+          result.error = `APIs had issues: ${warnings.join("; ")} - Showing sample events`
+        }
       }
 
       return result
@@ -769,13 +775,15 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         error instanceof Error ? error : new Error(errorMessage),
       )
 
+      // Return fallback events on complete failure
+      const fallbackEvents = generateFallbackEvents(params.size || 20)
       return {
-        events: [],
-        totalCount: 0,
+        events: fallbackEvents.slice(0, params.size || 20),
+        totalCount: fallbackEvents.length,
         page: params.page || 0,
-        totalPages: 0,
-        sources: [],
-        error: errorMessage,
+        totalPages: Math.ceil(fallbackEvents.length / (params.size || 20)),
+        sources: ["Fallback"],
+        error: `Search failed: ${errorMessage} - Showing sample events`,
         responseTime,
         cached: false,
       }

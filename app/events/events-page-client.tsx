@@ -61,11 +61,18 @@ function MapboxMap({
           throw new Error("Mapbox API key not configured")
         }
 
+        console.log("Initializing Mapbox map...")
+
         // Import Mapbox GL
         const mapboxgl = (await import("mapbox-gl")).default
         ;(mapboxgl as any).accessToken = mapboxApiKey
 
+        // Make mapboxgl available globally for marker creation
+        ;(window as any).mapboxgl = mapboxgl
+
         if (mapContainerRef.current && !mapRef.current) {
+          console.log("Creating map instance...")
+
           // Create map
           mapRef.current = new mapboxgl.Map({
             container: mapContainerRef.current,
@@ -81,21 +88,28 @@ function MapboxMap({
 
           // Map events
           mapRef.current.on("load", () => {
+            console.log("Map loaded successfully")
             setMapLoaded(true)
             try {
               mapRef.current.setFog({})
             } catch (e) {
-              // Fog not supported, continue
+              console.warn("Fog effect not supported")
             }
             logger.info("Mapbox map loaded", { component: "MapboxMap" })
           })
 
           mapRef.current.on("error", (e: any) => {
+            console.error("Mapbox error:", e)
             logger.error("Mapbox error", { component: "MapboxMap", error: e })
             setMapError("Map failed to load")
           })
+
+          mapRef.current.on("style.load", () => {
+            console.log("Map style loaded")
+          })
         }
       } catch (error) {
+        console.error("Failed to initialize map:", error)
         logger.error("Failed to initialize map", { component: "MapboxMap", error })
         setMapError("Failed to load map. Check your Mapbox configuration.")
       }
@@ -105,11 +119,12 @@ function MapboxMap({
 
     return () => {
       if (mapRef.current) {
+        console.log("Cleaning up map...")
         mapRef.current.remove()
         mapRef.current = null
       }
     }
-  }, [])
+  }, []) // Only run once on mount
 
   // Update map center
   useEffect(() => {
@@ -127,72 +142,148 @@ function MapboxMap({
     if (!mapRef.current || !mapLoaded) return
 
     // Clear existing markers
-    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.forEach((marker) => {
+      try {
+        marker.remove()
+      } catch (e) {
+        console.warn("Error removing marker:", e)
+      }
+    })
     markersRef.current = []
 
+    // Don't proceed if no events or mapbox not available
+    if (events.length === 0) return
+
+    // Get Mapbox GL from the imported module or window
+    let mapboxgl
+    try {
+      mapboxgl = (window as any).mapboxgl
+      if (!mapboxgl) {
+        console.warn("Mapbox GL not available on window")
+        return
+      }
+    } catch (e) {
+      console.warn("Error accessing Mapbox GL:", e)
+      return
+    }
+
+    console.log(`Creating ${events.length} markers`)
+
     // Add new markers
-    events.forEach((event) => {
-      if (!event.coordinates) return
+    events.forEach((event, index) => {
+      // Use provided coordinates or generate nearby coordinates
+      let coordinates = event.coordinates
+      if (!coordinates) {
+        // Generate coordinates near the map center with some randomization
+        const latOffset = (Math.random() - 0.5) * 0.02 // ~1km radius
+        const lngOffset = (Math.random() - 0.5) * 0.02
+        coordinates = {
+          lat: center.lat + latOffset,
+          lng: center.lng + lngOffset,
+        }
+        console.log(`Generated coordinates for ${event.title}:`, coordinates)
+      }
 
       try {
-        const mapboxgl = (window as any).mapboxgl
         const isSelected = event.id === selectedEventId
 
-        // Create marker element
+        // Create marker element with better styling
         const el = document.createElement("div")
-        el.className = `w-8 h-8 rounded-full border-2 border-white cursor-pointer transition-all duration-200 flex items-center justify-center ${
-          isSelected
-            ? "bg-purple-500 ring-4 ring-purple-500/50 scale-110 z-50"
-            : "bg-pink-500 hover:bg-pink-400 hover:scale-110"
-        }`
+        el.className = `marker-element cursor-pointer transition-all duration-200 flex items-center justify-center`
+        el.style.width = "32px"
+        el.style.height = "32px"
+        el.style.borderRadius = "50%"
+        el.style.border = "3px solid white"
+        el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)"
+        el.style.zIndex = isSelected ? "1000" : "100"
+        el.style.position = "relative"
 
+        if (isSelected) {
+          el.style.backgroundColor = "#8B5CF6" // purple-500
+          el.style.transform = "scale(1.2)"
+          el.style.boxShadow = "0 0 0 4px rgba(139, 92, 246, 0.3), 0 2px 8px rgba(0,0,0,0.3)"
+        } else {
+          el.style.backgroundColor = "#EC4899" // pink-500
+        }
+
+        // Add icon
         el.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2">
             <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
         `
 
+        // Add hover effects
+        el.addEventListener("mouseenter", () => {
+          if (!isSelected) {
+            el.style.transform = "scale(1.1)"
+            el.style.backgroundColor = "#F472B6" // pink-400
+          }
+        })
+
+        el.addEventListener("mouseleave", () => {
+          if (!isSelected) {
+            el.style.transform = "scale(1)"
+            el.style.backgroundColor = "#EC4899" // pink-500
+          }
+        })
+
         // Create marker
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([event.coordinates.lng, event.coordinates.lat])
-          .addTo(mapRef.current)
+        const marker = new mapboxgl.Marker(el).setLngLat([coordinates.lng, coordinates.lat]).addTo(mapRef.current)
 
         // Add click handler
         el.addEventListener("click", (e) => {
           e.stopPropagation()
+          console.log("Marker clicked:", event.title)
           onEventSelect(event)
         })
 
-        // Create popup
+        // Create popup with better content
         const popup = new mapboxgl.Popup({
-          offset: 25,
+          offset: 35,
           closeButton: false,
           closeOnClick: false,
+          className: "custom-popup",
         }).setHTML(`
-          <div class="p-3 max-w-xs">
-            <div class="font-semibold text-sm mb-1 text-gray-900">${event.title}</div>
-            <div class="text-xs text-gray-600 mb-1">${event.location}</div>
-            <div class="text-xs text-gray-500">${event.date}</div>
-            <div class="text-xs font-medium text-purple-600 mt-1">${event.price}</div>
+          <div style="padding: 12px; max-width: 250px; font-family: system-ui;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #1f2937; line-height: 1.3;">
+              ${event.title}
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+              📍 ${event.location}
+            </div>
+            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+              📅 ${event.date}${event.time ? ` at ${event.time}` : ""}
+            </div>
+            <div style="font-size: 12px; font-weight: 500; color: #8b5cf6;">
+              ${event.price}
+            </div>
           </div>
         `)
 
-        // Show popup on hover
+        // Show popup on hover with delay
+        let hoverTimeout: NodeJS.Timeout
         el.addEventListener("mouseenter", () => {
-          marker.setPopup(popup).togglePopup()
+          hoverTimeout = setTimeout(() => {
+            marker.setPopup(popup).togglePopup()
+          }, 500)
         })
 
         el.addEventListener("mouseleave", () => {
+          clearTimeout(hoverTimeout)
           popup.remove()
         })
 
         markersRef.current.push(marker)
+        console.log(`Created marker ${index + 1}/${events.length} for ${event.title}`)
       } catch (error) {
-        logger.warn("Failed to create marker", { component: "MapboxMap", eventId: event.id })
+        console.error(`Failed to create marker for event ${event.title}:`, error)
       }
     })
-  }, [events, selectedEventId, mapLoaded, onEventSelect])
+
+    console.log(`Successfully created ${markersRef.current.length} markers`)
+  }, [events, selectedEventId, mapLoaded, onEventSelect, center])
 
   if (mapError) {
     return (
