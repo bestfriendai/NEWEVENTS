@@ -1,4 +1,5 @@
 import { logger } from "@/lib/utils/logger"
+import { serverEnv } from "@/lib/env"
 
 export interface RealEvent {
   id: string
@@ -52,9 +53,9 @@ export interface RealLocationSearchParams {
 }
 
 class RealAPIEventsService {
-  private readonly ticketmasterApiKey = process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY
-  private readonly eventbriteApiKey = process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY
-  private readonly predictHQApiKey = process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY
+  private readonly ticketmasterApiKey = serverEnv.TICKETMASTER_API_KEY
+  private readonly eventbriteApiKey = serverEnv.EVENTBRITE_API_KEY
+  private readonly predictHQApiKey = serverEnv.PREDICTHQ_API_KEY
 
   private calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 3959 // Earth's radius in miles
@@ -157,7 +158,7 @@ class RealAPIEventsService {
               images: event.images?.map((img: any) => img.url) || [],
               ticketUrl: event.url,
               website: event.url,
-              rating: Math.random() * 2 + 3, // Random rating between 3-5
+              rating: Math.random() * 2 + 3,
               tags: [
                 ...(event.classifications?.map((c: any) => c.genre?.name).filter(Boolean) || []),
                 ...(event.classifications?.map((c: any) => c.subGenre?.name).filter(Boolean) || []),

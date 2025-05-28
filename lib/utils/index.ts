@@ -112,3 +112,19 @@ export function sanitizeHtml(html: string): string {
     .replace(/&[^;]+;/g, " ") // Remove HTML entities
     .trim()
 }
+
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return (
+      error.message.includes("fetch") ||
+      error.message.includes("network") ||
+      error.message.includes("ECONNREFUSED") ||
+      error.message.includes("timeout") ||
+      error.name === "NetworkError" ||
+      error.name === "TypeError"
+    )
+  }
+  return false
+}
+
+// Export isNetworkError

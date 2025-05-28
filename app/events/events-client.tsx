@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import { MapPin, Search, Navigation, Loader2, AlertTriangle, Calendar, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { logger } from "@/lib/utils/logger"
+import { geocodeLocation, reverseGeocode } from "@/app/actions/location-actions"
+import { EventsMap } from "@/components/events-map"
 
 // Simple event interface to avoid import issues
 interface SimpleEvent {
@@ -33,105 +35,105 @@ interface SimpleEvent {
 }
 
 // Simple map component that doesn't rely on complex imports
-function SimpleMap({
-  center,
-  events,
-  selectedEventId,
-  onEventSelect,
-}: {
-  center: { lat: number; lng: number }
-  events: SimpleEvent[]
-  selectedEventId: number | null
-  onEventSelect: (event: SimpleEvent) => void
-}) {
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
+// function SimpleMap({
+//   center,
+//   events,
+//   selectedEventId,
+//   onEventSelect,
+// }: {
+//   center: { lat: number; lng: number }
+//   events: SimpleEvent[]
+//   selectedEventId: number | null
+//   onEventSelect: (event: SimpleEvent) => void
+// }) {
+//   const [mapLoaded, setMapLoaded] = useState(false)
+//   const [mapError, setMapError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Simulate map loading
-    const timer = setTimeout(() => {
-      setMapLoaded(true)
-    }, 1000)
+//   useEffect(() => {
+//     // Simulate map loading
+//     const timer = setTimeout(() => {
+//       setMapLoaded(true)
+//     }, 1000)
 
-    return () => clearTimeout(timer)
-  }, [])
+//     return () => clearTimeout(timer)
+//   }, [])
 
-  if (mapError) {
-    return (
-      <div className="h-full bg-gray-900 flex items-center justify-center text-red-400">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
-          <p>Map failed to load</p>
-        </div>
-      </div>
-    )
-  }
+//   if (mapError) {
+//     return (
+//       <div className="h-full bg-gray-900 flex items-center justify-center text-red-400">
+//         <div className="text-center">
+//           <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+//           <p>Map failed to load</p>
+//         </div>
+//       </div>
+//     )
+//   }
 
-  if (!mapLoaded) {
-    return (
-      <div className="h-full bg-gray-900 flex items-center justify-center">
-        <div className="text-center text-white">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p>Loading map...</p>
-        </div>
-      </div>
-    )
-  }
+//   if (!mapLoaded) {
+//     return (
+//       <div className="h-full bg-gray-900 flex items-center justify-center">
+//         <div className="text-center text-white">
+//           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+//           <p>Loading map...</p>
+//         </div>
+//       </div>
+//     )
+//   }
 
-  return (
-    <div className="h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
-      {/* Map background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-pink-900/20" />
+//   return (
+//     <div className="h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+//       {/* Map background */}
+//       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-pink-900/20" />
 
-      {/* Center indicator */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-        <div className="w-4 h-4 bg-purple-500 rounded-full border-2 border-white shadow-lg"></div>
-      </div>
+//       {/* Center indicator */}
+//       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+//         <div className="w-4 h-4 bg-purple-500 rounded-full border-2 border-white shadow-lg"></div>
+//       </div>
 
-      {/* Event markers */}
-      {events.map((event, index) => {
-        const isSelected = event.id === selectedEventId
-        // Position markers around the center
-        const angle = (index / events.length) * 2 * Math.PI
-        const radius = 100 + Math.random() * 150
-        const x = 50 + (Math.cos(angle) * radius) / 10
-        const y = 50 + (Math.sin(angle) * radius) / 10
+//       {/* Event markers */}
+//       {events.map((event, index) => {
+//         const isSelected = event.id === selectedEventId
+//         // Position markers around the center
+//         const angle = (index / events.length) * 2 * Math.PI
+//         const radius = 100 + Math.random() * 150
+//         const x = 50 + (Math.cos(angle) * radius) / 10
+//         const y = 50 + (Math.sin(angle) * radius) / 10
 
-        return (
-          <div
-            key={event.id}
-            className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 hover:scale-125 ${
-              isSelected ? "scale-125 z-10" : ""
-            }`}
-            style={{ left: `${x}%`, top: `${y}%` }}
-            onClick={() => onEventSelect(event)}
-          >
-            <div
-              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                isSelected ? "bg-purple-500 border-white ring-2 ring-purple-500" : "bg-pink-500 border-white"
-              }`}
-            >
-              <MapPin className="h-3 w-3 text-white" />
-            </div>
-            {isSelected && (
-              <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs p-2 rounded whitespace-nowrap">
-                {event.title}
-              </div>
-            )}
-          </div>
-        )
-      })}
+//         return (
+//           <div
+//             key={event.id}
+//             className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 hover:scale-125 ${
+//               isSelected ? "scale-125 z-10" : ""
+//             }`}
+//             style={{ left: `${x}%`, top: `${y}%` }}
+//             onClick={() => onEventSelect(event)}
+//           >
+//             <div
+//               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+//                 isSelected ? "bg-purple-500 border-white ring-2 ring-purple-500" : "bg-pink-500 border-white"
+//               }`}
+//             >
+//               <MapPin className="h-3 w-3 text-white" />
+//             </div>
+//             {isSelected && (
+//               <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs p-2 rounded whitespace-nowrap">
+//                 {event.title}
+//               </div>
+//             )}
+//           </div>
+//         )
+//       })}
 
-      {/* Map info */}
-      <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white p-3 rounded-lg">
-        <div className="text-sm font-medium">
-          📍 {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
-        </div>
-        <div className="text-xs text-gray-300">{events.length} events found</div>
-      </div>
-    </div>
-  )
-}
+//       {/* Map info */}
+//       <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white p-3 rounded-lg">
+//         <div className="text-sm font-medium">
+//           📍 {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
+//         </div>
+//         <div className="text-xs text-gray-300">{events.length} events found</div>
+//       </div>
+//     </div>
+//   )
+// }
 
 export function EventsClient() {
   const [events, setEvents] = useState<SimpleEvent[]>([])
@@ -141,11 +143,28 @@ export function EventsClient() {
   const [selectedEvent, setSelectedEvent] = useState<SimpleEvent | null>(null)
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 })
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
+  const [mapLoadError, setMapLoadError] = useState<string | null>(null)
 
   // Fetch real events from API
-  const fetchEventsForLocation = async (lat: number, lng: number, locationName: string): Promise<SimpleEvent[]> => {
+  const fetchEventsForLocation = async (
+    lat: number,
+    lng: number,
+    locationName: string,
+    retryCount = 0,
+  ): Promise<SimpleEvent[]> => {
     try {
-      const response = await fetch(`/api/events?lat=${lat}&lng=${lng}&radius=25&limit=20`)
+      const response = await fetch(`/api/events/enhanced?lat=${lat}&lng=${lng}&radius=25&limit=100`)
+      if (!response.ok) {
+        if (response.status === 429 && retryCount < 3) {
+          // Implement exponential backoff
+          const delay = 2 ** retryCount * 1000 // 1s, 2s, 4s
+          logger.warn(`Rate limited. Retrying in ${delay}ms`, { component: "EventsClient", retryCount })
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          return fetchEventsForLocation(lat, lng, locationName, retryCount + 1) // Recursive call
+        }
+        throw new Error(`Failed to fetch events: ${response.status} ${response.statusText}`)
+      }
+
       const data = await response.json()
 
       if (!data.success) {
@@ -179,42 +198,22 @@ export function EventsClient() {
     }
   }
 
-  // Real geocoding using Mapbox
-  const geocodeLocation = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
+  // Real geocoding using server action
+  const geocodeLocationServer = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
     try {
-      const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-      if (!mapboxKey) {
-        throw new Error("Mapbox API key not configured")
+      const result = await geocodeLocation(query)
+      if (result.success && result.data) {
+        return {
+          lat: result.data.lat,
+          lng: result.data.lng,
+          name: result.data.name,
+        }
       }
-
-      const encodedQuery = encodeURIComponent(query.trim())
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${mapboxKey}&limit=1&types=place,locality,neighborhood,address`
-      )
-
-      if (!response.ok) {
-        throw new Error(`Geocoding failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const features = data.features || []
-
-      if (features.length === 0) {
-        return null
-      }
-
-      const feature = features[0]
-      const [lng, lat] = feature.center
-
-      return {
-        lat,
-        lng,
-        name: feature.place_name,
-      }
+      return null
     } catch (error) {
       logger.error("Geocoding failed", {
         component: "EventsClient",
-        action: "geocodeLocation",
+        action: "geocodeLocationServer",
         query,
         error: error instanceof Error ? error.message : "Unknown error",
       })
@@ -232,8 +231,8 @@ export function EventsClient() {
     try {
       logger.info("Starting location search", { component: "EventsClient", query: locationQuery })
 
-      // Geocode the location
-      const geocodedLocation = await geocodeLocation(locationQuery)
+      // Geocode the location using server action
+      const geocodedLocation = await geocodeLocationServer(locationQuery)
 
       if (!geocodedLocation) {
         throw new Error("Location not found. Please try a different search term.")
@@ -243,16 +242,36 @@ export function EventsClient() {
       setCurrentLocationName(geocodedLocation.name)
 
       // Fetch real events for this location
-      const realEvents = await fetchEventsForLocation(
+      const initialEvents = await fetchEventsForLocation(
         geocodedLocation.lat,
         geocodedLocation.lng,
-        geocodedLocation.name
+        geocodedLocation.name,
       )
-      setEvents(realEvents)
+      let allEvents = [...initialEvents]
+
+      // Additional search strategies
+      const keywords = ["music", "arts", "sports", "theater", "comedy", "festival"]
+      for (const keyword of keywords) {
+        const keywordQuery = `${keyword} in ${locationQuery}`
+        const keywordGeocodedLocation = await geocodeLocationServer(keywordQuery)
+
+        if (keywordGeocodedLocation) {
+          const keywordEvents = await fetchEventsForLocation(
+            keywordGeocodedLocation.lat,
+            keywordGeocodedLocation.lng,
+            keywordGeocodedLocation.name,
+          )
+
+          // Combine results, removing duplicates
+          allEvents = [...allEvents, ...keywordEvents.filter((event) => !allEvents.find((e) => e.id === event.id))]
+        }
+      }
+
+      setEvents(allEvents)
 
       logger.info("Events loaded successfully", {
         component: "EventsClient",
-        eventCount: realEvents.length,
+        eventCount: allEvents.length,
         location: geocodedLocation.name,
       })
     } catch (err) {
@@ -286,23 +305,11 @@ export function EventsClient() {
       const { latitude, longitude } = position.coords
       setMapCenter({ lat: latitude, lng: longitude })
 
-      // Try to reverse geocode to get a readable location name
+      // Try to reverse geocode to get a readable location name using server action
       try {
-        const mapboxKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-        if (mapboxKey) {
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxKey}&limit=1`
-          )
-          if (response.ok) {
-            const data = await response.json()
-            if (data.features && data.features.length > 0) {
-              setCurrentLocationName(data.features[0].place_name)
-            } else {
-              setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
-            }
-          } else {
-            setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
-          }
+        const result = await reverseGeocode(latitude, longitude)
+        if (result.success && result.data) {
+          setCurrentLocationName(result.data.name)
         } else {
           setCurrentLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`)
         }
@@ -474,12 +481,23 @@ export function EventsClient() {
     <div className="h-[calc(100vh-80px)] bg-[#0F1116] flex overflow-hidden">
       {/* Map Area */}
       <div className="flex-1 relative">
-        <SimpleMap
-          center={mapCenter}
-          events={events}
-          selectedEventId={selectedEvent?.id || null}
-          onEventSelect={handleEventSelect}
-        />
+        {mapLoadError ? (
+          <div className="h-full bg-gray-900 flex items-center justify-center text-red-400">
+            <div className="text-center">
+              <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+              <p>Map failed to load</p>
+              <p className="text-sm mt-2">{mapLoadError}</p>
+            </div>
+          </div>
+        ) : (
+          <EventsMap
+            center={mapCenter}
+            events={events}
+            selectedEventId={selectedEvent?.id || null}
+            onEventSelect={handleEventSelect}
+            onError={setMapLoadError}
+          />
+        )}
       </div>
 
       {/* Right Panel */}
@@ -550,9 +568,7 @@ export function EventsClient() {
             <div className="text-center py-8 text-gray-500">
               <MapPin className="h-12 w-12 mx-auto mb-3" />
               <p>Search for a location to discover events</p>
-              <p className="text-sm mt-2 text-gray-400">
-                Enter any city, address, or use your current location
-              </p>
+              <p className="text-sm mt-2 text-gray-400">Enter any city, address, or use your current location</p>
             </div>
           )}
         </div>

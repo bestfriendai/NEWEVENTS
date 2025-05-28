@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { geocodeLocation } from "@/app/actions/location-actions"
+import { reverseGeocode } from "@/app/actions/location-actions"
 
 interface LocationSetupScreenProps {
   onLocationSet: (location: { lat: number; lng: number; name: string }) => void
@@ -17,33 +19,16 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const geocodeLocation = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
+  const geocodeLocationServer = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
     try {
-      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-      if (!mapboxToken) {
-        throw new Error("Location services not configured")
-      }
-
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=1&types=place,locality,neighborhood,address`,
-      )
-
-      if (!response.ok) {
-        throw new Error("Failed to find location")
-      }
-
-      const data = await response.json()
-
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0]
-        const [lng, lat] = feature.center
+      const result = await geocodeLocation(query)
+      if (result.success && result.data) {
         return {
-          lat,
-          lng,
-          name: feature.place_name,
+          lat: result.data.lat,
+          lng: result.data.lng,
+          name: result.data.name,
         }
       }
-
       return null
     } catch (error) {
       return null
@@ -57,7 +42,7 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
     setError(null)
 
     try {
-      const location = await geocodeLocation(locationQuery)
+      const location = await geocodeLocationServer(locationQuery)
       if (location) {
         onLocationSet(location)
       } else {
@@ -70,16 +55,34 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
     }
   }
 
-  const handleCurrentLocation = async () => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by this browser")
-      return
-    }
-
+  const handlePopularLocationClick = async (city: string) => {
+    setLocationQuery(city)
     setIsLoading(true)
     setError(null)
 
     try {
+      const location = await geocodeLocationServer(city)
+      if (location) {
+        onLocationSet(location)
+      } else {
+        setError(`Could not find ${city}. Please try a different location.`)
+      }
+    } catch (err) {
+      setError("Failed to search for location. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCurrentLocation = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      if (!navigator.geolocation) {
+        throw new Error("Geolocation is not supported by this browser")
+      }
+
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           timeout: 15000,
@@ -90,24 +93,12 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
 
       const { latitude, longitude } = position.coords
 
-      // Reverse geocode to get location name
+      // Use server action for reverse geocoding
+      const result = await reverseGeocode(latitude, longitude)
       let locationName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
 
-      try {
-        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-        if (mapboxToken) {
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&limit=1`,
-          )
-          if (response.ok) {
-            const data = await response.json()
-            if (data.features && data.features.length > 0) {
-              locationName = data.features[0].place_name
-            }
-          }
-        }
-      } catch (e) {
-        // Reverse geocoding failed, use coordinates
+      if (result.success && result.data) {
+        locationName = result.data.name
       }
 
       const location = {
@@ -135,25 +126,6 @@ export function LocationSetupScreen({ onLocationSet }: LocationSetupScreenProps)
       }
 
       setError(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handlePopularLocationClick = async (city: string) => {
-    setLocationQuery(city)
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const location = await geocodeLocation(city)
-      if (location) {
-        onLocationSet(location)
-      } else {
-        setError(`Could not find ${city}. Please try a different location.`)
-      }
-    } catch (err) {
-      setError("Failed to search for location. Please try again.")
     } finally {
       setIsLoading(false)
     }

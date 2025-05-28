@@ -1,5 +1,6 @@
 import type { Event, EventFilters, ApiResponse } from "@/types/event.types"
 import { logger } from "@/lib/utils/logger"
+import { serverEnv } from "@/lib/env"
 
 interface EventsApiConfig {
   ticketmaster: {
@@ -22,15 +23,15 @@ class UnifiedEventsApi {
   constructor() {
     this.config = {
       ticketmaster: {
-        apiKey: process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || "",
+        apiKey: serverEnv.TICKETMASTER_API_KEY || "",
         baseUrl: "https://app.ticketmaster.com/discovery/v2",
       },
       predicthq: {
-        apiKey: process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "",
+        apiKey: serverEnv.PREDICTHQ_API_KEY || "",
         baseUrl: "https://api.predicthq.com/v1",
       },
       eventbrite: {
-        apiKey: process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "",
+        apiKey: serverEnv.EVENTBRITE_API_KEY || "",
         baseUrl: "https://www.eventbriteapi.com/v3",
       },
     }

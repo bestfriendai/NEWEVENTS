@@ -1,4 +1,5 @@
 import { logger } from "@/lib/utils/logger"
+import { geocodeLocation, reverseGeocode } from "@/app/actions/location-actions"
 
 export interface RealUserLocation {
   lat: number
@@ -16,8 +17,6 @@ export interface RealLocationError {
 }
 
 class RealLocationService {
-  private readonly mapboxApiKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-
   async getCurrentLocation(): Promise<RealUserLocation> {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -45,9 +44,31 @@ class RealLocationService {
               metadata: { lat: latitude, lng: longitude },
             })
 
-            // Try to reverse geocode the location
-            const location = await this.reverseGeocode(latitude, longitude)
-            resolve(location)
+            // Try to reverse geocode the location using server action
+            const result = await reverseGeocode(latitude, longitude)
+
+            if (result.success && result.data) {
+              resolve({
+                lat: result.data.lat,
+                lng: result.data.lng,
+                address: result.data.address || result.data.name,
+                city: result.data.city || "Current Location",
+                state: result.data.state || "",
+                country: result.data.country || "US",
+                displayName: result.data.name,
+              })
+            } else {
+              // Fallback to basic location
+              resolve({
+                lat: latitude,
+                lng: longitude,
+                address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                city: "Current Location",
+                state: "",
+                country: "US",
+                displayName: "Current Location",
+              })
+            }
           } catch (error) {
             logger.error("Error processing current location", {
               component: "RealLocationService",
@@ -112,42 +133,18 @@ class RealLocationService {
         metadata: { query },
       })
 
-      if (!this.mapboxApiKey) {
-        logger.warn("Mapbox API key not found, using fallback")
-        return this.getFallbackLocation(query)
-      }
+      // Use server action for geocoding
+      const result = await geocodeLocation(query)
 
-      const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`)
-      url.searchParams.set("access_token", this.mapboxApiKey)
-      url.searchParams.set("limit", "1")
-      url.searchParams.set("types", "place,locality,neighborhood,address")
-
-      const response = await fetch(url.toString())
-      if (!response.ok) {
-        throw new Error(`Mapbox API error: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0]
-        const [lng, lat] = feature.center
-
-        // Extract location components
-        const context = feature.context || []
-        const place = feature.place_name
-        const city = feature.text
-        const state = context.find((c: any) => c.id.startsWith("region"))?.text || ""
-        const country = context.find((c: any) => c.id.startsWith("country"))?.short_code?.toUpperCase() || "US"
-
+      if (result.success && result.data) {
         const location: RealUserLocation = {
-          lat,
-          lng,
-          address: place,
-          city,
-          state,
-          country,
-          displayName: `${city}${state ? `, ${state}` : ""}`,
+          lat: result.data.lat,
+          lng: result.data.lng,
+          address: result.data.address || result.data.name,
+          city: result.data.city || query,
+          state: result.data.state || "",
+          country: result.data.country || "US",
+          displayName: result.data.name,
         }
 
         logger.info("Location search successful", {
@@ -159,7 +156,7 @@ class RealLocationService {
         return location
       }
 
-      // No results found, use fallback
+      // Use fallback location
       return this.getFallbackLocation(query)
     } catch (error) {
       logger.error("Location search failed", {
@@ -171,69 +168,6 @@ class RealLocationService {
 
       // Use fallback location
       return this.getFallbackLocation(query)
-    }
-  }
-
-  private async reverseGeocode(lat: number, lng: number): Promise<RealUserLocation> {
-    if (!this.mapboxApiKey) {
-      return {
-        lat,
-        lng,
-        address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-        city: "Current Location",
-        state: "",
-        country: "US",
-        displayName: "Current Location",
-      }
-    }
-
-    try {
-      const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`)
-      url.searchParams.set("access_token", this.mapboxApiKey)
-      url.searchParams.set("limit", "1")
-
-      const response = await fetch(url.toString())
-      if (!response.ok) {
-        throw new Error(`Mapbox reverse geocoding error: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0]
-        const context = feature.context || []
-        const place = feature.place_name
-        const city = context.find((c: any) => c.id.startsWith("place"))?.text || "Current Location"
-        const state = context.find((c: any) => c.id.startsWith("region"))?.short_code || ""
-        const country = context.find((c: any) => c.id.startsWith("country"))?.short_code?.toUpperCase() || "US"
-
-        return {
-          lat,
-          lng,
-          address: place,
-          city,
-          state,
-          country,
-          displayName: `${city}${state ? `, ${state}` : ""}`,
-        }
-      }
-    } catch (error) {
-      logger.error("Reverse geocoding failed", {
-        component: "RealLocationService",
-        action: "reverseGeocode",
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-
-    // Fallback
-    return {
-      lat,
-      lng,
-      address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      city: "Current Location",
-      state: "",
-      country: "US",
-      displayName: "Current Location",
     }
   }
 

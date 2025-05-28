@@ -122,3 +122,8 @@ export function useLocation() {
   }
   return context
 }
+
+// Alias for useLocation for compatibility
+export const useLocationContext = useLocation
+
+// Export useLocationContext

@@ -76,8 +76,8 @@ The NEWEVENTS platform has a robust API integration setup with most critical ser
 - **Connectivity:** ❌ Account endpoint failed (401 Unauthorized)
 - **Geocoding:** ✅ Success (accurate location data)
 - **Reverse Geocoding:** ✅ Success (place name resolution)
-- **Issues:** Account verification endpoint requires different authentication
-- **Recommendation:** Core mapping functionality works; account endpoint not critical for event search
+- **Issues:** Account verification endpoint requires different authentication. Server-side only.
+- **Recommendation:** Core mapping functionality works; account endpoint not critical for event search. API key is server-side only.
 
 #### 6. Eventbrite API ⚠️
 - **Status:** Partially Operational
@@ -169,7 +169,6 @@ All returned events include:
 - `RAPIDAPI_KEY`
 - `RAPIDAPI_HOST`
 - `TOMTOM_API_KEY`
-- `NEXT_PUBLIC_MAPBOX_API_KEY`
 - `EVENTBRITE_PRIVATE_TOKEN`
 
 #### ❌ Missing

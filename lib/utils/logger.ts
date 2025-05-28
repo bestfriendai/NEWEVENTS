@@ -156,3 +156,47 @@ export function formatErrorMessage(error: unknown): string {
 
   return "Unknown error occurred"
 }
+
+// API logging utilities
+export function logApiCall(apiName: string, endpoint: string, params?: any): void {
+  logger.info(`API Call: ${apiName}`, {
+    component: "api-client",
+    action: "api_call",
+    metadata: { endpoint, params },
+  })
+}
+
+// API logging utilities
+export function logApiResponse(
+  apiName: string,
+  endpoint: string,
+  success: boolean,
+  responseTime?: number,
+  data?: any,
+): void {
+  if (success) {
+    logger.info(`API Success: ${apiName}`, {
+      component: "api-client",
+      action: "api_success",
+      metadata: { endpoint, responseTime, dataLength: Array.isArray(data) ? data.length : undefined },
+    })
+  } else {
+    logger.warn(`API Failed: ${apiName}`, {
+      component: "api-client",
+      action: "api_failure",
+      metadata: { endpoint, responseTime },
+    })
+  }
+}
+
+// API logging utilities
+export function logError(message: string, error: unknown, context?: any): void {
+  logger.error(message, {
+    component: context?.component || "unknown",
+    action: context?.action || "error",
+    metadata: context?.metadata,
+    error: formatErrorMessage(error),
+  })
+}
+
+// Export logApiCall, logApiResponse, logError

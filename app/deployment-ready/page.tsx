@@ -54,7 +54,6 @@ export default function DeploymentReadyPage() {
   const environmentVariables = [
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "NEXT_PUBLIC_MAPBOX_API_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_JWT_SECRET",
     "RAPIDAPI_KEY",
@@ -125,7 +124,7 @@ export default function DeploymentReadyPage() {
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              Environment Variables ({environmentVariables.length}/17 Configured)
+              Environment Variables ({environmentVariables.length}/16 Configured)
             </CardTitle>
           </CardHeader>
           <CardContent>

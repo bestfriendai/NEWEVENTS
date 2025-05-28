@@ -1,9 +1,7 @@
 // Client-side environment variables (prefixed with NEXT_PUBLIC_)
 export const clientEnv = {
-  NEXT_PUBLIC_MAPBOX_API_KEY: process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "",
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-  NEXT_PUBLIC_TICKETMASTER_API_KEY: process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || "",
   NEXT_PUBLIC_EVENTBRITE_API_KEY: process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "",
   NEXT_PUBLIC_PREDICTHQ_API_KEY: process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "",
 } as const
@@ -21,6 +19,7 @@ export const serverEnv = {
   EVENTBRITE_PUBLIC_TOKEN: process.env.EVENTBRITE_PUBLIC_TOKEN || "",
   PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY || "",
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
+  MAPBOX_API_KEY: process.env.MAPBOX_API_KEY || "", // Server-side only
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
   NODE_ENV: process.env.NODE_ENV || "development",
 } as const
@@ -35,7 +34,7 @@ export const env = {
 export const API_CONFIG = {
   ticketmaster: {
     baseUrl: "https://app.ticketmaster.com/discovery/v2",
-    apiKey: serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY,
+    apiKey: serverEnv.TICKETMASTER_API_KEY,
   },
   eventbrite: {
     baseUrl: "https://www.eventbriteapi.com/v3",
@@ -58,7 +57,7 @@ export const API_CONFIG = {
   },
   maps: {
     mapbox: {
-      apiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY,
+      apiKey: serverEnv.MAPBOX_API_KEY, // Server-side only
     },
     tomtom: {
       apiKey: serverEnv.TOMTOM_API_KEY,
@@ -105,15 +104,9 @@ export function getServerConfig() {
 // Client configuration function for client-side usage
 export function getClientConfig() {
   return {
-    mapbox: {
-      apiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY,
-    },
     supabase: {
       url: clientEnv.NEXT_PUBLIC_SUPABASE_URL,
       anonKey: clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    },
-    ticketmaster: {
-      apiKey: clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY,
     },
     eventbrite: {
       apiKey: clientEnv.NEXT_PUBLIC_EVENTBRITE_API_KEY,
@@ -123,6 +116,9 @@ export function getClientConfig() {
     },
   }
 }
+
+// Validated environment configuration
+export const CLIENT_CONFIG = getClientConfig()
 
 // Validate required environment variables
 export function validateEnv() {
@@ -173,7 +169,7 @@ export function getValidatedEnv() {
 
 // Helper functions to check API key availability
 export function hasTicketmasterApiKey(): boolean {
-  return !!(serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY)
+  return !!serverEnv.TICKETMASTER_API_KEY
 }
 
 export function hasEventbriteApiKey(): boolean {
@@ -193,7 +189,7 @@ export function hasRapidApiKey(): boolean {
 }
 
 export function hasMapboxApiKey(): boolean {
-  return !!clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY
+  return !!serverEnv.MAPBOX_API_KEY
 }
 
 // Export the validated config as default

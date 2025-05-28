@@ -47,3 +47,23 @@ export function useFavorites() {
   }
   return context
 }
+
+// Custom hook for toggling favorites
+export function useFavoriteToggle() {
+  const { addFavorite, removeFavorite, isFavorite } = useFavorites()
+
+  const toggleFavorite = useCallback(
+    (eventId: string) => {
+      if (isFavorite(eventId)) {
+        removeFavorite(eventId)
+      } else {
+        addFavorite(eventId)
+      }
+    },
+    [addFavorite, removeFavorite, isFavorite],
+  )
+
+  return { toggleFavorite, isFavorite }
+}
+
+// Export useFavoriteToggle

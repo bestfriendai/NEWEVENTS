@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MapPin,
@@ -27,6 +27,7 @@ import { fetchEvents, testEventAPIs, type EventSearchResult } from "@/app/action
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { logger } from "@/lib/utils/logger"
 import Image from "next/image"
+import { geocodeLocation, reverseGeocode } from "@/app/actions/location-actions"
 
 // Add CSS for pulse animation
 const pulseKeyframes = `
@@ -46,10 +47,9 @@ const pulseKeyframes = `
   }
 `
 
-// Real Mapbox Map Component
-function MapboxMap({
+// Simple Map Fallback Component (no API key required)
+function SimpleMapFallback({
   center,
-  zoom = 12,
   events,
   selectedEventId,
   onEventSelect,
@@ -57,351 +57,30 @@ function MapboxMap({
   className,
 }: {
   center: { lat: number; lng: number }
-  zoom?: number
   events: EventDetailProps[]
   selectedEventId: number | null
   onEventSelect: (event: EventDetailProps) => void
   userLocation?: { lat: number; lng: number; name: string } | null
   className?: string
 }) {
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
-
-  // Initialize Mapbox
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const initializeMap = async () => {
-      try {
-        const mapboxApiKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-        if (!mapboxApiKey) {
-          throw new Error("Mapbox API key not configured")
-        }
-
-        console.log("Initializing Mapbox map...")
-
-        // Import Mapbox GL
-        const mapboxgl = (await import("mapbox-gl")).default
-        ;(mapboxgl as any).accessToken = mapboxApiKey
-
-        // Make mapboxgl available globally for marker creation
-        ;(window as any).mapboxgl = mapboxgl
-
-        if (mapContainerRef.current && !mapRef.current) {
-          // Create map
-          mapRef.current = new mapboxgl.Map({
-            container: mapContainerRef.current,
-            style: "mapbox://styles/mapbox/dark-v11",
-            center: [center.lng, center.lat],
-            zoom: zoom,
-            projection: { name: "globe" } as any,
-          })
-
-          // Add controls
-          mapRef.current.addControl(new mapboxgl.NavigationControl(), "top-right")
-          mapRef.current.addControl(new mapboxgl.FullscreenControl(), "top-right")
-
-          // Map events
-          mapRef.current.on("load", () => {
-            setMapLoaded(true)
-            try {
-              mapRef.current.setFog({})
-            } catch (e) {
-              // Fog effect not supported, continue without it
-            }
-            logger.info("Mapbox map loaded", { component: "MapboxMap" })
-          })
-
-          mapRef.current.on("error", (e: any) => {
-            logger.error("Mapbox error", { component: "MapboxMap", error: e })
-            setMapError("Map failed to load")
-          })
-        }
-      } catch (error) {
-        logger.error("Failed to initialize map", { component: "MapboxMap", error })
-        setMapError("Failed to load map. Check your Mapbox configuration.")
-      }
-    }
-
-    initializeMap()
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
-      }
-    }
-  }, []) // Only run once on mount
-
-  // Update map center
-  useEffect(() => {
-    if (mapRef.current && mapLoaded) {
-      mapRef.current.flyTo({
-        center: [center.lng, center.lat],
-        zoom: zoom,
-        duration: 1500,
-      })
-    }
-  }, [center, zoom, mapLoaded])
-
-  // Update markers
-  useEffect(() => {
-    if (!mapRef.current || !mapLoaded) return
-
-    // Clear existing markers
-    markersRef.current.forEach((marker) => {
-      try {
-        marker.remove()
-      } catch (e) {
-        // Ignore marker removal errors
-      }
-    })
-    markersRef.current = []
-
-    // Get Mapbox GL from the imported module or window
-    let mapboxgl
-    try {
-      mapboxgl = (window as any).mapboxgl
-      if (!mapboxgl) {
-        return
-      }
-    } catch (e) {
-      return
-    }
-
-    // Add user location marker first (if available)
-    if (userLocation) {
-      try {
-        const userMarkerElement = document.createElement("div")
-        userMarkerElement.className = "user-location-marker"
-        userMarkerElement.innerHTML = `
-          <div style="
-            width: 24px;
-            height: 24px;
-            background-color: #3B82F6;
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-          ">
-            <div style="
-              width: 8px;
-              height: 8px;
-              background-color: white;
-              border-radius: 50%;
-            "></div>
-            <div style="
-              position: absolute;
-              width: 24px;
-              height: 24px;
-              background-color: #3B82F6;
-              border-radius: 50%;
-              opacity: 0.3;
-              animation: pulse 2s infinite;
-            "></div>
-          </div>
-        `
-
-        const userMarker = new mapboxgl.Marker(userMarkerElement)
-          .setLngLat([userLocation.lng, userLocation.lat])
-          .addTo(mapRef.current)
-
-        // Add popup for user location
-        const userPopup = new mapboxgl.Popup({
-          offset: 25,
-          closeButton: false,
-          closeOnClick: false,
-          className: "user-location-popup",
-        }).setHTML(`
-          <div style="padding: 8px; font-family: system-ui;">
-            <div style="font-weight: 600; font-size: 12px; color: #3B82F6; margin-bottom: 2px;">
-              📍 Your Location
-            </div>
-            <div style="font-size: 11px; color: #6b7280;">
-              ${userLocation.name}
-            </div>
-          </div>
-        `)
-
-        userMarkerElement.addEventListener("mouseenter", () => {
-          userPopup.setLngLat([userLocation.lng, userLocation.lat]).addTo(mapRef.current)
-        })
-
-        userMarkerElement.addEventListener("mouseleave", () => {
-          userPopup.remove()
-        })
-
-        markersRef.current.push(userMarker)
-      } catch (error) {
-        logger.error("Failed to create user location marker", {
-          component: "MapboxMap",
-          userLocation,
-          error
-        })
-      }
-    }
-
-    // Don't proceed if no events
-    if (events.length === 0) return
-
-    // Add event markers
-    events.forEach((event, index) => {
-      // Use provided coordinates or generate nearby coordinates
-      let coordinates = event.coordinates
-      if (!coordinates) {
-        // Generate coordinates near the map center with some randomization
-        const latOffset = (Math.random() - 0.5) * 0.02 // ~1km radius
-        const lngOffset = (Math.random() - 0.5) * 0.02
-        coordinates = {
-          lat: center.lat + latOffset,
-          lng: center.lng + lngOffset,
-        }
-      }
-
-      try {
-        const isSelected = event.id === selectedEventId
-
-        // Create marker element with better styling
-        const el = document.createElement("div")
-        el.className = `marker-element cursor-pointer transition-all duration-200 flex items-center justify-center`
-        el.style.width = "32px"
-        el.style.height = "32px"
-        el.style.borderRadius = "50%"
-        el.style.border = "3px solid white"
-        el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)"
-        el.style.zIndex = isSelected ? "1000" : "100"
-        el.style.position = "relative"
-
-        if (isSelected) {
-          el.style.backgroundColor = "#8B5CF6" // purple-500
-          el.style.transform = "scale(1.2)"
-          el.style.boxShadow = "0 0 0 4px rgba(139, 92, 246, 0.3), 0 2px 8px rgba(0,0,0,0.3)"
-        } else {
-          el.style.backgroundColor = "#EC4899" // pink-500
-        }
-
-        // Add icon
-        el.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-        `
-
-        // Add hover effects
-        el.addEventListener("mouseenter", () => {
-          if (!isSelected) {
-            el.style.transform = "scale(1.1)"
-            el.style.backgroundColor = "#F472B6" // pink-400
-          }
-        })
-
-        el.addEventListener("mouseleave", () => {
-          if (!isSelected) {
-            el.style.transform = "scale(1)"
-            el.style.backgroundColor = "#EC4899" // pink-500
-          }
-        })
-
-        // Create marker
-        const marker = new mapboxgl.Marker(el).setLngLat([coordinates.lng, coordinates.lat]).addTo(mapRef.current)
-
-        // Add click handler
-        el.addEventListener("click", (e) => {
-          e.stopPropagation()
-          onEventSelect(event)
-        })
-
-        // Create popup with better content
-        const popup = new mapboxgl.Popup({
-          offset: 35,
-          closeButton: false,
-          closeOnClick: false,
-          className: "custom-popup",
-        }).setHTML(`
-          <div style="padding: 12px; max-width: 250px; font-family: system-ui;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #1f2937; line-height: 1.3;">
-              ${event.title}
-            </div>
-            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
-              📍 ${event.location}
-            </div>
-            <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
-              📅 ${event.date}${event.time ? ` at ${event.time}` : ""}
-            </div>
-            <div style="font-size: 12px; font-weight: 500; color: #8b5cf6;">
-              ${event.price}
-            </div>
-          </div>
-        `)
-
-        // Show popup on hover with delay
-        let hoverTimeout: NodeJS.Timeout
-        el.addEventListener("mouseenter", () => {
-          hoverTimeout = setTimeout(() => {
-            marker.setPopup(popup).togglePopup()
-          }, 500)
-        })
-
-        el.addEventListener("mouseleave", () => {
-          clearTimeout(hoverTimeout)
-          popup.remove()
-        })
-
-        markersRef.current.push(marker)
-      } catch (error) {
-        logger.error("Failed to create marker", {
-          component: "MapboxMap",
-          eventTitle: event.title,
-          error
-        })
-      }
-    })
-  }, [events, selectedEventId, mapLoaded, onEventSelect, center, userLocation])
-
-  if (mapError) {
-    return (
-      <div className={`flex items-center justify-center bg-gray-900 text-red-400 ${className}`}>
-        <div className="text-center p-8">
-          <AlertTriangle className="h-16 w-16 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2 text-white">Map Unavailable</h3>
-          <p className="text-gray-300 mb-4">{mapError}</p>
-          <Button onClick={() => window.location.reload()} className="bg-purple-600 hover:bg-purple-700">
-            Reload Page
-          </Button>
+  return (
+    <div className={`relative bg-gray-900 ${className}`}>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center text-white p-8">
+          <MapPin className="h-16 w-16 mx-auto mb-4 text-purple-400" />
+          <h3 className="text-xl font-semibold mb-2">Interactive Map</h3>
+          <p className="text-gray-400 mb-4">
+            {events.length > 0 ? `${events.length} events found` : "Search for events to see them on the map"}
+          </p>
+          {userLocation && <div className="text-sm text-purple-400">📍 {userLocation.name}</div>}
         </div>
       </div>
-    )
-  }
 
-  return (
-    <div className={`relative ${className}`}>
-      {/* Inject CSS for animations */}
-      <style dangerouslySetInnerHTML={{ __html: pulseKeyframes }} />
-
-      {!mapLoaded && (
-        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-          <div className="text-center text-white">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
-            <p className="text-lg">Loading interactive map...</p>
-            <p className="text-sm text-gray-400 mt-2">Powered by Mapbox</p>
-          </div>
-        </div>
-      )}
-
-      <div ref={mapContainerRef} className="w-full h-full" />
-
-      {/* Map overlay */}
-      {mapLoaded && events.length > 0 && (
+      {/* Event markers overlay */}
+      {events.length > 0 && (
         <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white">
           <div className="text-sm font-medium">{events.length} events found</div>
-          <div className="text-xs text-gray-400">Click markers for details</div>
+          <div className="text-xs text-gray-400">Select events from the sidebar</div>
         </div>
       )}
     </div>
@@ -434,42 +113,30 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     } catch (error) {
       logger.error("Failed to check API status", {
         component: "EventsPageClient",
-        error
+        error,
       })
     }
   }, [])
 
-  // Geocoding function
-  const geocodeLocation = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
+  // Real geocoding using server action
+  const geocodeLocationServer = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
     try {
-      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
-      if (!mapboxToken) {
-        throw new Error("Mapbox API key not configured")
-      }
-
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=1`,
-      )
-
-      if (!response.ok) {
-        throw new Error("Geocoding failed")
-      }
-
-      const data = await response.json()
-
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0]
-        const [lng, lat] = feature.center
+      const result = await geocodeLocation(query)
+      if (result.success && result.data) {
         return {
-          lat,
-          lng,
-          name: feature.place_name,
+          lat: result.data.lat,
+          lng: result.data.lng,
+          name: result.data.name,
         }
       }
-
       return null
     } catch (error) {
-      logger.error("Geocoding error", { component: "EventsPageClient", error })
+      logger.error("Geocoding failed", {
+        component: "EventsPageClient",
+        action: "geocodeLocationServer",
+        query,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
       return null
     }
   }
@@ -523,7 +190,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
       logger.error("Event search failed", {
         component: "EventsPageClient",
         location: location.name,
-        error: err
+        error: err,
       })
     } finally {
       setIsLoading(false)
@@ -538,7 +205,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     setError(null)
 
     try {
-      const geocodedLocation = await geocodeLocation(locationQuery)
+      const geocodedLocation = await geocodeLocationServer(locationQuery)
 
       if (!geocodedLocation) {
         throw new Error("Location not found. Please try a different search term.")
@@ -574,21 +241,12 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
 
       const { latitude, longitude } = position.coords
 
+      // Use server action for reverse geocoding
+      const result = await reverseGeocode(latitude, longitude)
       let locationName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
 
-      // Reverse geocode
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_API_KEY}&limit=1`,
-        )
-        if (response.ok) {
-          const data = await response.json()
-          if (data.features && data.features.length > 0) {
-            locationName = data.features[0].place_name
-          }
-        }
-      } catch (e) {
-        // Reverse geocoding failed, use coordinates
+      if (result.success && result.data) {
+        locationName = result.data.name
       }
 
       const location = { lat: latitude, lng: longitude, name: locationName }
@@ -657,7 +315,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
   const extractPriceValue = (price: string): number => {
     if (price.toLowerCase().includes("free")) return 0
     const match = price.match(/\$(\d+(?:\.\d{2})?)/)
-    return match ? parseFloat(match[1]) : 999999
+    return match ? Number.parseFloat(match[1]) : 999999
   }
 
   // Helper function to calculate distance in miles using haversine formula
@@ -851,9 +509,8 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
           </div>
         )}
 
-        <MapboxMap
+        <SimpleMapFallback
           center={mapCenter}
-          zoom={events.length > 0 ? 12 : 10}
           events={sortedEvents}
           selectedEventId={selectedEvent?.id || null}
           onEventSelect={handleEventSelect}
@@ -1101,8 +758,14 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
                                           {sortBy === "distance" && event.coordinates && mapCenter && (
                                             <span className="ml-2 text-xs text-purple-400">
                                               {Math.round(
-                                                calculateDistance(mapCenter.lat, mapCenter.lng, event.coordinates.lat, event.coordinates.lng) * 10
-                                              ) / 10} mi
+                                                calculateDistance(
+                                                  mapCenter.lat,
+                                                  mapCenter.lng,
+                                                  event.coordinates.lat,
+                                                  event.coordinates.lng,
+                                                ) * 10,
+                                              ) / 10}{" "}
+                                              mi
                                             </span>
                                           )}
                                         </div>

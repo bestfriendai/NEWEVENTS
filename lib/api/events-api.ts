@@ -1,5 +1,5 @@
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import { searchTicketmasterEvents, getTicketmasterEventDetails } from "@/lib/api/ticketmaster-api"
+import { searchTicketmasterEvents } from "@/lib/api/ticketmaster-api"
 import { logger, measurePerformance, formatErrorMessage } from "@/lib/utils/logger"
 import { memoryCache } from "@/lib/utils/cache"
 import { serverEnv } from "@/lib/env"
@@ -617,7 +617,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
             endDateTime: params.endDateTime,
             classificationName: params.categories?.[0],
             page: params.page,
-            size: Math.floor((params.size || 20) / 4), // Divide among sources
+            size: Math.min(params.size || 50, 50), // Divide among sources
           })
             .then((result) => {
               if (result.events.length > 0) sources.push("Ticketmaster")
@@ -635,7 +635,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       searchPromises.push(
         searchRapidApiEvents({
           ...params,
-          size: Math.floor((params.size || 20) / 4),
+          size: Math.min(params.size || 50, 50),
         })
           .then((events) => {
             if (events.length > 0) sources.push("RapidAPI")
@@ -651,7 +651,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       searchPromises.push(
         searchEventbriteEvents({
           ...params,
-          size: Math.floor((params.size || 20) / 4),
+          size: Math.min(params.size || 50, 50),
         })
           .then((events) => {
             if (events.length > 0) sources.push("Eventbrite")
@@ -668,7 +668,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         searchPromises.push(
           searchPredictHQEvents({
             ...params,
-            size: Math.floor((params.size || 20) / 4),
+            size: Math.min(params.size || 50, 50),
           })
             .then((events) => {
               if (events.length > 0) sources.push("PredictHQ")
@@ -824,12 +824,7 @@ function applyFilters(events: EventDetailProps[], params: EventSearchParams): Ev
         return false
       }
 
-      const distance = calculateDistance(
-        userLat,
-        userLng,
-        event.coordinates.lat,
-        event.coordinates.lng
-      )
+      const distance = calculateDistance(userLat, userLng, event.coordinates.lat, event.coordinates.lng)
 
       const withinRadius = distance <= radiusInMiles
 
@@ -891,7 +886,11 @@ function applyFilters(events: EventDetailProps[], params: EventSearchParams): Ev
 }
 
 // Sort events
-function sortEvents(events: EventDetailProps[], sortBy: string, userLocation?: { lat: number; lng: number }): EventDetailProps[] {
+function sortEvents(
+  events: EventDetailProps[],
+  sortBy: string,
+  userLocation?: { lat: number; lng: number },
+): EventDetailProps[] {
   const sortedEvents = [...events]
 
   switch (sortBy) {
@@ -956,6 +955,22 @@ function generateFilterOptions(events: EventDetailProps[]) {
   }
 }
 
+// Test RapidAPI connection specifically
+export async function testRapidApiConnection(): Promise<boolean> {
+  try {
+    if (!serverEnv.RAPIDAPI_KEY) {
+      logger.warn("RapidAPI key not configured")
+      return false
+    }
+
+    const events = await searchRapidApiEvents({ keyword: "test", size: 1 })
+    return events.length >= 0 // Even 0 results means API is working
+  } catch (error) {
+    logger.error("RapidAPI connection test failed", { error: formatErrorMessage(error) })
+    return false
+  }
+}
+
 // Get event details
 export async function getEventDetails(eventId: string): Promise<EventDetailProps | null> {
   return measurePerformance("getEventDetails", async () => {
@@ -968,10 +983,11 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
       }
 
       // Try Ticketmaster first
-      const ticketmasterEvent = await getTicketmasterEventDetails(eventId)
-      if (ticketmasterEvent) {
-        memoryCache.set(cacheKey, ticketmasterEvent, 30 * 60 * 1000)
-        return ticketmasterEvent
+      const ticketmasterEvent = await searchTicketmasterEvents({ keyword: eventId, size: 1 })
+      if (ticketmasterEvent.events.length > 0) {
+        const event = ticketmasterEvent.events[0]
+        memoryCache.set(cacheKey, event, 30 * 60 * 1000)
+        return event
       }
 
       // If not found, search across all sources
@@ -1071,97 +1087,6 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
   }
 }
 
-// Generate fallback events when APIs are unavailable
-function generateFallbackEvents(limit = 6): EventDetailProps[] {
-  const categories = ["Music", "Arts", "Sports", "Food", "Business", "Technology"]
-  const locations = [
-    { name: "Madison Square Garden", city: "New York", lat: 40.7505, lng: -73.9934 },
-    { name: "Hollywood Bowl", city: "Los Angeles", lat: 34.1122, lng: -118.339 },
-    { name: "Navy Pier", city: "Chicago", lat: 41.8919, lng: -87.6051 },
-    { name: "Space Needle", city: "Seattle", lat: 47.6205, lng: -122.3493 },
-    { name: "Golden Gate Park", city: "San Francisco", lat: 37.7694, lng: -122.4862 },
-    { name: "South Beach", city: "Miami", lat: 25.7907, lng: -80.13 },
-  ]
-
-  const fallbackEvents: EventDetailProps[] = []
-
-  for (let i = 0; i < Math.min(limit, 12); i++) {
-    const category = categories[i % categories.length]
-    const location = locations[i % locations.length]
-
-    // Generate future dates
-    const futureDate = new Date()
-    futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 30) + 1)
-
-    const formattedDate = futureDate.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-
-    const hour = Math.floor(Math.random() * 12) + 1
-    const period = Math.random() > 0.5 ? "PM" : "AM"
-    const formattedTime = `${hour}:00 ${period}`
-
-    // Generate realistic prices
-    const isFree = Math.random() < 0.2
-    const basePrice = Math.floor(Math.random() * 100) + 15
-    const price = isFree ? "Free" : `$${basePrice}`
-
-    fallbackEvents.push({
-      id: 10000 + i, // Use high IDs to avoid conflicts
-      title: `${category} Event ${i + 1}`,
-      description: `Join us for an amazing ${category.toLowerCase()} event in ${location.city}. This event features incredible activities and unforgettable experiences.`,
-      category,
-      date: formattedDate,
-      time: formattedTime,
-      location: location.name,
-      address: `${location.name}, ${location.city}`,
-      price,
-      image: `/event-${(i % 12) + 1}.png`,
-      organizer: {
-        name: `${location.city} Events`,
-        avatar: `/avatar-${(i % 6) + 1}.png`,
-      },
-      attendees: Math.floor(Math.random() * 1000) + 100,
-      isFavorite: false,
-      coordinates: { lat: location.lat, lng: location.lng },
-      ticketLinks: isFree ? [] : [{ source: "Tickets", link: "#" }],
-    })
-  }
-
-  return fallbackEvents
-}
-
-// Get events by category
-export async function getEventsByCategory(category: string, limit = 20): Promise<EventDetailProps[]> {
-  try {
-    const cacheKey = `events_by_category:${category}:${limit}`
-    const cached = memoryCache.get<EventDetailProps[]>(cacheKey)
-
-    if (cached) {
-      return cached
-    }
-
-    const searchResult = await searchEvents({
-      keyword: category,
-      categories: [category],
-      size: limit,
-    })
-
-    const categoryEvents = searchResult.events
-
-    memoryCache.set(cacheKey, categoryEvents, 10 * 60 * 1000)
-    return categoryEvents
-  } catch (error) {
-    logger.error("Failed to get events by category", {
-      category,
-      error: formatErrorMessage(error),
-    })
-    return []
-  }
-}
-
 // Test API connections
 export async function testApiConnections(): Promise<{
   ticketmaster: boolean
@@ -1209,6 +1134,34 @@ export async function testApiConnections(): Promise<{
   }
 
   return results
+}
+
+// Define fallback events
+function generateFallbackEvents(count: number): EventDetailProps[] {
+  const fallbackEvents: EventDetailProps[] = []
+  for (let i = 0; i < count; i++) {
+    fallbackEvents.push({
+      id: i,
+      title: `Sample Event ${i + 1}`,
+      description: "This is a sample event. Please try again later.",
+      category: "Sample",
+      date: new Date().toLocaleDateString(),
+      time: "7:00 PM",
+      location: "Sample Location",
+      address: "123 Sample St, Sample City",
+      price: "Free",
+      image: "/community-event.png",
+      organizer: {
+        name: "Sample Organizer",
+        avatar: "/avatar-1.png",
+      },
+      attendees: Math.floor(Math.random() * 50) + 10,
+      isFavorite: false,
+      coordinates: { lat: 34.0522, lng: -118.2437 }, // Los Angeles coordinates
+      ticketLinks: [],
+    })
+  }
+  return fallbackEvents
 }
 
 // Export types

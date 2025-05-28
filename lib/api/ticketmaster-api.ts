@@ -1,4 +1,4 @@
-import { serverEnv, clientEnv } from "@/lib/env"
+import { serverEnv } from "@/lib/env"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import type { TicketmasterEvent } from "@/types"
 import { logger, measurePerformance } from "@/lib/utils/logger"
@@ -89,8 +89,8 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
     const startTime = Date.now()
 
     try {
-      // Get API key from server or client environment
-      const apiKey = serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY
+      // Get API key from server environment only
+      const apiKey = serverEnv.TICKETMASTER_API_KEY
 
       if (!apiKey) {
         logger.warn("Ticketmaster API key not configured")
@@ -590,8 +590,8 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
 export async function getTicketmasterEventDetails(eventId: string): Promise<EventDetailProps | null> {
   return measurePerformance("getTicketmasterEventDetails", async () => {
     try {
-      // Get API key from server or client environment
-      const apiKey = serverEnv.TICKETMASTER_API_KEY || clientEnv.NEXT_PUBLIC_TICKETMASTER_API_KEY
+      // Get API key from server environment only
+      const apiKey = serverEnv.TICKETMASTER_API_KEY
 
       if (!apiKey) {
         logger.warn("Ticketmaster API key not configured")
