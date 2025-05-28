@@ -9,7 +9,7 @@ events
 page
 with enhanced features:
 
-```tsx file="app/events/page.tsx"
+\`\`\`tsx file="app/events/page.tsx"
 [v0-no-op-code-block-prefix]import { Suspense } from 'react'
 import { ImprovedEventsPageClient } from './improved-events-page-client'
 import { EventsPageSkeleton } from '../../components/events/EventsPageSkeleton'
