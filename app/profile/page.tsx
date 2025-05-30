@@ -31,29 +31,35 @@ import { EventCard } from "@/components/event-card"
 import { EventDetailModal } from "@/components/event-detail-modal";
 import type { EventDetail } from "@/types/event.types";
 
-// Sample user data
-const userData = {
-  id: 1,
-  name: "Alex Morgan",
-  username: "@alexmorgan",
-  avatar: "/avatar-1.png",
-  coverPhoto: "/profile-cover.png?height=400&width=1200&query=city skyline night",
-  bio: "Event enthusiast and digital nomad. Always looking for the next adventure and great experiences to share.",
-  location: "San Francisco, CA",
-  email: "alex@example.com",
-  phone: "+1 (555) 123-4567",
-  website: "alexmorgan.com",
-  joinDate: "May 2023",
-  stats: {
-    eventsAttended: 47,
-    eventsHosted: 12,
-    followers: 842,
-    following: 356,
-  },
-  interests: ["Music", "Art", "Technology", "Food", "Travel", "Photography"],
-  upcomingEvents: 5,
-  completedProfile: 85,
+// User data would be loaded from authentication system
+const getUserData = () => {
+  // This would fetch real user data from auth/database
+  // For now, return placeholder data
+  return {
+    id: 1,
+    name: "User",
+    username: "@user",
+    avatar: "/avatar-1.png",
+    coverPhoto: "/profile-cover.png?height=400&width=1200&query=city skyline night",
+    bio: "Event enthusiast and digital nomad. Always looking for the next adventure and great experiences to share.",
+    location: "Your City",
+    email: "user@example.com",
+    phone: "+1 (555) 123-4567",
+    website: "user.com",
+    joinDate: "2024",
+    stats: {
+      eventsAttended: 0,
+      eventsHosted: 0,
+      followers: 0,
+      following: 0,
+    },
+    interests: ["Music", "Art", "Technology"],
+    upcomingEvents: 0,
+    completedProfile: 50,
+  }
 }
+
+const userData = getUserData()
 
 // Sample events data (reusing from other pages)
 const sampleEvents: EventDetail[] = [

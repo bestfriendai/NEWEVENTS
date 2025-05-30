@@ -12,6 +12,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
+import { getFeaturedEvents } from "@/app/actions/event-actions"
+import type { EventDetailProps } from "@/components/event-detail-modal"
 
 // Dynamically import the COBE globe to avoid SSR issues
 const SimpleCobeGlobe = dynamic(() => import("@/components/simple-cobe-globe"), {
@@ -29,6 +31,9 @@ export default function ClientPage() {
   const [activeTab, setActiveTab] = useState("concerts")
   const [isClient, setIsClient] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [featuredEvents, setFeaturedEvents] = useState<EventDetailProps[]>([])
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true)
+  const [eventsError, setEventsError] = useState<string | null>(null)
 
   // Generate stable particle positions (fixed values to prevent hydration mismatch)
   const particlePositions = useState(() =>
@@ -43,6 +48,25 @@ export default function ClientPage() {
 
   useEffect(() => {
     setIsClient(true)
+  }, [])
+
+  // Load featured events
+  useEffect(() => {
+    const loadFeaturedEvents = async () => {
+      try {
+        setIsLoadingEvents(true)
+        setEventsError(null)
+        const events = await getFeaturedEvents(12) // Get 12 events for 4 categories with 3 each
+        setFeaturedEvents(events)
+      } catch (error) {
+        console.error("Failed to load featured events:", error)
+        setEventsError("Failed to load events")
+      } finally {
+        setIsLoadingEvents(false)
+      }
+    }
+
+    loadFeaturedEvents()
   }, [])
 
   const features = [
@@ -63,11 +87,32 @@ export default function ClientPage() {
     },
   ]
 
+  // Helper function to filter events by category
+  const getEventsByCategory = (categoryId: string) => {
+    if (isLoadingEvents || featuredEvents.length === 0) return []
+
+    const categoryMap: { [key: string]: string[] } = {
+      concerts: ["music", "concert", "festival"],
+      sports: ["sports", "game", "athletic"],
+      arts: ["arts", "theater", "exhibition", "culture"],
+      food: ["food", "drink", "restaurant", "culinary"],
+    }
+
+    const keywords = categoryMap[categoryId] || []
+    return featuredEvents.filter(event =>
+      keywords.some(keyword =>
+        event.category?.toLowerCase().includes(keyword) ||
+        event.title.toLowerCase().includes(keyword) ||
+        event.description.toLowerCase().includes(keyword)
+      )
+    ).slice(0, 3) // Limit to 3 events per category
+  }
+
   const categories = [
-    { id: "concerts", label: "Concerts", count: 1240 },
-    { id: "sports", label: "Sports", count: 890 },
-    { id: "arts", label: "Arts & Theater", count: 650 },
-    { id: "food", label: "Food & Drink", count: 420 },
+    { id: "concerts", label: "Concerts", count: getEventsByCategory("concerts").length },
+    { id: "sports", label: "Sports", count: getEventsByCategory("sports").length },
+    { id: "arts", label: "Arts & Theater", count: getEventsByCategory("arts").length },
+    { id: "food", label: "Food & Drink", count: getEventsByCategory("food").length },
   ]
 
   const testimonials = [
@@ -305,102 +350,202 @@ export default function ClientPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activeTab === "concerts" && (
                 <>
-                  <EventCard
-                    title="Summer Music Festival"
-                    date="Aug 15-17, 2023"
-                    location="Central Park, New York"
-                    image="/event-1.png"
-                    category="Music"
-                  />
-                  <EventCard
-                    title="Jazz Night Downtown"
-                    date="Jul 28, 2023"
-                    location="Blue Note, Chicago"
-                    image="/event-2.png"
-                    category="Music"
-                  />
-                  <EventCard
-                    title="Electronic Dance Party"
-                    date="Sep 5, 2023"
-                    location="Warehouse District, LA"
-                    image="/event-3.png"
-                    category="Music"
-                  />
+                  {isLoadingEvents ? (
+                    // Loading skeletons
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 animate-pulse">
+                        <div className="aspect-[3/2] w-full bg-gray-700"></div>
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : eventsError ? (
+                    <div className="col-span-3 text-center py-8">
+                      <p className="text-gray-400">Failed to load events. Please try again later.</p>
+                    </div>
+                  ) : getEventsByCategory("concerts").length > 0 ? (
+                    getEventsByCategory("concerts").map((event) => (
+                      <RealEventCard key={event.id} event={event} />
+                    ))
+                  ) : (
+                    // Fallback to sample events if no real events match
+                    <>
+                      <EventCard
+                        title="Summer Music Festival"
+                        date="Aug 15-17, 2023"
+                        location="Central Park, New York"
+                        image="/event-1.png"
+                        category="Music"
+                      />
+                      <EventCard
+                        title="Jazz Night Downtown"
+                        date="Jul 28, 2023"
+                        location="Blue Note, Chicago"
+                        image="/event-2.png"
+                        category="Music"
+                      />
+                      <EventCard
+                        title="Electronic Dance Party"
+                        date="Sep 5, 2023"
+                        location="Warehouse District, LA"
+                        image="/event-3.png"
+                        category="Music"
+                      />
+                    </>
+                  )}
                 </>
               )}
               {activeTab === "sports" && (
                 <>
-                  <EventCard
-                    title="Championship Basketball"
-                    date="Aug 22, 2023"
-                    location="Madison Square Garden, NY"
-                    image="/event-4.png"
-                    category="Sports"
-                  />
-                  <EventCard
-                    title="Marathon 2023"
-                    date="Oct 10, 2023"
-                    location="Downtown, Boston"
-                    image="/event-5.png"
-                    category="Sports"
-                  />
-                  <EventCard
-                    title="Tennis Open Finals"
-                    date="Sep 12, 2023"
-                    location="Tennis Center, Miami"
-                    image="/event-6.png"
-                    category="Sports"
-                  />
+                  {isLoadingEvents ? (
+                    // Loading skeletons
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 animate-pulse">
+                        <div className="aspect-[3/2] w-full bg-gray-700"></div>
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : eventsError ? (
+                    <div className="col-span-3 text-center py-8">
+                      <p className="text-gray-400">Failed to load events. Please try again later.</p>
+                    </div>
+                  ) : getEventsByCategory("sports").length > 0 ? (
+                    getEventsByCategory("sports").map((event) => (
+                      <RealEventCard key={event.id} event={event} />
+                    ))
+                  ) : (
+                    // Fallback to sample events if no real events match
+                    <>
+                      <EventCard
+                        title="Championship Basketball"
+                        date="Aug 22, 2023"
+                        location="Madison Square Garden, NY"
+                        image="/event-4.png"
+                        category="Sports"
+                      />
+                      <EventCard
+                        title="Marathon 2023"
+                        date="Oct 10, 2023"
+                        location="Downtown, Boston"
+                        image="/event-5.png"
+                        category="Sports"
+                      />
+                      <EventCard
+                        title="Tennis Open Finals"
+                        date="Sep 12, 2023"
+                        location="Tennis Center, Miami"
+                        image="/event-6.png"
+                        category="Sports"
+                      />
+                    </>
+                  )}
                 </>
               )}
               {activeTab === "arts" && (
                 <>
-                  <EventCard
-                    title="Modern Art Exhibition"
-                    date="Aug 5-30, 2023"
-                    location="Metropolitan Museum, NY"
-                    image="/event-7.png"
-                    category="Arts"
-                  />
-                  <EventCard
-                    title="Broadway Show Premier"
-                    date="Sep 15, 2023"
-                    location="Theater District, NY"
-                    image="/event-8.png"
-                    category="Arts"
-                  />
-                  <EventCard
-                    title="Photography Workshop"
-                    date="Aug 12, 2023"
-                    location="Art Center, San Francisco"
-                    image="/event-9.png"
-                    category="Arts"
-                  />
+                  {isLoadingEvents ? (
+                    // Loading skeletons
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 animate-pulse">
+                        <div className="aspect-[3/2] w-full bg-gray-700"></div>
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : eventsError ? (
+                    <div className="col-span-3 text-center py-8">
+                      <p className="text-gray-400">Failed to load events. Please try again later.</p>
+                    </div>
+                  ) : getEventsByCategory("arts").length > 0 ? (
+                    getEventsByCategory("arts").map((event) => (
+                      <RealEventCard key={event.id} event={event} />
+                    ))
+                  ) : (
+                    // Fallback to sample events if no real events match
+                    <>
+                      <EventCard
+                        title="Modern Art Exhibition"
+                        date="Aug 5-30, 2023"
+                        location="Metropolitan Museum, NY"
+                        image="/event-7.png"
+                        category="Arts"
+                      />
+                      <EventCard
+                        title="Broadway Show Premier"
+                        date="Sep 15, 2023"
+                        location="Theater District, NY"
+                        image="/event-8.png"
+                        category="Arts"
+                      />
+                      <EventCard
+                        title="Photography Workshop"
+                        date="Aug 12, 2023"
+                        location="Art Center, San Francisco"
+                        image="/event-9.png"
+                        category="Arts"
+                      />
+                    </>
+                  )}
                 </>
               )}
               {activeTab === "food" && (
                 <>
-                  <EventCard
-                    title="Wine & Food Festival"
-                    date="Sep 8-10, 2023"
-                    location="Waterfront Park, San Diego"
-                    image="/event-10.png"
-                    category="Food"
-                  />
-                  <EventCard
-                    title="Craft Beer Tasting"
-                    date="Aug 19, 2023"
-                    location="Brewery District, Portland"
-                    image="/event-11.png"
-                    category="Food"
-                  />
-                  <EventCard
-                    title="Chef's Table Experience"
-                    date="Sep 22, 2023"
-                    location="Gourmet Hall, Chicago"
-                    image="/event-12.png"
-                    category="Food"
-                  />
+                  {isLoadingEvents ? (
+                    // Loading skeletons
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 animate-pulse">
+                        <div className="aspect-[3/2] w-full bg-gray-700"></div>
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : eventsError ? (
+                    <div className="col-span-3 text-center py-8">
+                      <p className="text-gray-400">Failed to load events. Please try again later.</p>
+                    </div>
+                  ) : getEventsByCategory("food").length > 0 ? (
+                    getEventsByCategory("food").map((event) => (
+                      <RealEventCard key={event.id} event={event} />
+                    ))
+                  ) : (
+                    // Fallback to sample events if no real events match
+                    <>
+                      <EventCard
+                        title="Wine & Food Festival"
+                        date="Sep 8-10, 2023"
+                        location="Waterfront Park, San Diego"
+                        image="/event-10.png"
+                        category="Food"
+                      />
+                      <EventCard
+                        title="Craft Beer Tasting"
+                        date="Aug 19, 2023"
+                        location="Brewery District, Portland"
+                        image="/event-11.png"
+                        category="Food"
+                      />
+                      <EventCard
+                        title="Chef's Table Experience"
+                        date="Sep 22, 2023"
+                        location="Gourmet Hall, Chicago"
+                        image="/event-12.png"
+                        category="Food"
+                      />
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -653,5 +798,88 @@ function EventCard({ title, date, location, image, category }: EventCardProps) {
         <p className="text-gray-500 text-sm">{location}</p>
       </div>
     </div>
+  )
+}
+
+// Real event card component for API data
+interface RealEventCardProps {
+  event: EventDetailProps
+}
+
+function RealEventCard({ event }: RealEventCardProps) {
+  return (
+    <Link href={`/events?event=${event.id}`} className="block">
+      <div className="bg-[#1A1D25] rounded-xl overflow-hidden border border-gray-800 hover:border-purple-500/30 transition-all duration-300 hover:transform hover:scale-105 cursor-pointer">
+        <div className="aspect-[3/2] w-full relative">
+          {event.image && event.image !== "/community-event.png" ? (
+            <img
+              src={event.image}
+              alt={event.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to gradient background if image fails to load
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                target.parentElement!.innerHTML = `
+                  <div class="w-full h-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                    <div class="text-center">
+                      <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                      </div>
+                      <p class="text-gray-400 text-xs">${event.category}</p>
+                    </div>
+                  </div>
+                `
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto mb-2 flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-gray-400 text-xs">{event.category}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Price badge */}
+          {event.price && (
+            <div className="absolute top-3 right-3">
+              <div className="bg-black/70 rounded-full px-2 py-1 backdrop-blur-sm">
+                <span className="text-white font-bold text-xs">{event.price}</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="p-4">
+          <h3 className="text-white font-semibold mb-2 line-clamp-2">{event.title}</h3>
+          <div className="space-y-1 text-sm">
+            <div className="flex items-center text-gray-400">
+              <Calendar className="w-3 h-3 mr-1 text-purple-400" />
+              <span>{event.date}</span>
+              {event.time && (
+                <>
+                  <span className="mx-1">•</span>
+                  <span>{event.time}</span>
+                </>
+              )}
+            </div>
+            <div className="flex items-center text-gray-400">
+              <MapPin className="w-3 h-3 mr-1 text-purple-400" />
+              <span className="line-clamp-1">{event.location}</span>
+            </div>
+            {event.attendees && (
+              <div className="flex items-center text-gray-400">
+                <Users className="w-3 h-3 mr-1 text-purple-400" />
+                <span>{event.attendees} attending</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
   )
 }

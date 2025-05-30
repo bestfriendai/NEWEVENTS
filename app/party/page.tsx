@@ -13,7 +13,13 @@ import { AdvancedFilters } from "@/components/party/advanced-filters"
 import { PartyFooter } from "@/components/party/party-footer"
 import { EventCard } from "@/components/event-card"
 
-// Sample party events data
+// Party events will be loaded from real APIs
+const getPartyEvents = async (): Promise<EventDetail[]> => {
+  // This would fetch real party/nightlife events from the APIs
+  // For now, return empty array - real implementation would filter by nightlife category
+  return []
+}
+
 const partyEvents: EventDetail[] = [
   {
     id: 101,

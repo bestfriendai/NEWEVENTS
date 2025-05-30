@@ -3,6 +3,8 @@ import { env } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 import { transformEventEntityToProps } from "@/lib/utils/event-utils"
 import type { EventDetailProps } from "@/types/event-detail"
+import { searchEvents as searchEventsAPI, getFeaturedEvents as getFeaturedEventsAPI } from "@/lib/api/events-api"
+import type { EventSearchParams as APIEventSearchParams } from "@/lib/api/events-api"
 
 export interface EventSearchParams {
   lat?: number
@@ -26,20 +28,92 @@ class EventsService {
   private supabase
 
   constructor() {
-    this.supabase = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL!,
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // Handle missing environment variables gracefully during build
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
+    const supabaseKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key"
+
+    this.supabase = createClient(supabaseUrl, supabaseKey)
   }
 
   /**
-   * Search for events based on location and filters
+   * Search for events based on location and filters using real APIs
    */
   async searchEvents(params: EventSearchParams): Promise<EventsResponse> {
     try {
-      logger.info("Searching for events", {
+      logger.info("Searching for events using real APIs", {
         component: "EventsService",
         action: "searchEvents",
+        metadata: params,
+      })
+
+      // Convert service params to API params
+      const apiParams: APIEventSearchParams = {
+        coordinates: params.lat && params.lng ? { lat: params.lat, lng: params.lng } : undefined,
+        radius: params.radius || 25, // Default 25km radius
+        categories: params.category && params.category !== "all" ? [params.category] : undefined,
+        startDateTime: params.startDate,
+        endDateTime: params.endDate,
+        page: Math.floor((params.offset || 0) / (params.limit || 50)),
+        size: params.limit || 50,
+        sort: "date"
+      }
+
+      // Use the real API to search events
+      const apiResult = await searchEventsAPI(apiParams)
+
+      if (apiResult.error) {
+        logger.error("API search failed", {
+          component: "EventsService",
+          action: "searchEvents",
+          error: apiResult.error,
+        })
+
+        // Try fallback to database if API fails
+        return this.searchEventsFromDatabase(params)
+      }
+
+      const totalCount = apiResult.totalCount
+      const hasMore = apiResult.page < apiResult.totalPages - 1
+
+      logger.info("Events search completed via API", {
+        component: "EventsService",
+        action: "searchEvents",
+        metadata: {
+          eventCount: apiResult.events.length,
+          totalCount,
+          hasMore,
+          sources: apiResult.sources,
+        },
+      })
+
+      return {
+        events: apiResult.events,
+        totalCount,
+        hasMore,
+        error: undefined,
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      logger.error("Events search failed", {
+        component: "EventsService",
+        action: "searchEvents",
+        error: errorMessage,
+      })
+
+      // Fallback to database search
+      logger.info("Falling back to database search")
+      return this.searchEventsFromDatabase(params)
+    }
+  }
+
+  /**
+   * Fallback database search when APIs fail
+   */
+  private async searchEventsFromDatabase(params: EventSearchParams): Promise<EventsResponse> {
+    try {
+      logger.info("Searching events from database (fallback)", {
+        component: "EventsService",
+        action: "searchEventsFromDatabase",
         metadata: params,
       })
 
@@ -55,7 +129,7 @@ class EventsService {
         // Use PostGIS distance calculation (assuming PostGIS is enabled)
         // This is a simplified approach - in production you might want to use proper spatial queries
         const radiusInDegrees = params.radius / 111.32 // Rough conversion from km to degrees
-        
+
         query = query
           .gte("location_lat", params.lat - radiusInDegrees)
           .lte("location_lat", params.lat + radiusInDegrees)
@@ -84,9 +158,9 @@ class EventsService {
       const { data, error, count } = await query
 
       if (error) {
-        logger.error("Error searching events", {
+        logger.error("Database search failed", {
           component: "EventsService",
-          action: "searchEvents",
+          action: "searchEventsFromDatabase",
           error: error.message,
         })
         return {
@@ -101,9 +175,9 @@ class EventsService {
       const totalCount = count || 0
       const hasMore = totalCount > offset + limit
 
-      logger.info("Events search completed", {
+      logger.info("Database search completed", {
         component: "EventsService",
-        action: "searchEvents",
+        action: "searchEventsFromDatabase",
         metadata: {
           eventCount: events.length,
           totalCount,
@@ -119,9 +193,9 @@ class EventsService {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      logger.error("Events search failed", {
+      logger.error("Database search failed", {
         component: "EventsService",
-        action: "searchEvents",
+        action: "searchEventsFromDatabase",
         error: errorMessage,
       })
 
@@ -201,13 +275,43 @@ class EventsService {
   }
 
   /**
-   * Get events by category
+   * Get events by category using real APIs
    */
   async getEventsByCategory(category: string, limit = 20): Promise<EventsResponse> {
-    return this.searchEvents({
-      category,
-      limit,
-    })
+    try {
+      logger.info("Getting events by category using real APIs", {
+        component: "EventsService",
+        action: "getEventsByCategory",
+        metadata: { category, limit },
+      })
+
+      // Use the real API to get featured events
+      const featuredEvents = await getFeaturedEventsAPI(limit)
+
+      // Filter by category if specified and not "all"
+      const filteredEvents = category && category !== "all"
+        ? featuredEvents.filter(event =>
+            event.category?.toLowerCase() === category.toLowerCase()
+          )
+        : featuredEvents
+
+      return {
+        events: filteredEvents,
+        totalCount: filteredEvents.length,
+        hasMore: false,
+        error: undefined,
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      logger.error("Get events by category failed", {
+        component: "EventsService",
+        action: "getEventsByCategory",
+        error: errorMessage,
+      })
+
+      // Fallback to database search
+      return this.searchEvents({ category, limit })
+    }
   }
 
   /**
