@@ -41,14 +41,12 @@ export interface EventSearchResult {
 export async function fetchEvents(params: {
   keyword?: string
   location?: string
-  coordinates?: { lat: number; lng: number; name?: string }
+  coordinates?: { lat: number; lng: number }
   radius?: number
   size?: number
   page?: number
   sort?: string
   categories?: string[]
-  priceRange?: { min: number; max: number }
-  dateRange?: { start: string; end: string }
 }): Promise<EventSearchResult> {
   try {
     logger.info("Server action: fetchEvents called", { params })
@@ -58,22 +56,16 @@ export async function fetchEvents(params: {
       keyword: params.keyword,
       location: params.location,
       coordinates: params.coordinates,
-      radius: params.radius || 50, // Default to 50 miles
+      radius: params.radius || 25,
       size: params.size || 20,
       page: params.page || 0,
       sort: params.sort || "date",
       categories: params.categories,
-      priceRange: params.priceRange,
-      dateRange: params.dateRange,
     }
 
     // If we have coordinates but no location string, create one
     if (params.coordinates && !params.location) {
-      if (params.coordinates.name) {
-        searchParams.location = params.coordinates.name
-      } else {
-        searchParams.location = `${params.coordinates.lat},${params.coordinates.lng}`
-      }
+      searchParams.location = `${params.coordinates.lat},${params.coordinates.lng}`
     }
 
     const result = await searchEventsAPI(searchParams)
@@ -109,19 +101,14 @@ export async function fetchEvents(params: {
 /**
  * Get featured events with caching
  */
-export async function getFeaturedEvents(
-  limit = 6,
-  coordinates?: { lat: number; lng: number },
-): Promise<EventDetailProps[]> {
+export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> {
   try {
-    logger.info("Server action: getFeaturedEvents called", { limit, coordinates })
+    logger.info("Server action: getFeaturedEvents called", { limit })
 
-    // Pass coordinates to the API for location-aware featured events
-    const events = await getFeaturedEventsAPI(limit, coordinates)
+    const events = await getFeaturedEventsAPI(limit)
 
     logger.info("Server action: getFeaturedEvents completed", {
       eventCount: events.length,
-      withLocation: !!coordinates,
     })
 
     return events

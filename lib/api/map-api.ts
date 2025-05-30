@@ -16,8 +16,8 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
       return null
     }
 
-    // Try Mapbox first if API key is available
-    if (API_CONFIG?.mapbox?.apiKey) {
+    // Try Mapbox first
+    if (API_CONFIG.mapbox.apiKey) {
       try {
         const encodedAddress = encodeURIComponent(address.trim())
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${API_CONFIG.mapbox.apiKey}`
@@ -49,8 +49,8 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
       }
     }
 
-    // Fallback to TomTom if API key is available
-    if (API_CONFIG?.tomtom?.apiKey) {
+    // Fallback to TomTom
+    if (API_CONFIG.tomtom.apiKey) {
       try {
         const encodedAddress = encodeURIComponent(address.trim())
         const url = `https://api.tomtom.com/search/2/geocode/${encodedAddress}.json?key=${API_CONFIG.tomtom.apiKey}`
@@ -98,8 +98,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       return "Unknown location"
     }
 
-    // Try Mapbox first if API key is available
-    if (API_CONFIG?.mapbox?.apiKey) {
+    // Try Mapbox first
+    if (API_CONFIG.mapbox.apiKey) {
       try {
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${API_CONFIG.mapbox.apiKey}`
 
@@ -136,8 +136,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       }
     }
 
-    // Fallback to TomTom if API key is available
-    if (API_CONFIG?.tomtom?.apiKey) {
+    // Fallback to TomTom
+    if (API_CONFIG.tomtom.apiKey) {
       try {
         const url = `https://api.tomtom.com/search/2/reverseGeocode/${lat},${lng}.json?key=${API_CONFIG.tomtom.apiKey}`
 
@@ -318,7 +318,7 @@ function fallbackReverseGeocode(lat: number, lng: number): string {
     return "Miami Area"
   } else if (lat >= 29.6 && lat <= 29.9 && lng >= -95.5 && lng <= -95.2) {
     return "Houston Area"
-  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -97.0 && lng >= -96.6) {
+  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -97.0 && lng <= -96.6) {
     return "Dallas Area"
   } else if (lat >= 33.6 && lat <= 33.9 && lng >= -84.5 && lng <= -84.2) {
     return "Atlanta Area"
@@ -334,13 +334,13 @@ function fallbackReverseGeocode(lat: number, lng: number): string {
     return "Portland Area"
   } else if (lat >= 36.0 && lat <= 36.3 && lng >= -115.3 && lng <= -115.0) {
     return "Las Vegas Area"
-  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -117.3 && lng >= -117.0) {
+  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -117.3 && lng <= -117.0) {
     return "San Diego Area"
-  } else if (lat >= 33.3 && lat <= 33.6 && lng >= -112.2 && lng >= -111.9) {
+  } else if (lat >= 33.3 && lat <= 33.6 && lng >= -112.2 && lng <= -111.9) {
     return "Phoenix Area"
   } else if (lat >= 39.0 && lat <= 39.3 && lng >= -76.7 && lng <= -76.5) {
     return "Baltimore Area"
-  } else if (lat >= 42.9 && lat <= 43.2 && lng >= -87.0 && lng >= -87.8) {
+  } else if (lat >= 42.9 && lat <= 43.2 && lng >= -87.0 && lng <= -87.8) {
     return "Milwaukee Area"
   } else if (lat >= 44.8 && lat <= 45.1 && lng >= -93.4 && lng <= -93.1) {
     return "Minneapolis Area"
@@ -348,25 +348,25 @@ function fallbackReverseGeocode(lat: number, lng: number): string {
     return "Kansas City Area"
   } else if (lat >= 35.0 && lat <= 35.3 && lng >= -106.8 && lng <= -106.5) {
     return "Albuquerque Area"
-  } else if (lat >= 32.1 && lat <= 32.4 && lng >= -111.1 && lng >= -110.8) {
+  } else if (lat >= 32.1 && lat <= 32.4 && lng >= -111.1 && lng <= -110.8) {
     return "Tucson Area"
-  } else if (lat >= 36.6 && lat <= 36.9 && lng >= -120.0 && lng >= -119.6) {
+  } else if (lat >= 36.6 && lat <= 36.9 && lng >= -120.0 && lng <= -119.6) {
     return "Fresno Area"
-  } else if (lat >= 38.4 && lat <= 38.7 && lng >= -121.6 && lng >= -121.3) {
+  } else if (lat >= 38.4 && lat <= 38.7 && lng >= -121.6 && lng <= -121.3) {
     return "Sacramento Area"
-  } else if (lat >= 35.6 && lat <= 35.9 && lng >= -78.8 && lng >= -78.5) {
+  } else if (lat >= 35.6 && lat <= 35.9 && lng >= -78.8 && lng <= -78.5) {
     return "Raleigh Area"
-  } else if (lat >= 36.7 && lat <= 37.0 && lng >= -76.1 && lng >= -75.8) {
+  } else if (lat >= 36.7 && lat <= 37.0 && lng >= -76.1 && lng <= -75.8) {
     return "Virginia Beach Area"
   } else if (lat >= 41.1 && lat <= 41.4 && lng >= -96.1 && lng <= -95.8) {
     return "Omaha Area"
-  } else if (lat >= 37.6 && lat <= 37.9 && lng >= -122.4 && lng >= -122.1) {
+  } else if (lat >= 37.6 && lat <= 37.9 && lng >= -122.4 && lng <= -122.1) {
     return "Oakland Area"
-  } else if (lat >= 36.0 && lat <= 36.3 && lng >= -96.1 && lng >= -95.8) {
+  } else if (lat >= 36.0 && lat <= 36.3 && lng >= -96.1 && lng <= -95.8) {
     return "Tulsa Area"
-  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -97.2 && lng >= -96.9) {
+  } else if (lat >= 32.6 && lat <= 32.9 && lng >= -97.2 && lng <= -96.9) {
     return "Arlington Area"
-  } else if (lat >= 29.8 && lat <= 30.1 && lng >= -90.2 && lng >= -89.9) {
+  } else if (lat >= 29.8 && lat <= 30.1 && lng >= -90.2 && lng <= -89.9) {
     return "New Orleans Area"
   }
 
