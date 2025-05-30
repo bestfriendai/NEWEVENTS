@@ -1,10 +1,6 @@
 "use server"
 
-import {
-  searchEvents as searchEventsAPI,
-  getFeaturedEvents as getFeaturedEventsAPI,
-  type EventSearchParams,
-} from "@/lib/api/events-api"
+import { unifiedEventsService, type UnifiedEventSearchParams } from "@/lib/api/unified-events-service"
 import { logger } from "@/lib/utils/logger"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
@@ -22,19 +18,6 @@ export interface EventSearchResult {
   responseTime?: number
 }
 
-// Zod schemas for validation
-// const EventSearchParamsSchema = z.object({
-//   keyword: z.string().optional(),
-//   location: z.string().optional(),
-//   radius: z.number().min(1).max(100).optional(),
-//   startDate: z.string().optional(),
-//   endDate: z.string().optional(),
-//   categories: z.array(z.string()).optional(),
-//   page: z.number().min(0).optional(),
-//   size: z.number().min(1).max(100).optional(),
-//   sort: z.string().optional(),
-// })
-
 /**
  * Enhanced event fetching with multi-level caching and database integration
  */
@@ -51,35 +34,38 @@ export async function fetchEvents(params: {
   try {
     logger.info("Server action: fetchEvents called", { params })
 
-    // Convert to API parameters
-    const searchParams: EventSearchParams = {
-      keyword: params.keyword,
-      location: params.location,
-      coordinates: params.coordinates,
+    // Convert to unified API parameters
+    const searchParams: UnifiedEventSearchParams = {
+      query: params.keyword,
+      lat: params.coordinates?.lat,
+      lng: params.coordinates?.lng,
       radius: params.radius || 25,
-      size: params.size || 20,
-      page: params.page || 0,
-      sort: params.sort || "date",
-      categories: params.categories,
+      limit: params.size || 20,
+      offset: (params.page || 0) * (params.size || 20),
+      category: params.categories?.[0], // Use first category for now
     }
 
-    // If we have coordinates but no location string, create one
-    if (params.coordinates && !params.location) {
-      searchParams.location = `${params.coordinates.lat},${params.coordinates.lng}`
-    }
+    const result = await unifiedEventsService.searchEvents(searchParams)
 
-    const result = await searchEventsAPI(searchParams)
+    // Convert sources object to array for backward compatibility
+    const sourcesArray: string[] = []
+    if (result.sources.rapidapi > 0) sourcesArray.push("RapidAPI")
+    if (result.sources.ticketmaster > 0) sourcesArray.push("Ticketmaster")
+    if (result.sources.cached > 0) sourcesArray.push("Cached")
 
-    // Transform the result to match our interface
+    // Calculate pagination info
+    const pageSize = params.size || 20
+    const currentPage = params.page || 0
+    const totalPages = Math.ceil(result.totalCount / pageSize)
+
     return {
       events: result.events,
       totalCount: result.totalCount,
-      page: result.page,
-      totalPages: result.totalPages,
-      sources: result.sources,
+      page: currentPage,
+      totalPages,
+      sources: sourcesArray,
       error: result.error ? { message: result.error } : undefined,
-      cached: result.cached,
-      responseTime: result.responseTime,
+      cached: result.sources.cached > 0,
     }
   } catch (error) {
     logger.error("Server action: fetchEvents failed", { error, params })
@@ -105,13 +91,19 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
   try {
     logger.info("Server action: getFeaturedEvents called", { limit })
 
-    const events = await getFeaturedEventsAPI(limit)
+    // Default to NYC coordinates for featured events
+    const result = await unifiedEventsService.getFeaturedEventsNearUser(
+      40.7128, // NYC lat
+      -74.006, // NYC lng
+      50, // radius
+      limit
+    )
 
     logger.info("Server action: getFeaturedEvents completed", {
-      eventCount: events.length,
+      eventCount: result.events.length,
     })
 
-    return events
+    return result.events
   } catch (error) {
     logger.error("Server action: getFeaturedEvents failed", { error, limit })
     return []
@@ -138,25 +130,23 @@ export async function testEventAPIs(): Promise<{
     }
 
     // Test with a simple search
-    const testResult = await searchEventsAPI({
-      keyword: "music",
-      location: "New York, NY",
-      size: 1,
+    const testResult = await unifiedEventsService.searchEvents({
+      query: "music",
+      lat: 40.7128,
+      lng: -74.006,
+      limit: 1,
     })
 
     // Check which sources returned data
-    if (testResult.sources.includes("Ticketmaster")) {
+    if (testResult.sources.ticketmaster > 0) {
       results.ticketmaster = true
     }
-    if (testResult.sources.includes("RapidAPI")) {
+    if (testResult.sources.rapidapi > 0) {
       results.rapidapi = true
     }
-    if (testResult.sources.includes("Eventbrite")) {
-      results.eventbrite = true
-    }
-    if (testResult.sources.includes("PredictHQ")) {
-      results.predicthq = true
-    }
+    // Note: eventbrite and predicthq are not implemented in unified service yet
+    results.eventbrite = false
+    results.predicthq = false
 
     if (testResult.error) {
       errors.push(testResult.error)
@@ -184,10 +174,10 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
   try {
     logger.info("Server action: getEventsByCategory called", { category, limit })
 
-    const searchResult = await searchEventsAPI({
-      keyword: category,
-      categories: [category],
-      size: limit,
+    const searchResult = await unifiedEventsService.searchEvents({
+      query: category,
+      category: category,
+      limit,
     })
 
     const categoryEvents = searchResult.events
@@ -207,142 +197,5 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
   }
 }
 
-/**
- * Search events from database
- */
-// async function searchEventsFromDatabase(params: EventSearchParams): Promise<EventSearchResult> {
-//   try {
-//     const searchOptions: EventSearchOptions = {
-//       limit: params.size || 20,
-//       offset: (params.page || 0) * (params.size || 20),
-//       orderBy: "popularity_score",
-//       orderDirection: "desc",
-//       isActive: true,
-//     }
-
-//     // Add search filters
-//     if (params.keyword) {
-//       searchOptions.searchText = params.keyword
-//     }
-
-//     if (params.categories && params.categories.length > 0) {
-//       searchOptions.category = params.categories[0] // For now, use first category
-//     }
-
-//     if (params.location) {
-//       // In a real implementation, you'd geocode the location first
-//       searchOptions.location = {
-//         lat: 40.7128, // Default to NYC
-//         lng: -74.006,
-//         radius: params.radius || 25,
-//       }
-//     }
-
-//     if (params.startDate && params.endDate) {
-//       searchOptions.dateRange = {
-//         start: params.startDate,
-//         end: params.endDate,
-//       }
-//     }
-
-//     const result = await eventRepository.searchEvents(searchOptions)
-
-//     if (result.error) {
-//       throw new Error(result.error)
-//     }
-
-//     // Transform database events to EventDetailProps format
-//     const transformedEvents = result.data.map(transformDatabaseEventToEventDetail)
-
-//     return {
-//       events: transformedEvents,
-//       totalCount: result.count,
-//       hasMore: result.hasMore,
-//       page: params.page || 0,
-//     }
-//   } catch (error) {
-//     logger.error(
-//       "Database search error",
-//       {
-//         component: "event-actions",
-//         action: "database_search_error",
-//       },
-//       error instanceof Error ? error : new Error(String(error)),
-//     )
-
-//     return {
-//       events: [],
-//       totalCount: 0,
-//       hasMore: false,
-//       page: 0,
-//     }
-//   }
-// }
-
-/**
- * Search events from external APIs
- */
-// async function searchEventsFromAPI(params: EventSearchParams): Promise<EventSearchResult> {
-//   try {
-//     const enhancedParams = {
-//       keyword: params.keyword,
-//       location: params.location,
-//       radius: params.radius,
-//       startDateTime: params.startDate,
-//       endDateTime: params.endDate,
-//       categories: params.categories,
-//       page: params.page,
-//       size: params.size,
-//       userPreferences: {
-//         favoriteCategories: params.categories || [],
-//         pricePreference: "any" as const,
-//         timePreference: "any" as const,
-//       },
-//     }
-
-//     const result = await searchEnhancedEvents({
-//       keyword: category,
-//       location: "New York",
-//       size: limit,
-//       categories: [category.toLowerCase()],
-//     })
-//     freshEvents = apiResult.events
-//   } catch (error) {
-//     // Final fallback
-//     freshEvents = generateFallbackEvents("New York", limit)
-//   }
-
-//     // Try to cache the result
-//     try {
-//       await cacheService.set(cacheKey, freshEvents, {
-//         ttl: 1800,
-//         namespace: "events",
-//       })
-//     } catch (cacheError) {
-//       logger.warn("Failed to cache category events", {
-//         component: "event-actions",
-//         action: "category_cache_set_warning",
-//       })
-//     }
-
-//     return freshEvents
-//   } catch (error) {
-//     logger.error(
-//       "Error getting events by category",
-//       {
-//         component: "event-actions",
-//         action: "get_events_by_category_error",
-//         metadata: { category },
-//       },
-//       error instanceof Error ? error : new Error(String(error)),
-//     )
-
-//     return generateFallbackEvents("New York", limit)
-//   }
-// }
-
-// Export testRapidApiConnection
-// export { testRapidApiConnection, getEventsByCategory }
-
 // Export types
-export type { EventSearchParams, EventSearchResult }
+export type { UnifiedEventSearchParams as EventSearchParams }
