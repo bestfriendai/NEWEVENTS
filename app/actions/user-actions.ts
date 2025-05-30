@@ -345,14 +345,11 @@ export async function getCurrentUser(): Promise<UserActionResult<UserEntity>> {
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
-      "Error getting current user",
-      {
-        component: "user-actions",
-        action: "get_current_user_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error getting current user", {
+      component: "user-actions",
+      action: "get_current_user_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,
@@ -442,14 +439,11 @@ export async function updateUserProfile(
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
-      "Error updating user profile",
-      {
-        component: "user-actions",
-        action: "update_profile_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error updating user profile", {
+      component: "user-actions",
+      action: "update_profile_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,
@@ -511,14 +505,11 @@ export async function getUserPreferences(): Promise<UserActionResult> {
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
-      "Error getting user preferences",
-      {
-        component: "user-actions",
-        action: "get_preferences_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error getting user preferences", {
+      component: "user-actions",
+      action: "get_preferences_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,
@@ -608,15 +599,12 @@ export async function toggleEventFavorite(
       data: true,
     }
   } catch (error) {
-    logger.error(
-      "Error toggling event favorite",
-      {
-        component: "user-actions",
-        action: "toggle_favorite_error",
-        metadata: { eventId, action },
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error toggling event favorite", {
+      component: "user-actions",
+      action: "toggle_favorite_error",
+      metadata: { eventId, action },
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,
@@ -695,14 +683,11 @@ export async function getUserFavorites(limit = 50): Promise<UserActionResult> {
       data: favoritesData,
     }
   } catch (error) {
-    logger.error(
-      "Error getting user favorites",
-      {
-        component: "user-actions",
-        action: "get_favorites_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error getting user favorites", {
+      component: "user-actions",
+      action: "get_favorites_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     // Return empty array instead of error to prevent UI crashes
     return {
@@ -765,15 +750,12 @@ export async function isEventFavorited(eventId: number): Promise<UserActionResul
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
-      "Error checking if event is favorited",
-      {
-        component: "user-actions",
-        action: "is_favorited_error",
-        metadata: { eventId },
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error checking if event is favorited", {
+      component: "user-actions",
+      action: "is_favorited_error",
+      metadata: { eventId },
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: true,
@@ -828,14 +810,11 @@ export async function getUserAnalytics(): Promise<UserActionResult> {
       data: analytics,
     }
   } catch (error) {
-    logger.error(
-      "Error getting user analytics",
-      {
-        component: "user-actions",
-        action: "get_analytics_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error getting user analytics", {
+      component: "user-actions",
+      action: "get_analytics_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,
@@ -898,14 +877,11 @@ export async function deleteUserAccount(): Promise<UserActionResult<boolean>> {
       data: true,
     }
   } catch (error) {
-    logger.error(
-      "Error deleting user account",
-      {
-        component: "user-actions",
-        action: "delete_account_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
-    )
+    logger.error("Error deleting user account", {
+      component: "user-actions",
+      action: "delete_account_error",
+      error: error instanceof Error ? error.message : String(error),
+    })
 
     return {
       success: false,

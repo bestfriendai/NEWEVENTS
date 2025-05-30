@@ -5,7 +5,7 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, MapPin, Users, Heart, ExternalLink } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Heart, ExternalLink, Share2, Copy } from "lucide-react"
 import { EventMap } from "@/components/event-map"
 
 // EventDetailProps interface definition
@@ -48,9 +48,38 @@ interface EventDetailModalProps {
 
 export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDetailModalProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
 
   const toggleDescription = () => {
     setShowFullDescription(!showFullDescription)
+  }
+
+  const handleShare = async () => {
+    if (!event) return
+
+    setIsSharing(true)
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: event.title,
+          text: event.description,
+          url: window.location.href,
+        })
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(`${event.title} - ${window.location.href}`)
+        // You could show a toast notification here
+      }
+    } catch (error) {
+      console.error('Error sharing:', error)
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
+  const handleImageError = () => {
+    setImageError(true)
   }
 
   // If no event is provided, don't render the content
@@ -69,22 +98,44 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
         <div className="relative h-48 overflow-hidden">
-          <Image
-            src={event.image || "/placeholder.svg"}
-            alt={event.title}
-            fill
-            style={{ objectFit: 'cover' }}
-            sizes="(max-width: 600px) 100vw, 600px"
-          />
+          {!imageError ? (
+            <Image
+              src={event.image || "/community-event.png"}
+              alt={event.title}
+              fill
+              style={{ objectFit: 'cover' }}
+              sizes="(max-width: 600px) 100vw, 600px"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-purple-600/20 to-indigo-700/20 flex items-center justify-center">
+              <div className="text-center text-white">
+                <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm opacity-75">Event Image</p>
+              </div>
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 text-white hover:bg-white/20"
-            onClick={() => onFavorite(event.id)}
-          >
-            <Heart className={`h-5 w-5 ${event.isFavorite ? "fill-red-500 text-red-500" : ""}`} />
-          </Button>
+
+          <div className="absolute top-2 right-2 flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={handleShare}
+              disabled={isSharing}
+            >
+              {isSharing ? <Copy className="h-5 w-5" /> : <Share2 className="h-5 w-5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={() => onFavorite(event.id)}
+            >
+              <Heart className={`h-5 w-5 ${event.isFavorite ? "fill-red-500 text-red-500" : ""}`} />
+            </Button>
+          </div>
         </div>
 
         <DialogHeader className="p-6 pb-2">

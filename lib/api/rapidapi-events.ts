@@ -174,3 +174,12 @@ class RapidAPIEventsService {
 }
 
 export const rapidAPIEventsService = new RapidAPIEventsService()
+
+// Export convenience functions
+export async function searchRapidApiEvents(params: EventSearchParams): Promise<RapidAPIEvent[]> {
+  return rapidAPIEventsService.searchEvents(params)
+}
+
+export async function getRapidApiEventDetails(eventId: string): Promise<RapidAPIEvent | null> {
+  return rapidAPIEventsService.getEventDetails(eventId)
+}

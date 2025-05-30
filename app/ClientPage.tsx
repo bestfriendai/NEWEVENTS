@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
 import { getFeaturedEvents } from "@/app/actions/event-actions"
 import type { EventDetailProps } from "@/components/event-detail-modal"
+import { logger } from "@/lib/utils/logger"
 
 // Dynamically import the COBE globe to avoid SSR issues
 const SimpleCobeGlobe = dynamic(() => import("@/components/simple-cobe-globe"), {
@@ -50,23 +51,33 @@ export default function ClientPage() {
     setIsClient(true)
   }, [])
 
-  // Load featured events
+  // Load featured events with improved error handling and caching
   useEffect(() => {
     const loadFeaturedEvents = async () => {
       try {
         setIsLoadingEvents(true)
         setEventsError(null)
-        const events = await getFeaturedEvents(12) // Get 12 events for 4 categories with 3 each
-        setFeaturedEvents(events)
+
+        // Get 12 events for 4 categories with 3 each
+        const events = await getFeaturedEvents(12)
+
+        if (events && events.length > 0) {
+          setFeaturedEvents(events)
+        } else {
+          // If no events returned, show a helpful message but don't error
+          setEventsError("No events available at the moment")
+        }
       } catch (error) {
-        console.error("Failed to load featured events:", error)
-        setEventsError("Failed to load events")
+        logger.error("Failed to load featured events", { error })
+        setEventsError("Unable to load events. Please try again later.")
       } finally {
         setIsLoadingEvents(false)
       }
     }
 
-    loadFeaturedEvents()
+    // Add a small delay to show loading state and prevent flash
+    const timer = setTimeout(loadFeaturedEvents, 300)
+    return () => clearTimeout(timer)
   }, [])
 
   const features = [
