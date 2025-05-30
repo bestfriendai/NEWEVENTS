@@ -2,7 +2,7 @@
 export const clientEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-  NEXT_PUBLIC_EVENTBRITE_API_KEY: process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "",
+  // Removed NEXT_PUBLIC_EVENTBRITE_API_KEY from client environment
   NEXT_PUBLIC_PREDICTHQ_API_KEY: process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "",
 } as const
 
@@ -13,11 +13,11 @@ export const serverEnv = {
   TOMTOM_API_KEY: process.env.TOMTOM_API_KEY || "",
   TICKETMASTER_API_KEY: process.env.TICKETMASTER_API_KEY || "",
   TICKETMASTER_SECRET: process.env.TICKETMASTER_SECRET || "",
-  EVENTBRITE_API_KEY: process.env.EVENTBRITE_API_KEY || "",
+  EVENTBRITE_API_KEY: process.env.EVENTBRITE_API_KEY || process.env.NEXT_PUBLIC_EVENTBRITE_API_KEY || "", // Use NEXT_PUBLIC version as fallback on server only
   EVENTBRITE_CLIENT_SECRET: process.env.EVENTBRITE_CLIENT_SECRET || "",
   EVENTBRITE_PRIVATE_TOKEN: process.env.EVENTBRITE_PRIVATE_TOKEN || "",
   EVENTBRITE_PUBLIC_TOKEN: process.env.EVENTBRITE_PUBLIC_TOKEN || "",
-  PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY || "",
+  PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY || process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "",
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
   MAPBOX_API_KEY: process.env.MAPBOX_API_KEY || "", // Server-side only
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
@@ -38,7 +38,7 @@ export const API_CONFIG = {
   },
   eventbrite: {
     baseUrl: "https://www.eventbriteapi.com/v3",
-    apiKey: serverEnv.EVENTBRITE_API_KEY || clientEnv.NEXT_PUBLIC_EVENTBRITE_API_KEY,
+    apiKey: serverEnv.EVENTBRITE_API_KEY, // Only use server-side key
     privateToken: serverEnv.EVENTBRITE_PRIVATE_TOKEN,
   },
   rapidapi: {
@@ -49,7 +49,7 @@ export const API_CONFIG = {
   },
   predicthq: {
     baseUrl: "https://api.predicthq.com/v1",
-    apiKey: serverEnv.PREDICTHQ_API_KEY || clientEnv.NEXT_PUBLIC_PREDICTHQ_API_KEY,
+    apiKey: serverEnv.PREDICTHQ_API_KEY,
   },
   tomtom: {
     baseUrl: "https://api.tomtom.com",
@@ -108,9 +108,7 @@ export function getClientConfig() {
       url: clientEnv.NEXT_PUBLIC_SUPABASE_URL,
       anonKey: clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     },
-    eventbrite: {
-      apiKey: clientEnv.NEXT_PUBLIC_EVENTBRITE_API_KEY,
-    },
+    // Removed eventbrite from client config
     predicthq: {
       apiKey: clientEnv.NEXT_PUBLIC_PREDICTHQ_API_KEY,
     },
@@ -173,11 +171,8 @@ export function hasTicketmasterApiKey(): boolean {
 }
 
 export function hasEventbriteApiKey(): boolean {
-  return !!(
-    serverEnv.EVENTBRITE_PRIVATE_TOKEN ||
-    serverEnv.EVENTBRITE_API_KEY ||
-    clientEnv.NEXT_PUBLIC_EVENTBRITE_API_KEY
-  )
+  // Only check server-side keys
+  return !!(serverEnv.EVENTBRITE_PRIVATE_TOKEN || serverEnv.EVENTBRITE_API_KEY)
 }
 
 export function hasPredictHQApiKey(): boolean {

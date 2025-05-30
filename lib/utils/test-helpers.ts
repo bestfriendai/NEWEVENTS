@@ -278,7 +278,7 @@ export const assert = {
 /**
  * Performance testing utilities
  */
-export const performance = {
+export const performanceUtils = {
   now: (): number => {
     return Date.now()
   },
@@ -292,7 +292,7 @@ export const performance = {
 {
   const start = Date.now()
   const result = await fn()
-  const duration = Date.now() - start
+  const duration = performance.now() - start
 
   logger.info(`Performance measurement: ${name}`, {
     component: "performance",
@@ -321,7 +321,7 @@ export const performance = {
   const results: T[] = []
 
   for (let i = 0; i < iterations; i++) {
-    const { result, duration } = await performance.measure(`${name} iteration ${i + 1}`, fn)
+    const { result, duration } = await performanceUtils.measure(`${name} iteration ${i + 1}`, fn)
     durations.push(duration)
     results.push(result)
   }

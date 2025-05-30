@@ -1,5 +1,5 @@
 import { logger, formatErrorMessage } from "@/lib/utils/logger"
-import { env } from "@/lib/env"
+import { getServerConfig } from "@/lib/env"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 export interface EventbriteSearchParams {
@@ -28,7 +28,9 @@ class EventbriteAPI {
   private token: string
 
   constructor() {
-    this.token = env.EVENTBRITE_PRIVATE_TOKEN || env.EVENTBRITE_PUBLIC_TOKEN || ""
+    // Only use server-side tokens
+    const config = getServerConfig()
+    this.token = config.eventbrite.privateToken || config.eventbrite.apiKey || ""
   }
 
   private async makeRequest(endpoint: string, params: URLSearchParams): Promise<any> {
@@ -213,9 +215,10 @@ class EventbriteAPI {
   }
 }
 
+// Create a server-side only instance
 export const eventbriteAPI = new EventbriteAPI()
 
-// Export convenience functions
+// Export convenience functions for server-side use only
 export async function searchEventbriteEvents(params: EventbriteSearchParams): Promise<EventDetailProps[]> {
   const result = await eventbriteAPI.searchEvents(params)
   return result.events
