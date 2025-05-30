@@ -31,6 +31,7 @@ export interface EnhancedEventSearchResult {
 }
 
 import { eventsService } from "@/lib/services/events-service"
+import { calculateDistance } from "@/lib/utils/event-utils"
 
 // This API now uses real data from Supabase
 
@@ -46,8 +47,11 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         metadata: { params },
       })
 
-      // Generate cache key
-      const cacheKey = `enhanced_events:${JSON.stringify(params)}`
+      // Generate cache key with location awareness
+      const locationKey = params.coordinates
+        ? `${params.coordinates.lat.toFixed(2)},${params.coordinates.lng.toFixed(2)}`
+        : params.location || "default"
+      const cacheKey = `enhanced_events:${locationKey}:${JSON.stringify(params)}`
 
       // Check cache first
       const cached = memoryCache.get<EnhancedEventSearchResult>(cacheKey)
@@ -60,14 +64,15 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         return cached
       }
 
-      // Use real events service to search for events
+      // Use real events service to search for events with improved location parameters
       const searchParams = {
         lat: params.coordinates?.lat,
         lng: params.coordinates?.lng,
-        radius: params.radius || 25,
+        radius: params.radius || 50, // Increased from 25 to 50 miles
         category: params.categories?.[0], // Use first category if provided
         limit: (params.page || 0) * (params.size || 20) + (params.size || 20), // Get enough for pagination
         offset: 0,
+        sort: params.coordinates ? "distance" : "popularity", // Sort by distance when coordinates are provided
       }
 
       const eventsResult = await eventsService.searchEvents(searchParams)
@@ -89,12 +94,24 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         )
       }
 
-      // Apply location filtering
+      // Apply location filtering with improved distance calculation
       if (params.location) {
         const location = params.location.toLowerCase()
         filteredEvents = filteredEvents.filter(
           (event) => event.location.toLowerCase().includes(location) || event.address.toLowerCase().includes(location),
         )
+      } else if (params.coordinates && params.radius) {
+        // Filter by distance when coordinates are provided
+        filteredEvents = filteredEvents.filter((event) => {
+          if (!event.coordinates) return false
+          const distance = calculateDistance(
+            params.coordinates!.lat,
+            params.coordinates!.lng,
+            event.coordinates.lat,
+            event.coordinates.lng,
+          )
+          return distance <= (params.radius || 50)
+        })
       }
 
       // Apply user preferences filtering
@@ -102,8 +119,12 @@ export async function searchEnhancedEvents(params: EnhancedEventSearchParams): P
         filteredEvents = applyUserPreferences(filteredEvents, params.userPreferences)
       }
 
-      // Sort events
-      const sortedEvents = sortEvents(filteredEvents, params.sort || "relevance")
+      // Sort events with improved sorting
+      const sortedEvents = sortEvents(
+        filteredEvents,
+        params.sort || (params.coordinates ? "distance" : "relevance"),
+        params.coordinates,
+      )
 
       // Apply pagination
       const page = params.page || 0
@@ -204,7 +225,11 @@ function applyUserPreferences(
 }
 
 // Sort events based on different criteria
-function sortEvents(events: EventDetailProps[], sortBy: string): EventDetailProps[] {
+function sortEvents(
+  events: EventDetailProps[],
+  sortBy: string,
+  coordinates?: { lat: number; lng: number },
+): EventDetailProps[] {
   const sortedEvents = [...events]
 
   switch (sortBy) {
@@ -225,11 +250,23 @@ function sortEvents(events: EventDetailProps[], sortBy: string): EventDetailProp
         return priceA - priceB
       })
 
+    case "distance":
+      if (coordinates) {
+        return sortedEvents.sort((a, b) => {
+          if (!a.coordinates || !b.coordinates) return 0
+          const distanceA = calculateDistance(coordinates.lat, coordinates.lng, a.coordinates.lat, a.coordinates.lng)
+          const distanceB = calculateDistance(coordinates.lat, coordinates.lng, b.coordinates.lat, b.coordinates.lng)
+          return distanceA - distanceB
+        })
+      }
+      break
+
     case "relevance":
     default:
       // Keep original order for relevance
       return sortedEvents
   }
+  return sortedEvents
 }
 
 // Extract numeric price value for sorting
@@ -241,28 +278,72 @@ function extractPriceValue(priceString: string): number {
   return match ? Number.parseFloat(match[1]) : 999999
 }
 
-// Get featured events
-export async function getFeaturedEvents(): Promise<EventDetailProps[]> {
+// Get featured events with location awareness
+export async function getFeaturedEvents(
+  limit = 3,
+  coordinates?: { lat: number; lng: number },
+): Promise<EventDetailProps[]> {
   return measurePerformance("getFeaturedEvents", async () => {
     try {
-      logger.info("Fetching featured events")
+      logger.info("Fetching featured events", { limit, coordinates })
 
-      // Check cache first
-      const cached = memoryCache.get<EventDetailProps[]>("featured_events")
+      // Create location-aware cache key
+      const locationKey = coordinates ? `${coordinates.lat.toFixed(2)},${coordinates.lng.toFixed(2)}` : "default"
+      const cacheKey = `enhanced_featured_events:${locationKey}:${limit}`
+
+      const cached = memoryCache.get<EventDetailProps[]>(cacheKey)
       if (cached) {
         logger.info("Featured events cache hit")
         return cached
       }
 
-      // Get upcoming events as featured events
-      const upcomingResult = await eventsService.getUpcomingEvents(3)
-      const featuredEvents = upcomingResult.events
+      // Get upcoming events as featured events with location awareness
+      const searchParams = coordinates
+        ? {
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            radius: 50, // 50 mile radius for featured events
+            limit: limit * 2, // Get more than needed to filter for best
+            sort: "distance", // Sort by distance when coordinates are provided
+          }
+        : {
+            limit: limit * 2,
+            sort: "popularity",
+          }
+
+      const upcomingResult = await eventsService.getUpcomingEvents(searchParams)
+
+      // Sort by a combination of proximity (if coordinates provided) and popularity
+      let featuredEvents = upcomingResult.events
+
+      if (coordinates) {
+        // Sort by a weighted score of distance and popularity
+        featuredEvents = featuredEvents.sort((a, b) => {
+          if (!a.coordinates || !b.coordinates) return b.attendees - a.attendees
+
+          const distanceA = calculateDistance(coordinates.lat, coordinates.lng, a.coordinates.lat, a.coordinates.lng)
+          const distanceB = calculateDistance(coordinates.lat, coordinates.lng, b.coordinates.lat, b.coordinates.lng)
+
+          // Weight: 60% distance, 40% popularity
+          const scoreA = distanceA * 0.6 - a.attendees * 0.4
+          const scoreB = distanceB * 0.6 - b.attendees * 0.4
+
+          return scoreA - scoreB
+        })
+      } else {
+        // Sort by popularity only
+        featuredEvents = featuredEvents.sort((a, b) => b.attendees - a.attendees)
+      }
+
+      // Take the top events
+      featuredEvents = featuredEvents.slice(0, limit)
 
       // Cache for 30 minutes
-      memoryCache.set("featured_events", featuredEvents, 30 * 60 * 1000)
+      memoryCache.set(cacheKey, featuredEvents, 30 * 60 * 1000)
 
       logger.info("Featured events fetched successfully", {
         count: featuredEvents.length,
+        withLocation: !!coordinates,
       })
 
       return featuredEvents

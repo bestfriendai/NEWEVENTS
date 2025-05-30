@@ -612,12 +612,13 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
             keyword: params.keyword,
             location: params.location,
             coordinates: params.coordinates,
-            radius: params.radius,
+            radius: params.radius || 50, // Increased from 25 to 50 miles for better coverage
             startDateTime: params.startDateTime,
             endDateTime: params.endDateTime,
             classificationName: params.categories?.[0],
             page: params.page,
-            size: Math.min(params.size || 50, 50), // Divide among sources
+            size: Math.min(params.size || 50, 50), // Maximize results per source
+            sort: "distance,asc", // Sort by distance when coordinates are provided
           })
             .then((result) => {
               if (result.events.length > 0) sources.push("Ticketmaster")
@@ -636,6 +637,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         searchRapidApiEvents({
           ...params,
           size: Math.min(params.size || 50, 50),
+          radius: params.radius || 50, // Increased radius
         })
           .then((events) => {
             if (events.length > 0) sources.push("RapidAPI")
@@ -652,6 +654,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         searchEventbriteEvents({
           ...params,
           size: Math.min(params.size || 50, 50),
+          radius: params.radius || 50, // Increased radius
         })
           .then((events) => {
             if (events.length > 0) sources.push("Eventbrite")
@@ -669,6 +672,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           searchPredictHQEvents({
             ...params,
             size: Math.min(params.size || 50, 50),
+            radius: params.radius || 50, // Increased radius
           })
             .then((events) => {
               if (events.length > 0) sources.push("PredictHQ")
@@ -1010,36 +1014,49 @@ export async function getEventDetails(eventId: string): Promise<EventDetailProps
 }
 
 // Get featured events
-export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> {
+export async function getFeaturedEvents(
+  limit = 6,
+  coordinates?: { lat: number; lng: number },
+): Promise<EventDetailProps[]> {
   try {
-    const cacheKey = `featured_events:${limit}`
+    // Create a location-aware cache key
+    const locationKey = coordinates ? `${coordinates.lat.toFixed(2)},${coordinates.lng.toFixed(2)}` : "default"
+    const cacheKey = `featured_events:${locationKey}:${limit}`
     const cached = memoryCache.get<EventDetailProps[]>(cacheKey)
 
     if (cached) {
       return cached
     }
 
-    logger.info("Fetching featured events", { limit })
+    logger.info("Fetching featured events", { limit, coordinates })
 
-    // Try multiple search strategies for featured events
-    const searchStrategies = [
-      { keyword: "concert music festival", location: "New York, NY" },
-      { keyword: "popular events", location: "Los Angeles, CA" },
-      { keyword: "entertainment shows", location: "Chicago, IL" },
-      { keyword: "live music", location: "Austin, TX" },
-    ]
+    // Try multiple search strategies for featured events with location awareness
+    const searchStrategies = coordinates
+      ? [
+          // If we have coordinates, prioritize nearby events
+          { coordinates, radius: 50, sort: "distance,asc" },
+          { coordinates, radius: 100, sort: "popularity,desc" },
+          { keyword: "popular events", coordinates, radius: 150 },
+        ]
+      : [
+          // Fallback to popular cities if no coordinates
+          { keyword: "concert music festival", location: "New York, NY" },
+          { keyword: "popular events", location: "Los Angeles, CA" },
+          { keyword: "entertainment shows", location: "Chicago, IL" },
+          { keyword: "live music", location: "Austin, TX" },
+        ]
 
     const allEvents: EventDetailProps[] = []
     let successfulSources = 0
 
     for (const strategy of searchStrategies) {
       try {
-        logger.info(`Trying search strategy: ${strategy.keyword} in ${strategy.location}`)
+        logger.info(`Trying search strategy with ${strategy.coordinates ? "coordinates" : "location"}`)
 
         const searchResult = await searchEvents({
           ...strategy,
           size: Math.ceil(limit / 2), // Get more events per strategy
-          sort: "popularity",
+          sort: strategy.sort || "popularity",
         })
 
         if (searchResult.events.length > 0) {
@@ -1050,7 +1067,7 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
           )
 
           // Break if we have enough events from successful sources
-          if (allEvents.length >= limit && successfulSources >= 2) break
+          if (allEvents.length >= limit * 2 && successfulSources >= 2) break
         }
       } catch (error) {
         logger.warn(`Featured events search strategy failed: ${formatErrorMessage(error)}`)

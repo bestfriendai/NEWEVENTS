@@ -44,8 +44,14 @@ class LocationService {
               metadata: { lat: latitude, lng: longitude, accuracy: position.coords.accuracy },
             })
 
-            // Get address from coordinates
-            const address = await reverseGeocode(latitude, longitude)
+            // Get address from coordinates with fallback
+            let address: string
+            try {
+              address = await reverseGeocode(latitude, longitude)
+            } catch (geocodeError) {
+              console.warn("Reverse geocoding failed, using coordinates:", geocodeError)
+              address = `Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
+            }
 
             const location: UserLocation = {
               lat: latitude,
@@ -65,10 +71,19 @@ class LocationService {
               error: error instanceof Error ? error.message : String(error),
             })
 
-            reject({
-              code: "LOCATION_PROCESSING_ERROR",
-              message: "Failed to process location data",
-            })
+            // Fallback to coordinates-only location
+            const { latitude, longitude } = position.coords
+            const fallbackLocation: UserLocation = {
+              lat: latitude,
+              lng: longitude,
+              address: `Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+              city: "Unknown",
+              state: "",
+              country: "US",
+              displayName: `Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+            }
+
+            resolve(fallbackLocation)
           }
         },
         (error) => {

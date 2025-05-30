@@ -5,6 +5,7 @@ import { logger, measurePerformance } from "@/lib/utils/logger"
 import { withRetry, formatErrorMessage } from "@/lib/utils/index"
 import { memoryCache } from "@/lib/utils/cache"
 
+// Add sort parameter to the interface
 export interface TicketmasterSearchParams {
   keyword?: string
   location?: string
@@ -15,6 +16,7 @@ export interface TicketmasterSearchParams {
   page?: number
   size?: number
   classificationName?: string
+  sort?: string
 }
 
 export interface TicketmasterSearchResult {
@@ -140,7 +142,7 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       if (params.coordinates) {
         if (isValidCoordinates(params.coordinates)) {
           queryParams.append("latlong", `${params.coordinates.lat},${params.coordinates.lng}`)
-          queryParams.append("radius", Math.min(params.radius || 50, 500).toString()) // Max 500 miles
+          queryParams.append("radius", Math.min(params.radius || 50, 500).toString()) // Max 500 miles, default 50
           queryParams.append("unit", "miles")
         } else {
           logger.warn("Invalid coordinates provided", {
@@ -152,6 +154,21 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       } else if (params.location) {
         queryParams.append("city", params.location.trim())
       }
+
+      // Sort parameter with better defaults
+      if (params.sort) {
+        queryParams.append("sort", params.sort)
+      } else if (params.coordinates) {
+        queryParams.append("sort", "distance,asc") // Default to distance when coordinates are provided
+      } else {
+        queryParams.append("sort", "relevance,desc") // Default to relevance otherwise
+      }
+
+      // Add more detailed parameters
+      queryParams.append("includeSpellcheck", "yes")
+      queryParams.append("includeTBA", "yes") // Include events with TBA dates
+      queryParams.append("includeTBD", "yes") // Include events with TBD dates
+      queryParams.append("includeTest", "no") // Exclude test events
 
       // Search parameters with validation
       if (params.keyword) queryParams.append("keyword", params.keyword.trim())
@@ -170,8 +187,8 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       queryParams.append("page", Math.max(params.page || 0, 0).toString())
 
       // Sort and additional options
-      queryParams.append("sort", "relevance,desc")
-      queryParams.append("includeSpellcheck", "yes")
+      // queryParams.append("sort", "relevance,desc")
+      // queryParams.append("includeSpellcheck", "yes")
 
       const url = `https://app.ticketmaster.com/discovery/v2/events.json?${queryParams.toString()}`
 
@@ -362,6 +379,7 @@ function isValidImageUrl(url: string): boolean {
   }
 }
 
+// Extract ticket links with more detail
 function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; link: string }> {
   const links: Array<{ source: string; link: string }> = []
 
@@ -394,6 +412,18 @@ function extractTicketLinks(event: TicketmasterEvent): Array<{ source: string; l
         links.push({
           source: `${presale.name || "Presale"}`,
           link: presale.url,
+        })
+      }
+    })
+  }
+
+  // External links
+  if (event._links?.attractions) {
+    event._links.attractions.forEach((attraction: any) => {
+      if (attraction.url && isValidUrl(attraction.url)) {
+        links.push({
+          source: attraction.name || "Artist Info",
+          link: attraction.url,
         })
       }
     })
@@ -538,6 +568,10 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
   if (eventData.promoter?.description) {
     if (description) description += " "
     description += eventData.promoter.description
+  }
+  if (eventData._embedded?.attractions?.[0]?.description) {
+    if (description) description += " "
+    description += eventData._embedded.attractions[0].description
   }
 
   // Sanitize description

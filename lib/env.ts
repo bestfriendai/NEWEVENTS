@@ -55,6 +55,9 @@ export const API_CONFIG = {
     baseUrl: "https://api.tomtom.com",
     apiKey: serverEnv.TOMTOM_API_KEY,
   },
+  mapbox: {
+    apiKey: serverEnv.MAPBOX_API_KEY, // Server-side only
+  },
   maps: {
     mapbox: {
       apiKey: serverEnv.MAPBOX_API_KEY, // Server-side only
@@ -185,6 +188,10 @@ export function hasRapidApiKey(): boolean {
 
 export function hasMapboxApiKey(): boolean {
   return !!serverEnv.MAPBOX_API_KEY
+}
+
+export function hasTomTomApiKey(): boolean {
+  return !!serverEnv.TOMTOM_API_KEY
 }
 
 // Export the validated config as default
