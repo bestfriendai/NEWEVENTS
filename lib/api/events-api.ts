@@ -81,6 +81,127 @@ class APIRateLimiter {
 
 const rateLimiter = new APIRateLimiter()
 
+// Image validation utility
+function isValidImageUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false
+
+  try {
+    const urlObj = new URL(url)
+    // Check if it's a valid HTTP/HTTPS URL
+    if (!["http:", "https:"].includes(urlObj.protocol)) return false
+
+    // Check if it has a valid image extension or is from known image services
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
+    const imageServices = [
+      "images.unsplash.com",
+      "img.evbuc.com",
+      "s1.ticketm.net",
+      "media.ticketmaster.com",
+      "tmol-prd.s3.amazonaws.com",
+      "livenationinternational.com",
+      "cdn.evbuc.com",
+      "eventbrite.com",
+      "rapidapi.com",
+      "pexels.com",
+      "pixabay.com",
+      "cloudinary.com",
+      "amazonaws.com",
+      "googleusercontent.com",
+      "fbcdn.net",
+      "cdninstagram.com"
+    ]
+
+    const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext))
+    const isFromImageService = imageServices.some(service => url.includes(service))
+
+    return hasImageExtension || isFromImageService
+  } catch {
+    return false
+  }
+}
+
+// Enhanced image extraction for RapidAPI events
+function extractRapidApiImage(event: any): string {
+  // Try multiple image sources in order of preference
+  const imageSources = [
+    // Primary event images
+    event.image,
+    event.thumbnail,
+    event.photo,
+    event.picture,
+    event.banner,
+    event.cover_image,
+    event.poster,
+    event.featured_image,
+
+    // Nested image objects
+    event.images?.[0]?.url,
+    event.images?.[0],
+    event.photos?.[0]?.url,
+    event.photos?.[0],
+
+    // Venue images
+    event.venue?.image,
+    event.venue?.photo,
+    event.venue?.banner,
+    event.venue?.images?.[0]?.url,
+    event.venue?.images?.[0],
+
+    // Organizer images
+    event.organizer?.image,
+    event.organizer?.logo,
+    event.organizer?.avatar,
+    event.organizer?.photo,
+
+    // Artist/performer images
+    event.artist?.image,
+    event.performer?.image,
+    event.artists?.[0]?.image,
+    event.performers?.[0]?.image,
+
+    // Category-based fallback images
+    getCategoryImage(event.category || event.type || ""),
+  ]
+
+  for (const imageUrl of imageSources) {
+    if (imageUrl && isValidImageUrl(imageUrl)) {
+      return imageUrl
+    }
+  }
+
+  return "/community-event.png"
+}
+
+// Get category-based fallback image
+function getCategoryImage(category: string): string {
+  const categoryLower = category.toLowerCase()
+
+  const categoryMap: { [key: string]: string } = {
+    "music": "/images/categories/music-default.jpg",
+    "concert": "/images/categories/music-default.jpg",
+    "festival": "/images/categories/festival-default.jpg",
+    "sports": "/images/categories/sports-default.jpg",
+    "theater": "/images/categories/theater-default.jpg",
+    "comedy": "/images/categories/comedy-default.jpg",
+    "dance": "/images/categories/dance-default.jpg",
+    "art": "/images/categories/art-default.jpg",
+    "food": "/images/categories/food-default.jpg",
+    "business": "/images/categories/business-default.jpg",
+    "conference": "/images/categories/conference-default.jpg",
+    "workshop": "/images/categories/workshop-default.jpg",
+    "nightlife": "/images/categories/nightlife-default.jpg",
+    "community": "/images/categories/community-default.jpg",
+  }
+
+  for (const [key, imagePath] of Object.entries(categoryMap)) {
+    if (categoryLower.includes(key)) {
+      return imagePath
+    }
+  }
+
+  return "/community-event.png"
+}
+
 // Search events from RapidAPI
 async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDetailProps[]> {
   if (!rateLimiter.checkRapidApiLimit()) {
@@ -265,6 +386,29 @@ async function searchEventbriteEvents(params: EventSearchParams): Promise<EventD
   }
 }
 
+// Enhanced image extraction for Eventbrite events
+function extractEventbriteImage(event: any): string {
+  // Try multiple image sources in order of preference
+  const imageSources = [
+    event.logo?.original?.url,
+    event.logo?.url,
+    event.image?.original?.url,
+    event.image?.url,
+    event.organizer?.logo?.original?.url,
+    event.organizer?.logo?.url,
+    event.venue?.image?.original?.url,
+    event.venue?.image?.url,
+  ]
+
+  for (const imageUrl of imageSources) {
+    if (imageUrl && isValidImageUrl(imageUrl)) {
+      return imageUrl
+    }
+  }
+
+  return "/community-event.png"
+}
+
 // Transform Eventbrite event data
 function transformEventbriteEvent(event: any): EventDetailProps {
   const numericId = event.id ? Number.parseInt(event.id) : Math.floor(Math.random() * 10000)
@@ -312,6 +456,27 @@ function transformEventbriteEvent(event: any): EventDetailProps {
   const fullAddress =
     [address.address_1, address.city, address.region, address.country].filter(Boolean).join(", ") || "Address TBA"
 
+  // Extract the best available image
+  const image = extractEventbriteImage(event)
+
+  // Debug logging for image extraction
+  if (image !== "/community-event.png") {
+    logger.info("Eventbrite event image found", {
+      component: "events-api",
+      action: "image_extraction",
+      metadata: {
+        eventTitle: event.name?.text || event.name,
+        imageUrl: image,
+        originalImages: {
+          logo: event.logo?.url,
+          logoOriginal: event.logo?.original?.url,
+          image: event.image?.url,
+          organizerLogo: event.organizer?.logo?.url,
+        }
+      },
+    })
+  }
+
   return {
     id: numericId,
     title: event.name?.text || event.name || "Untitled Event",
@@ -322,7 +487,7 @@ function transformEventbriteEvent(event: any): EventDetailProps {
     location: venue.name || "Venue TBA",
     address: fullAddress,
     price,
-    image: event.logo?.url || event.logo?.original?.url || "/community-event.png",
+    image,
     organizer: {
       name: event.organizer?.name || "Event Organizer",
       avatar: event.organizer?.logo?.url || "/avatar-1.png",
@@ -462,6 +627,26 @@ function transformRapidApiEvent(event: any, index: number): EventDetailProps {
     )
   }
 
+  // Extract the best available image
+  const image = extractRapidApiImage(event)
+
+  // Debug logging for image extraction
+  if (image !== "/community-event.png") {
+    logger.info("RapidAPI event image found", {
+      component: "events-api",
+      action: "image_extraction",
+      metadata: {
+        eventTitle: event.name || event.title,
+        imageUrl: image,
+        originalImages: {
+          image: event.image,
+          thumbnail: event.thumbnail,
+          photo: event.photo,
+        }
+      },
+    })
+  }
+
   return {
     id: numericId,
     title: event.name || event.title || "Untitled Event",
@@ -472,7 +657,7 @@ function transformRapidApiEvent(event: any, index: number): EventDetailProps {
     location: event.venue?.name || event.venue_name || "Venue TBA",
     address: event.venue?.full_address || event.venue_address || "Address TBA",
     price,
-    image: event.thumbnail || event.image || "/community-event.png",
+    image,
     organizer: {
       name: event.organizer || event.venue?.name || "Event Organizer",
       avatar: "/avatar-1.png",
@@ -485,6 +670,36 @@ function transformRapidApiEvent(event: any, index: number): EventDetailProps {
         : undefined,
     ticketLinks,
   }
+}
+
+// Enhanced image extraction for PredictHQ events
+function extractPredictHQImage(event: any): string {
+  // PredictHQ doesn't provide images, so we'll use category-based placeholders
+  const category = event.category?.toLowerCase() || ""
+
+  // Category-based image mapping
+  const categoryImages: { [key: string]: string } = {
+    "concerts": "/images/categories/music.jpg",
+    "music": "/images/categories/music.jpg",
+    "festivals": "/images/categories/festival.jpg",
+    "sports": "/images/categories/sports.jpg",
+    "conferences": "/images/categories/business.jpg",
+    "performing-arts": "/images/categories/arts.jpg",
+    "community": "/images/categories/community.jpg",
+    "academic": "/images/categories/education.jpg",
+    "expos": "/images/categories/expo.jpg",
+    "politics": "/images/categories/politics.jpg",
+  }
+
+  // Try to find a category-specific image
+  for (const [key, imagePath] of Object.entries(categoryImages)) {
+    if (category.includes(key)) {
+      return imagePath
+    }
+  }
+
+  // Default fallback
+  return "/community-event.png"
 }
 
 // Transform PredictHQ event data
@@ -511,6 +726,9 @@ function transformPredictHQEvent(event: any): EventDetailProps {
     hour12: true,
   })
 
+  // Extract the best available image (category-based for PredictHQ)
+  const image = extractPredictHQImage(event)
+
   return {
     id: numericId,
     title: event.title || "Untitled Event",
@@ -521,7 +739,7 @@ function transformPredictHQEvent(event: any): EventDetailProps {
     location: event.venue?.name || event.location?.[0] || "Venue TBA",
     address: event.location?.join(", ") || "Address TBA",
     price: "Price TBA",
-    image: "/community-event.png",
+    image,
     organizer: {
       name: "Event Organizer",
       avatar: "/avatar-1.png",
@@ -617,7 +835,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
             endDateTime: params.endDateTime,
             classificationName: params.categories?.[0],
             page: params.page,
-            size: Math.min(params.size || 50, 50), // Divide among sources
+            size: Math.min(params.size || 100, 100), // Increased size since we're only using 2 sources
           })
             .then((result) => {
               if (result.events.length > 0) sources.push("Ticketmaster")
@@ -635,7 +853,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       searchPromises.push(
         searchRapidApiEvents({
           ...params,
-          size: Math.min(params.size || 50, 50),
+          size: Math.min(params.size || 100, 100), // Increased size since we're only using 2 sources
         })
           .then((events) => {
             if (events.length > 0) sources.push("RapidAPI")
@@ -647,41 +865,8 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           }),
       )
 
-      // Eventbrite search
-      searchPromises.push(
-        searchEventbriteEvents({
-          ...params,
-          size: Math.min(params.size || 50, 50),
-        })
-          .then((events) => {
-            if (events.length > 0) sources.push("Eventbrite")
-            return events
-          })
-          .catch((error) => {
-            warnings.push(`Eventbrite: ${formatErrorMessage(error)}`)
-            return []
-          }),
-      )
-
-      // PredictHQ search - only if API key is available
-      if (serverEnv.PREDICTHQ_API_KEY) {
-        searchPromises.push(
-          searchPredictHQEvents({
-            ...params,
-            size: Math.min(params.size || 50, 50),
-          })
-            .then((events) => {
-              if (events.length > 0) sources.push("PredictHQ")
-              return events
-            })
-            .catch((error) => {
-              warnings.push(`PredictHQ: ${formatErrorMessage(error)}`)
-              return []
-            }),
-        )
-      } else {
-        logger.info("PredictHQ API key not configured - skipping PredictHQ search")
-      }
+      // Disabled other sources for now - focusing on RapidAPI and Ticketmaster only
+      logger.info("Using RapidAPI and Ticketmaster sources only")
 
       // Wait for all searches to complete
       const results = await Promise.allSettled(searchPromises)

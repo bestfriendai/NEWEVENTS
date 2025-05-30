@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
 
 import { motion } from "framer-motion"
 import Image from "next/image"
@@ -21,6 +22,7 @@ import {
   Briefcase,
   GraduationCap,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -67,6 +69,9 @@ export function EnhancedEventCard({
   index = 0,
   variant = "default",
 }: EnhancedEventCardProps) {
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageError, setImageError] = useState(false)
+
   const { isFavorite, toggleFavorite, isLoading: favoriteLoading } = useFavoriteToggle(event.id)
   const IconComponent = CATEGORY_ICONS[event.category as keyof typeof CATEGORY_ICONS] || Zap
   const categoryColor = CATEGORY_COLORS[event.category as keyof typeof CATEGORY_COLORS] || "from-purple-500 to-pink-500"
@@ -74,6 +79,15 @@ export function EnhancedEventCard({
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation()
     await toggleFavorite()
+  }
+
+  const handleImageLoad = () => {
+    setImageLoading(false)
+  }
+
+  const handleImageError = () => {
+    setImageLoading(false)
+    setImageError(true)
   }
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -103,11 +117,21 @@ export function EnhancedEventCard({
           <CardContent className="p-4">
             <div className="flex space-x-4">
               <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden">
+                {imageLoading && (
+                  <div className="absolute inset-0 bg-gray-800 flex items-center justify-center z-10">
+                    <Loader2 className="h-4 w-4 text-purple-400 animate-spin" />
+                  </div>
+                )}
                 <Image
-                  src={event.image || "/placeholder.svg?height=80&width=80&text=Event"}
+                  src={imageError ? "/community-event.png" : (event.image || "/community-event.png")}
                   alt={event.title}
                   fill
-                  className="object-cover"
+                  className={cn(
+                    "object-cover transition-opacity duration-300",
+                    imageLoading ? "opacity-0" : "opacity-100"
+                  )}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
                   sizes="80px"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -167,11 +191,21 @@ export function EnhancedEventCard({
       >
         <Card className="bg-gradient-to-br from-[#1A1D25] to-[#22252F] border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 overflow-hidden group-hover:shadow-2xl group-hover:shadow-purple-500/20">
           <div className="relative h-64 overflow-hidden">
+            {imageLoading && (
+              <div className="absolute inset-0 bg-gray-800 flex items-center justify-center z-10">
+                <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+              </div>
+            )}
             <Image
-              src={event.image || "/placeholder.svg?height=256&width=400&text=" + encodeURIComponent(event.title)}
+              src={imageError ? "/community-event.png" : (event.image || "/community-event.png")}
               alt={event.title}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-110"
+              className={cn(
+                "object-cover transition-all duration-500 group-hover:scale-110",
+                imageLoading ? "opacity-0" : "opacity-100"
+              )}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -300,11 +334,21 @@ export function EnhancedEventCard({
     >
       <Card className="bg-[#1A1D25]/80 backdrop-blur-md border border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 overflow-hidden group-hover:shadow-2xl group-hover:shadow-purple-500/20">
         <div className="relative h-48 overflow-hidden">
+          {imageLoading && (
+            <div className="absolute inset-0 bg-gray-800 flex items-center justify-center z-10">
+              <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+            </div>
+          )}
           <Image
-            src={event.image || "/placeholder.svg?height=200&width=300&text=" + encodeURIComponent(event.title)}
+            src={imageError ? "/community-event.png" : (event.image || "/community-event.png")}
             alt={event.title}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-110"
+            className={cn(
+              "object-cover transition-all duration-500 group-hover:scale-110",
+              imageLoading ? "opacity-0" : "opacity-100"
+            )}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
