@@ -118,7 +118,64 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
   }
 }
 
+// Test function to check if APIs are working
+export async function testEventAPIs(): Promise<{
+  ticketmaster: boolean
+  rapidapi: boolean
+  eventbrite: boolean
+  predicthq: boolean
+  errors: string[]
+}> {
+  try {
+    logger.info("Testing event APIs")
 
+    const errors: string[] = []
+    const results = {
+      ticketmaster: false,
+      rapidapi: false,
+      eventbrite: false,
+      predicthq: false,
+    }
+
+    // Test with a simple search
+    const testResult = await searchEventsAPI({
+      keyword: "music",
+      location: "New York, NY",
+      size: 1,
+    })
+
+    // Check which sources returned data
+    if (testResult.sources.includes("Ticketmaster")) {
+      results.ticketmaster = true
+    }
+    if (testResult.sources.includes("RapidAPI")) {
+      results.rapidapi = true
+    }
+    if (testResult.sources.includes("Eventbrite")) {
+      results.eventbrite = true
+    }
+    if (testResult.sources.includes("PredictHQ")) {
+      results.predicthq = true
+    }
+
+    if (testResult.error) {
+      errors.push(testResult.error)
+    }
+
+    logger.info("API test completed", { results, errors })
+
+    return { ...results, errors }
+  } catch (error) {
+    logger.error("API test failed", { error })
+    return {
+      ticketmaster: false,
+      rapidapi: false,
+      eventbrite: false,
+      predicthq: false,
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+    }
+  }
+}
 
 /**
  * Get events by category with caching
@@ -288,4 +345,4 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
 // export { testRapidApiConnection, getEventsByCategory }
 
 // Export types
-export type { EventSearchParams }
+export type { EventSearchParams, EventSearchResult }

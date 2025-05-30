@@ -6,9 +6,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getEventsByCategory } from "@/app/actions/event-actions"
 import { logger } from "@/lib/utils/logger"
 
-export async function GET(request: NextRequest, context: { params: Promise<{ category: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { category: string } }) {
   try {
-    const params = await context.params
     const category = decodeURIComponent(params.category)
     const { searchParams } = new URL(request.url)
     const limit = Number.parseInt(searchParams.get("limit") || "30")
@@ -36,12 +35,15 @@ export async function GET(request: NextRequest, context: { params: Promise<{ cat
 
     return response
   } catch (error) {
-    logger.error("Category events API error", {
-      component: "category-events-api",
-      action: "request_error",
-      metadata: { category: "unknown" },
-      error: error instanceof Error ? error.message : String(error),
-    })
+    logger.error(
+      "Category events API error",
+      {
+        component: "category-events-api",
+        action: "request_error",
+        metadata: { category: params.category },
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

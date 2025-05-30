@@ -54,7 +54,7 @@ export function ImprovedEventsMap({
           })
         },
         (error) => {
-          // Location access denied - silently handle
+          console.log("Location access denied:", error)
         },
       )
     }

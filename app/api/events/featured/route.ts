@@ -26,11 +26,14 @@ export async function GET() {
 
     return response
   } catch (error) {
-    logger.error("Featured events API error", {
-      component: "featured-events-api",
-      action: "request_error",
-      error: error instanceof Error ? error.message : String(error),
-    })
+    logger.error(
+      "Featured events API error",
+      {
+        component: "featured-events-api",
+        action: "request_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

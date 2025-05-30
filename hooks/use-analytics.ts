@@ -12,7 +12,10 @@ export interface AnalyticsEvent {
 export function useAnalytics() {
   const trackEvent = useCallback(async (event: AnalyticsEvent) => {
     try {
-      // Analytics tracking would be implemented here in production
+      // For now, just log to console in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Analytics Event:', event)
+      }
       
       // In production, you would send this to your analytics service
       // await fetch('/api/analytics', {

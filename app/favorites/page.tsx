@@ -3,57 +3,90 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { EventDetailModal } from "@/components/event-detail-modal";
-import type { EventDetailProps } from "@/components/event-detail-modal";
+import type { EventDetail } from "@/types/event.types";
 import { FavoritesHeader } from "@/components/favorites/favorites-header"
 import { FavoritesFilters } from "@/components/favorites/favorites-filters"
 import { EmptyFavorites } from "@/components/favorites/empty-favorites"
 import { FavoritesFooter } from "@/components/favorites/favorites-footer"
 import { EventCard } from "@/components/event-card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { AppLayout } from "@/components/app-layout"
 
-// Helper function to get favorites from localStorage
-const getFavoritesFromStorage = (): EventDetailProps[] => {
-  if (typeof window === "undefined") return []
-  try {
-    const stored = localStorage.getItem("dateai-favorites")
-    return stored ? JSON.parse(stored) : []
-  } catch (error) {
-    return []
-  }
-}
+// Sample favorites data
+const initialFavorites: EventDetail[] = [
+  {
+    id: 102,
+    title: "Underground Techno Night",
+    description:
+      "Dive into the underground techno scene with this exclusive warehouse party featuring cutting-edge techno artists and producers. The raw industrial setting creates the perfect atmosphere for authentic techno sounds and minimalist aesthetics. Limited capacity ensures an intimate experience for true techno enthusiasts.",
+    category: "Techno",
+    date: "May 29, 2025",
+    time: "11:00 PM - 6:00 AM",
+    location: "The Warehouse",
+    address: "456 Industrial Ave, Eastside",
+    price: "$40",
+    image: "/vibrant-community-event.png?height=400&width=600&query=underground techno party",
+    organizer: {
+      name: "Techno Collective",
+      avatar: "/avatar-2.png?height=40&width=40&query=techno dj",
+    },
+    attendees: 450,
+    isFavorite: true,
+  },
+  {
+    id: 105,
+    title: "80s Retro Dance Night",
+    description:
+      "Step back in time to the golden era of synth-pop, new wave, and disco at our 80s themed dance party. Dress in your best retro outfits and dance to iconic hits from Madonna, Michael Jackson, Prince, and more. Our vintage decorations, light shows, and special themed cocktails create an authentic 80s atmosphere.",
+    category: "Retro",
+    date: "June 1, 2025",
+    time: "8:00 PM - 2:00 AM",
+    location: "Flashback Lounge",
+    address: "202 Memory Lane, Midtown",
+    price: "$30",
+    image: "/vibrant-community-event.png?height=400&width=600&query=80s retro dance party",
+    organizer: {
+      name: "Time Machine Events",
+      avatar: "/avatar-5.png?height=40&width=40&query=retro dj",
+    },
+    attendees: 540,
+    isFavorite: true,
+  },
+  {
+    id: 2,
+    title: "Urban Art Exhibition",
+    description:
+      "Explore the vibrant world of urban art at this exclusive exhibition featuring works from renowned street artists and emerging talents. Witness live painting demonstrations, participate in interactive workshops, and immerse yourself in the creative energy of the urban art scene.",
+    category: "Art",
+    date: "May 22, 2025",
+    time: "10:00 AM - 6:00 PM",
+    location: "Modern Gallery",
+    address: "456 Art Avenue, Cultural District",
+    price: "$25",
+    image: "/vibrant-community-event.png?height=400&width=600&query=urban art exhibition",
+    organizer: {
+      name: "Art Collective",
+      avatar: "/avatar-2.png?height=40&width=40&query=art curator",
+    },
+    attendees: 520,
+    isFavorite: true,
+  },
+]
 
-// Helper function to save favorites to localStorage
-const saveFavoritesToStorage = (favorites: EventDetailProps[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem("dateai-favorites", JSON.stringify(favorites))
-  } catch (error) {
-    // Handle storage error silently
-  }
-}
-
-function FavoritesPageContent() {
+export default function FavoritesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
-  const [favorites, setFavorites] = useState<EventDetailProps[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [favorites, setFavorites] = useState<EventDetail[]>(initialFavorites)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
-  const [filteredFavorites, setFilteredFavorites] = useState<EventDetailProps[]>([])
+  const [filteredFavorites, setFilteredFavorites] = useState<EventDetail[]>(initialFavorites)
 
   useEffect(() => {
-    // Load favorites from localStorage
-    const loadFavorites = () => {
-      const storedFavorites = getFavoritesFromStorage()
-      setFavorites(storedFavorites)
-      setFilteredFavorites(storedFavorites)
+    // Simulate loading
+    const timer = setTimeout(() => {
       setIsLoading(false)
-    }
-
-    // Small delay to show loading state
-    const timer = setTimeout(loadFavorites, 300)
+    }, 800)
     return () => clearTimeout(timer)
   }, [])
 
@@ -101,9 +134,7 @@ function FavoritesPageContent() {
   }
 
   const handleRemoveFavorite = (id: number) => {
-    const updatedFavorites = favorites.filter((event) => event.id !== id)
-    setFavorites(updatedFavorites)
-    saveFavoritesToStorage(updatedFavorites)
+    setFavorites((prev) => prev.filter((event) => event.id !== id))
   }
 
   const handleSearch = () => {
@@ -180,13 +211,5 @@ function FavoritesPageContent() {
         onFavorite={handleRemoveFavorite}
       />
     </div>
-  )
-}
-
-export default function FavoritesPage() {
-  return (
-    <AppLayout>
-      <FavoritesPageContent />
-    </AppLayout>
   )
 }

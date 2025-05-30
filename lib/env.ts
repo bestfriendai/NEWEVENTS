@@ -120,16 +120,6 @@ export const CLIENT_CONFIG = getClientConfig()
 
 // Validate required environment variables
 export function validateEnv() {
-  // Skip validation during build time
-  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL && !process.env.NETLIFY) {
-    return {
-      isValid: true,
-      missing: [],
-      missingClient: [],
-      missingServer: [],
-    }
-  }
-
   const requiredClientVars = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const
   const requiredServerVars = [] as const // Add required server vars here
 
@@ -157,8 +147,8 @@ export function getValidatedEnv() {
   if (!validation.isValid) {
     const errorMessage = `Environment validation failed:\n${validation.missing.map((key) => `${key}: Required`).join("\n")}`
 
-    // During build time or in development, just warn instead of throwing
-    if (typeof window === "undefined" && (serverEnv.NODE_ENV === "development" || process.env.NODE_ENV === 'production')) {
+    // In development, just warn instead of throwing
+    if (typeof window === "undefined" && serverEnv.NODE_ENV === "development") {
       console.warn(errorMessage)
       return API_CONFIG
     }
@@ -169,9 +159,7 @@ export function getValidatedEnv() {
       return API_CONFIG
     }
 
-    // Only throw in runtime production with missing vars
-    console.warn(errorMessage)
-    return API_CONFIG
+    throw new Error(errorMessage)
   }
 
   return API_CONFIG

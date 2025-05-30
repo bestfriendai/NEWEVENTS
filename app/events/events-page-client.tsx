@@ -23,7 +23,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { fetchEvents, type EventSearchResult } from "@/app/actions/event-actions"
+import { fetchEvents, testEventAPIs, type EventSearchResult } from "@/app/actions/event-actions"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { logger } from "@/lib/utils/logger"
 import Image from "next/image"
@@ -101,14 +101,22 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 39.8283, lng: -98.5795 })
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
   const [sidebarOpen, setSidebarOpen] = useState(true)
-
+  const [apiStatus, setApiStatus] = useState<any>(null)
   const [searchRadius, setSearchRadius] = useState(25) // Default 25 mile radius
   const [sortBy, setSortBy] = useState("date")
-  const [priceFilter, setPriceFilter] = useState<{ min?: number; max?: number }>({})
-  const [dateFilter, setDateFilter] = useState<{ start?: string; end?: string }>({})
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
-  // API status is handled internally by the events service
+  // Test API status
+  const checkApiStatus = useCallback(async () => {
+    try {
+      const status = await testEventAPIs()
+      setApiStatus(status)
+    } catch (error) {
+      logger.error("Failed to check API status", {
+        component: "EventsPageClient",
+        error,
+      })
+    }
+  }, [])
 
   // Real geocoding using server action
   const geocodeLocationServer = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
@@ -146,10 +154,6 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
         radius: searchRadius,
         size: 50,
         keyword: "events", // Add a general keyword to help find events
-        sort: sortBy,
-        priceRange: priceFilter.min || priceFilter.max ? priceFilter : undefined,
-        startDateTime: dateFilter.start,
-        endDateTime: dateFilter.end,
       }
 
       const result: EventSearchResult = await fetchEvents(searchParams)
@@ -191,7 +195,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     } finally {
       setIsLoading(false)
     }
-  }, [searchRadius, sortBy, priceFilter, dateFilter])
+  }, [])
 
   // Search for events by location query
   const handleLocationSearch = useCallback(async () => {
@@ -335,7 +339,10 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     }
   }, [initialLocation, searchForEvents])
 
-
+  // Check API status on mount
+  useEffect(() => {
+    checkApiStatus()
+  }, [checkApiStatus])
 
   // Add location change button to the sidebar header
   const renderLocationHeader = () => (
@@ -459,7 +466,26 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
         </div>
       </div>
 
-
+      {/* API Status */}
+      {apiStatus && (
+        <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
+          <div className="text-xs text-gray-400 mb-2">API Status:</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {Object.entries(apiStatus).map(([api, status]) => {
+              if (api === "errors") return null
+              return (
+                <div key={api} className="flex items-center justify-between">
+                  <span className="capitalize text-gray-400">{api}</span>
+                  <div className={`w-2 h-2 rounded-full ${status ? "bg-green-400" : "bg-red-400"}`} />
+                </div>
+              )
+            })}
+          </div>
+          {apiStatus.errors && apiStatus.errors.length > 0 && (
+            <div className="mt-2 text-xs text-red-400">Issues: {apiStatus.errors.join(", ")}</div>
+          )}
+        </div>
+      )}
 
       {error && (
         <Alert variant="destructive" className="mt-3">

@@ -9,7 +9,7 @@ import { EnhancedSearch } from "@/components/ui/enhanced-search"
 import { AdvancedFilters } from "@/components/ui/advanced-filters"
 import { SmartEventRecommendations } from "@/components/events/SmartEventRecommendations"
 import { EventCard, EventCardGrid } from "@/components/events/EventCard"
-import EventsMap from "@/components/events/EventsMap"
+import { EventsMap } from "@/components/events/EventsMap"
 import { UserInsightsDashboard } from "@/components/analytics/UserInsightsDashboard"
 import { useLocationContext } from "@/contexts/LocationContext"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -17,23 +17,22 @@ import { searchEvents } from "@/lib/api/events-api"
 import { performanceMonitor, ImageOptimizer } from "@/lib/performance/optimization"
 import { logger } from "@/lib/utils/logger"
 import { cn } from "@/lib/utils"
-import type { Event } from "@/types/event.types"
-import type { EventDetailProps } from "@/components/event-detail-modal"
+import type { EventDetail } from "@/types/event.types"
 
 interface EnhancedEventsPageProps {
-  initialEvents?: EventDetailProps[]
+  initialEvents?: EventDetail[]
   className?: string
 }
 
 export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEventsPageProps) {
   // State management
-  const [events, setEvents] = useState<EventDetailProps[]>(initialEvents)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetailProps[]>(initialEvents)
+  const [events, setEvents] = useState<EventDetail[]>(initialEvents)
+  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(initialEvents)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("grid")
-  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [sortBy, setSortBy] = useState<"relevance" | "date" | "distance" | "popularity">("relevance")
 
   // Hooks
@@ -221,7 +220,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
     setFilteredEvents(filtered)
   }, [events, debouncedSearchQuery, activeFilters, sortBy, userLocation])
 
-  const handleEventSelect = useCallback((event: EventDetailProps) => {
+  const handleEventSelect = useCallback((event: EventDetail) => {
     setSelectedEvent(event)
     logger.info("Event selected", { eventId: event.id, title: event.title })
   }, [])
