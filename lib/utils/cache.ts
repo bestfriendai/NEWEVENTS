@@ -164,9 +164,7 @@ export const memoryCache = new MemoryCache()
 setInterval(
   () => {
     const cleaned = memoryCache.cleanup()
-    if (cleaned > 0) {
-      console.log(`Cache cleanup: removed ${cleaned} expired entries`)
-    }
+    // Cache cleanup completed silently
   },
   5 * 60 * 1000,
 )

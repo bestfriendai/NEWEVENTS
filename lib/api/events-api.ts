@@ -1140,21 +1140,7 @@ function generateFilterOptions(events: EventDetailProps[]) {
   }
 }
 
-// Test RapidAPI connection specifically
-export async function testRapidApiConnection(): Promise<boolean> {
-  try {
-    if (!serverEnv.RAPIDAPI_KEY) {
-      logger.warn("RapidAPI key not configured")
-      return false
-    }
 
-    const events = await searchRapidApiEvents({ keyword: "test", size: 1 })
-    return events.length >= 0 // Even 0 results means API is working
-  } catch (error) {
-    logger.error("RapidAPI connection test failed", { error: formatErrorMessage(error) })
-    return false
-  }
-}
 
 // Get event details
 export async function getEventDetails(eventId: string): Promise<EventDetailProps | null> {
@@ -1272,54 +1258,7 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
   }
 }
 
-// Test API connections
-export async function testApiConnections(): Promise<{
-  ticketmaster: boolean
-  rapidapi: boolean
-  eventbrite: boolean
-  predicthq: boolean
-}> {
-  const results = {
-    ticketmaster: false,
-    rapidapi: false,
-    eventbrite: false,
-    predicthq: false,
-  }
 
-  // Test Ticketmaster
-  try {
-    const tmResult = await searchTicketmasterEvents({ keyword: "test", size: 1 })
-    results.ticketmaster = !tmResult.error
-  } catch (error) {
-    logger.error("Ticketmaster test failed", { error: formatErrorMessage(error) })
-  }
-
-  // Test RapidAPI
-  try {
-    const rapidEvents = await searchRapidApiEvents({ keyword: "test", size: 1 })
-    results.rapidapi = rapidEvents.length >= 0 // Even 0 results means API is working
-  } catch (error) {
-    logger.error("RapidAPI test failed", { error: formatErrorMessage(error) })
-  }
-
-  // Test Eventbrite
-  try {
-    const ebEvents = await searchEventbriteEvents({ keyword: "test", size: 1 })
-    results.eventbrite = ebEvents.length >= 0
-  } catch (error) {
-    logger.error("Eventbrite test failed", { error: formatErrorMessage(error) })
-  }
-
-  // Test PredictHQ
-  try {
-    const phqEvents = await searchPredictHQEvents({ keyword: "test", size: 1 })
-    results.predicthq = phqEvents.length >= 0
-  } catch (error) {
-    logger.error("PredictHQ test failed", { error: formatErrorMessage(error) })
-  }
-
-  return results
-}
 
 // Define fallback events
 function generateFallbackEvents(count: number): EventDetailProps[] {
