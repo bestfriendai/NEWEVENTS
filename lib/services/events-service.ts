@@ -2,7 +2,8 @@ import { createClient } from "@supabase/supabase-js"
 import { env } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 import { transformEventEntityToProps } from "@/lib/utils/event-utils"
-import type { EventDetailProps } from "@/types/event-detail"
+import type { EventDetailProps } from "@/components/event-detail-modal"
+import { unifiedEventsService, type UnifiedEventSearchParams } from "@/lib/api/unified-events-service"
 
 export interface EventSearchParams {
   lat?: number
@@ -37,85 +38,43 @@ class EventsService {
    */
   async searchEvents(params: EventSearchParams): Promise<EventsResponse> {
     try {
-      logger.info("Searching for events", {
+      logger.info("Searching for events using unified service", {
         component: "EventsService",
         action: "searchEvents",
         metadata: params,
       })
 
-      let query = this.supabase
-        .from("events")
-        .select("*", { count: "exact" })
-        .eq("is_active", true)
-        .gte("start_date", new Date().toISOString()) // Only future events
-        .order("start_date", { ascending: true })
-
-      // Apply location-based filtering if coordinates provided
-      if (params.lat && params.lng && params.radius) {
-        // Use PostGIS distance calculation (assuming PostGIS is enabled)
-        // This is a simplified approach - in production you might want to use proper spatial queries
-        const radiusInDegrees = params.radius / 111.32 // Rough conversion from km to degrees
-        
-        query = query
-          .gte("location_lat", params.lat - radiusInDegrees)
-          .lte("location_lat", params.lat + radiusInDegrees)
-          .gte("location_lng", params.lng - radiusInDegrees)
-          .lte("location_lng", params.lng + radiusInDegrees)
+      // Convert EventSearchParams to UnifiedEventSearchParams
+      const unifiedParams: UnifiedEventSearchParams = {
+        lat: params.lat,
+        lng: params.lng,
+        radius: params.radius,
+        category: params.category,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        limit: params.limit,
+        offset: params.offset,
       }
 
-      // Apply category filter
-      if (params.category && params.category !== "all") {
-        query = query.eq("category", params.category)
-      }
+      // Use the unified events service to fetch from APIs and cache in Supabase
+      const result = await unifiedEventsService.searchEvents(unifiedParams)
 
-      // Apply date range filters
-      if (params.startDate) {
-        query = query.gte("start_date", params.startDate)
-      }
-      if (params.endDate) {
-        query = query.lte("start_date", params.endDate)
-      }
-
-      // Apply pagination
-      const limit = params.limit || 50
-      const offset = params.offset || 0
-      query = query.range(offset, offset + limit - 1)
-
-      const { data, error, count } = await query
-
-      if (error) {
-        logger.error("Error searching events", {
-          component: "EventsService",
-          action: "searchEvents",
-          error: error.message,
-        })
-        return {
-          events: [],
-          totalCount: 0,
-          hasMore: false,
-          error: error.message,
-        }
-      }
-
-      const events = (data || []).map(transformEventEntityToProps)
-      const totalCount = count || 0
-      const hasMore = totalCount > offset + limit
-
-      logger.info("Events search completed", {
+      logger.info("Unified events search completed", {
         component: "EventsService",
         action: "searchEvents",
         metadata: {
-          eventCount: events.length,
-          totalCount,
-          hasMore,
+          eventCount: result.events.length,
+          totalCount: result.totalCount,
+          hasMore: result.hasMore,
+          sources: result.sources,
         },
       })
 
       return {
-        events,
-        totalCount,
-        hasMore,
-        error: undefined,
+        events: result.events,
+        totalCount: result.totalCount,
+        hasMore: result.hasMore,
+        error: result.error,
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
