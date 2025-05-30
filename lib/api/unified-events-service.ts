@@ -165,6 +165,70 @@ class UnifiedEventsService {
   }
 
   /**
+   * Get featured events near user location
+   */
+  async getFeaturedEventsNearUser(lat: number, lng: number, radius = 25, limit = 10): Promise<UnifiedEventsResponse> {
+    try {
+      logger.info("Fetching featured events near user", {
+        component: "UnifiedEventsService",
+        action: "getFeaturedEventsNearUser",
+        metadata: { lat, lng, radius, limit },
+      })
+
+      // Search for events near the user with higher priority categories
+      const featuredCategories = ["Concerts", "Club Events", "Day Parties"]
+      const allFeaturedEvents: EventDetailProps[] = []
+
+      for (const category of featuredCategories) {
+        const categoryEvents = await this.searchEvents({
+          lat,
+          lng,
+          radius,
+          category,
+          limit: Math.ceil(limit / featuredCategories.length),
+        })
+
+        if (categoryEvents.events.length > 0) {
+          allFeaturedEvents.push(...categoryEvents.events)
+        }
+      }
+
+      // Remove duplicates and sort by date
+      const uniqueEvents = this.removeDuplicates(allFeaturedEvents)
+      const sortedEvents = uniqueEvents.sort((a, b) => {
+        const dateTimeA = this.parseEventDateTime(a.date, a.time)
+        const dateTimeB = this.parseEventDateTime(b.date, b.time)
+        return new Date(dateTimeA).getTime() - new Date(dateTimeB).getTime()
+      })
+
+      // Take only the requested limit
+      const featuredEvents = sortedEvents.slice(0, limit)
+
+      return {
+        events: featuredEvents,
+        totalCount: featuredEvents.length,
+        hasMore: false,
+        sources: { rapidapi: 0, ticketmaster: 0, cached: featuredEvents.length },
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      logger.error("Featured events search failed", {
+        component: "UnifiedEventsService",
+        action: "getFeaturedEventsNearUser",
+        error: errorMessage,
+      })
+
+      return {
+        events: [],
+        totalCount: 0,
+        hasMore: false,
+        error: errorMessage,
+        sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
+      }
+    }
+  }
+
+  /**
    * Fetch events from RapidAPI
    */
   private async fetchFromRapidAPI(params: UnifiedEventSearchParams, limit: number): Promise<EventDetailProps[]> {
@@ -192,47 +256,58 @@ class UnifiedEventsService {
         start: 0,
       })
 
-      // Transform RapidAPI events to our format with enhanced image handling
-      const transformedEvents: EventDetailProps[] = await Promise.all(
-        rapidApiEvents.slice(0, limit).map(async (event, index) => {
-          const category = rapidAPIEventsService.categorizeEvent(event)
-          const title = event.name || "Untitled Event"
-          
-          // Preprocess and validate image
-          const preprocessedImage = imageService.preprocessImageUrl(event.thumbnail, 'rapidapi')
-          const imageResult = await imageService.validateAndEnhanceImage(
-            preprocessedImage,
-            category,
-            title
-          )
-          
-          return {
-            id: this.generateNumericId(event.event_id),
-            title,
-            description: event.description || "No description available",
-            category,
-            date: this.formatDate(event.start_time),
-            time: this.formatTime(event.start_time),
-            location: event.venue?.name || "Venue TBA",
-            address: event.venue?.full_address || "Address TBA",
-            price: "Check Event",
-            image: imageResult.url,
-            organizer: {
-              name: event.publisher || "Event Organizer",
-              logo: "/avatar-1.png",
-            },
-            attendees: Math.floor(Math.random() * 500) + 50,
-            isFavorite: false,
-            coordinates: event.venue?.latitude && event.venue?.longitude ? {
-              lat: event.venue.latitude,
-              lng: event.venue.longitude,
-            } : undefined,
-            ticketLinks: event.ticket_links || [],
-            source: 'rapidapi' as const,
-            externalId: event.event_id,
-          }
-        })
-      )
+      // Transform RapidAPI events to our format with direct image usage
+      const transformedEvents: EventDetailProps[] = rapidApiEvents.slice(0, limit).map((event, index) => {
+        const category = rapidAPIEventsService.categorizeEvent(event)
+        const title = event.name || "Untitled Event"
+        
+        // Use the thumbnail directly from RapidAPI, fallback to category image if not available
+        const eventImage = event.thumbnail && event.thumbnail.startsWith('http')
+          ? event.thumbnail
+          : this.getCategoryImage(category)
+        
+        // Format ticket links properly
+        const ticketLinks = event.ticket_links?.map(link => ({
+          source: link.source || "Buy Tickets",
+          link: link.link,
+          price: undefined
+        })) || []
+
+        // Add event link if available
+        if (event.link && !ticketLinks.some(tl => tl.link === event.link)) {
+          ticketLinks.unshift({
+            source: "Event Details",
+            link: event.link,
+            price: undefined
+          })
+        }
+        
+        return {
+          id: this.generateNumericId(event.event_id),
+          title,
+          description: event.description || "No description available",
+          category,
+          date: this.formatDate(event.start_time),
+          time: this.formatTime(event.start_time),
+          location: event.venue?.name || "Venue TBA",
+          address: event.venue?.full_address || "Address TBA",
+          price: "Check Event",
+          image: eventImage,
+          organizer: {
+            name: event.publisher || "Event Organizer",
+            logo: "/avatar-1.png",
+          },
+          attendees: Math.floor(Math.random() * 500) + 50,
+          isFavorite: false,
+          coordinates: event.venue?.latitude && event.venue?.longitude ? {
+            lat: event.venue.latitude,
+            lng: event.venue.longitude,
+          } : undefined,
+          ticketLinks,
+          source: 'rapidapi' as const,
+          externalId: event.event_id,
+        }
+      })
 
       return transformedEvents
     } catch (error) {
@@ -277,25 +352,20 @@ class UnifiedEventsService {
 
       const result = await searchTicketmasterEvents(ticketmasterParams)
       
-      // Add source and external ID to events with enhanced image handling
-      const eventsWithSource = await Promise.all(
-        result.events.map(async (event) => {
-          // Validate and enhance Ticketmaster images
-          const preprocessedImage = imageService.preprocessImageUrl(event.image, 'ticketmaster')
-          const imageResult = await imageService.validateAndEnhanceImage(
-            preprocessedImage,
-            event.category,
-            event.title
-          )
+      // Add source and external ID to events with direct image usage
+      const eventsWithSource = result.events.map((event) => {
+        // Use Ticketmaster image directly, fallback to category image if not available
+        const eventImage = event.image && event.image.startsWith('http')
+          ? event.image
+          : this.getCategoryImage(event.category)
 
-          return {
-            ...event,
-            image: imageResult.url,
-            source: 'ticketmaster' as const,
-            externalId: `tm_${event.id}`,
-          }
-        })
-      )
+        return {
+          ...event,
+          image: eventImage,
+          source: 'ticketmaster' as const,
+          externalId: `tm_${event.id}`,
+        }
+      })
 
       return eventsWithSource
     } catch (error) {
@@ -468,11 +538,11 @@ class UnifiedEventsService {
       })
     }
 
-    // Sort by date
+    // Sort by date and time (soonest first)
     filtered.sort((a, b) => {
-      const dateA = new Date(a.date)
-      const dateB = new Date(b.date)
-      return dateA.getTime() - dateB.getTime()
+      const dateTimeA = this.parseEventDateTime(a.date, a.time)
+      const dateTimeB = this.parseEventDateTime(b.date, b.time)
+      return new Date(dateTimeA).getTime() - new Date(dateTimeB).getTime()
     })
 
     return filtered
@@ -506,6 +576,9 @@ class UnifiedEventsService {
   private formatTime(dateString: string): string {
     try {
       const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return "Time TBA"
+      }
       return date.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
@@ -582,6 +655,23 @@ class UnifiedEventsService {
 
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180)
+  }
+
+  /**
+   * Get category-specific fallback image
+   */
+  private getCategoryImage(category: string): string {
+    const categoryImages: Record<string, string[]> = {
+      "Concerts": ["/event-1.png", "/event-2.png", "/event-3.png"],
+      "Club Events": ["/event-4.png", "/event-5.png", "/event-6.png"],
+      "Day Parties": ["/event-7.png", "/event-8.png", "/event-9.png"],
+      "Parties": ["/event-10.png", "/event-11.png", "/event-12.png"],
+      "General Events": ["/community-event.png"],
+    }
+
+    const images = categoryImages[category] || categoryImages["General Events"]
+    const randomIndex = Math.floor(Math.random() * images.length)
+    return images[randomIndex]
   }
 }
 
