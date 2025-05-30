@@ -491,10 +491,16 @@ export function EventsClient() {
           </div>
         ) : (
           <EventsMap
-            center={mapCenter}
-            events={events}
-            selectedEventId={selectedEvent?.id || null}
-            onEventSelect={handleEventSelect}
+            events={events.map(event => ({
+              ...event,
+              organizer: event.organizer || { name: "Event Organizer", logo: "" }
+            }))}
+            userLocation={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng, name: currentLocationName } : null}
+            selectedEvent={selectedEvent ? {
+              ...selectedEvent,
+              organizer: selectedEvent.organizer || { name: "Event Organizer", logo: "" }
+            } : null}
+            onEventSelect={(event) => handleEventSelect(event)}
             onError={setMapLoadError}
           />
         )}

@@ -11,7 +11,7 @@ import { SmartEventRecommendations } from "@/components/events/SmartEventRecomme
 import { EventCard, EventCardGrid } from "@/components/events/EventCard"
 import EventsMap from "@/components/events/EventsMap"
 import { UserInsightsDashboard } from "@/components/analytics/UserInsightsDashboard"
-import { useLocationContext } from "@/contexts/LocationContext"
+// Location context removed - using direct location state
 import { useDebounce } from "@/hooks/use-debounce"
 import { searchEvents } from "@/lib/api/events-api"
 import { performanceMonitor, ImageOptimizer } from "@/lib/performance/optimization"
@@ -37,7 +37,8 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
   const [sortBy, setSortBy] = useState<"relevance" | "date" | "distance" | "popularity">("relevance")
 
   // Hooks
-  const { userLocation, isLocationLoading } = useLocationContext()
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
+  const [isLocationLoading, setIsLocationLoading] = useState(false)
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
   // Performance monitoring
@@ -48,7 +49,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
     const criticalImages = events
       .slice(0, 6)
       .map((event) => event.image)
-      .filter(Boolean)
+      .filter((image): image is string => Boolean(image))
     ImageOptimizer.preloadCriticalImages(criticalImages)
   }, [events])
 
@@ -355,9 +356,9 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
                     <div className="h-96 rounded-lg overflow-hidden">
                       <EventsMap
                         events={filteredEvents}
+                        userLocation={userLocation}
                         selectedEvent={selectedEvent}
-                        onEventClick={handleEventSelect}
-                        center={userLocation ? [userLocation.lng, userLocation.lat] : undefined}
+                        onEventSelect={handleEventSelect}
                       />
                     </div>
                   )}
@@ -380,7 +381,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
 
           <TabsContent value="recommendations">
             <SmartEventRecommendations
-              userLocation={userLocation}
+              userLocation={userLocation || undefined}
               userPreferences={{
                 favoriteCategories: ["music", "food"],
                 priceRange: "medium",
