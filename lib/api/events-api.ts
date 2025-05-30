@@ -81,7 +81,7 @@ class APIRateLimiter {
 
 const rateLimiter = new APIRateLimiter()
 
-// Image validation utility
+// Enhanced image validation utility
 function isValidImageUrl(url: string): boolean {
   if (!url || typeof url !== "string") return false
 
@@ -91,8 +91,9 @@ function isValidImageUrl(url: string): boolean {
     if (!["http:", "https:"].includes(urlObj.protocol)) return false
 
     // Check if it has a valid image extension or is from known image services
-    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".avif"]
     const imageServices = [
+      // Event platforms
       "images.unsplash.com",
       "img.evbuc.com",
       "s1.ticketm.net",
@@ -102,19 +103,71 @@ function isValidImageUrl(url: string): boolean {
       "cdn.evbuc.com",
       "eventbrite.com",
       "rapidapi.com",
+
+      // Image hosting services
       "pexels.com",
       "pixabay.com",
       "cloudinary.com",
       "amazonaws.com",
       "googleusercontent.com",
       "fbcdn.net",
-      "cdninstagram.com"
+      "cdninstagram.com",
+      "imgur.com",
+      "flickr.com",
+      "photobucket.com",
+
+      // CDN services
+      "cloudfront.net",
+      "fastly.com",
+      "jsdelivr.net",
+      "unpkg.com",
+      "cdnjs.cloudflare.com",
+
+      // Social media
+      "scontent.com",
+      "twimg.com",
+      "ytimg.com",
+      "vimeocdn.com",
+
+      // Event-specific services
+      "meetupstatic.com",
+      "stubhubstatic.com",
+      "seatgeek.com",
+      "vivid-seats.com",
+      "ticketnetwork.com",
+
+      // Music platforms
+      "spotify.com",
+      "last.fm",
+      "bandcamp.com",
+      "soundcloud.com"
     ]
 
     const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext))
-    const isFromImageService = imageServices.some(service => url.includes(service))
+    const isFromImageService = imageServices.some(service => url.toLowerCase().includes(service.toLowerCase()))
 
-    return hasImageExtension || isFromImageService
+    // Additional checks for image URLs without extensions
+    const hasImageParams = url.toLowerCase().includes('image') ||
+                          url.toLowerCase().includes('photo') ||
+                          url.toLowerCase().includes('picture') ||
+                          url.toLowerCase().includes('img') ||
+                          url.toLowerCase().includes('thumb')
+
+    // Check for common image URL patterns
+    const imageUrlPatterns = [
+      /\/images?\//i,
+      /\/photos?\//i,
+      /\/pictures?\//i,
+      /\/thumbs?\//i,
+      /\/media\//i,
+      /\/assets\//i,
+      /\/uploads?\//i,
+      /\/gallery\//i
+    ]
+
+    const hasImagePattern = imageUrlPatterns.some(pattern => pattern.test(url))
+
+    return hasImageExtension || isFromImageService || hasImageParams || hasImagePattern
   } catch {
     return false
   }
@@ -133,18 +186,33 @@ function extractRapidApiImage(event: any): string {
     event.cover_image,
     event.poster,
     event.featured_image,
+    event.event_image,
+    event.main_image,
 
-    // Nested image objects
+    // Nested image objects - handle arrays and objects
     event.images?.[0]?.url,
+    event.images?.[0]?.original?.url,
+    event.images?.[0]?.large?.url,
+    event.images?.[0]?.medium?.url,
     event.images?.[0],
     event.photos?.[0]?.url,
+    event.photos?.[0]?.original?.url,
     event.photos?.[0],
+
+    // Multiple image sizes
+    event.image_large,
+    event.image_medium,
+    event.image_small,
+    event.thumbnail_large,
+    event.thumbnail_medium,
 
     // Venue images
     event.venue?.image,
     event.venue?.photo,
     event.venue?.banner,
+    event.venue?.cover_image,
     event.venue?.images?.[0]?.url,
+    event.venue?.images?.[0]?.original?.url,
     event.venue?.images?.[0],
 
     // Organizer images
@@ -152,12 +220,22 @@ function extractRapidApiImage(event: any): string {
     event.organizer?.logo,
     event.organizer?.avatar,
     event.organizer?.photo,
+    event.organizer?.banner,
 
     // Artist/performer images
     event.artist?.image,
+    event.artist?.photo,
     event.performer?.image,
+    event.performer?.photo,
     event.artists?.[0]?.image,
+    event.artists?.[0]?.photo,
     event.performers?.[0]?.image,
+    event.performers?.[0]?.photo,
+
+    // Social media images
+    event.facebook_image,
+    event.twitter_image,
+    event.instagram_image,
 
     // Category-based fallback images
     getCategoryImage(event.category || event.type || ""),
@@ -165,11 +243,39 @@ function extractRapidApiImage(event: any): string {
 
   for (const imageUrl of imageSources) {
     if (imageUrl && isValidImageUrl(imageUrl)) {
+      logger.debug("RapidAPI image found", {
+        component: "events-api",
+        action: "image_extraction",
+        metadata: {
+          eventTitle: event.name || event.title,
+          imageUrl,
+          imageSource: getImageSourceType(imageUrl, imageSources),
+        }
+      })
       return imageUrl
     }
   }
 
   return "/community-event.png"
+}
+
+// Helper function to identify image source type for debugging
+function getImageSourceType(foundUrl: string, allSources: any[]): string {
+  const index = allSources.findIndex(source => source === foundUrl)
+  const sourceTypes = [
+    "primary_image", "thumbnail", "photo", "picture", "banner", "cover_image",
+    "poster", "featured_image", "event_image", "main_image",
+    "nested_images_url", "nested_images_original", "nested_images_large",
+    "nested_images_medium", "nested_images_direct", "photos_url", "photos_original", "photos_direct",
+    "image_large", "image_medium", "image_small", "thumbnail_large", "thumbnail_medium",
+    "venue_image", "venue_photo", "venue_banner", "venue_cover", "venue_images_url",
+    "venue_images_original", "venue_images_direct",
+    "organizer_image", "organizer_logo", "organizer_avatar", "organizer_photo", "organizer_banner",
+    "artist_image", "artist_photo", "performer_image", "performer_photo",
+    "artists_image", "artists_photo", "performers_image", "performers_photo",
+    "facebook_image", "twitter_image", "instagram_image", "category_fallback"
+  ]
+  return sourceTypes[index] || "unknown"
 }
 
 // Get category-based fallback image
@@ -202,7 +308,7 @@ function getCategoryImage(category: string): string {
   return "/community-event.png"
 }
 
-// Search events from RapidAPI
+// Enhanced search events from RapidAPI with multiple strategies
 async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDetailProps[]> {
   if (!rateLimiter.checkRapidApiLimit()) {
     logger.warn("RapidAPI rate limit exceeded")
@@ -218,75 +324,68 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
 
     rateLimiter.recordRapidApiRequest()
 
-    const url = new URL("https://real-time-events-search.p.rapidapi.com/search-events")
+    // Multiple search strategies to get more events
+    const searchStrategies = []
+    const baseSize = Math.min(params.size || 50, 100)
 
-    // Add parameters with better defaults
-    if (params.keyword) {
-      url.searchParams.set("query", params.keyword)
-    } else {
-      // Default search for popular events if no keyword
-      url.searchParams.set("query", "concert music festival")
+    // Strategy 1: User's specific search
+    if (params.keyword || params.location) {
+      searchStrategies.push({
+        query: params.keyword || "events entertainment",
+        location: params.location,
+        size: Math.floor(baseSize / 3)
+      })
     }
 
+    // Strategy 2: Popular event categories
+    const popularCategories = ["concert", "music festival", "comedy show", "sports", "theater"]
+    for (let i = 0; i < Math.min(2, popularCategories.length); i++) {
+      searchStrategies.push({
+        query: popularCategories[i],
+        location: params.location,
+        size: Math.floor(baseSize / 4)
+      })
+    }
+
+    // Strategy 3: Location-based search without specific keywords
     if (params.location) {
-      url.searchParams.set("location", params.location)
-    } else {
-      // Default to major cities if no location specified
-      url.searchParams.set("location", "New York, NY")
+      searchStrategies.push({
+        query: "entertainment events",
+        location: params.location,
+        size: Math.floor(baseSize / 3)
+      })
     }
 
-    if (params.startDateTime) {
-      const date = new Date(params.startDateTime)
-      url.searchParams.set("start_date", date.toISOString().split("T")[0])
-    } else {
-      // Default to today
-      url.searchParams.set("start_date", new Date().toISOString().split("T")[0])
-    }
+    const allEvents: EventDetailProps[] = []
 
-    url.searchParams.set("limit", String(Math.min(params.size || 20, 50))) // RapidAPI may have limits
-    url.searchParams.set("is_virtual", "false")
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        "X-RapidAPI-Key": serverEnv.RAPIDAPI_KEY,
-        "X-RapidAPI-Host": serverEnv.RAPIDAPI_HOST || "real-time-events-search.p.rapidapi.com",
-        "Content-Type": "application/json",
-      },
+    // Execute search strategies in parallel
+    const searchPromises = searchStrategies.map(async (strategy) => {
+      try {
+        const events = await executeRapidApiSearch({
+          ...params,
+          keyword: strategy.query,
+          location: strategy.location,
+          size: strategy.size
+        })
+        return events
+      } catch (error) {
+        logger.warn("RapidAPI search strategy failed", { strategy, error })
+        return []
+      }
     })
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        logger.error("RapidAPI authentication failed - check API key")
-        return []
+    const results = await Promise.allSettled(searchPromises)
+
+    // Collect all successful results
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        allEvents.push(...result.value)
       }
-      if (response.status === 403) {
-        logger.error("RapidAPI access forbidden - check subscription")
-        return []
-      }
-      if (response.status === 429) {
-        logger.warn("RapidAPI rate limit exceeded")
-        return []
-      }
+    })
 
-      const errorText = await response.text().catch(() => "Unknown error")
-      logger.error(`RapidAPI error: ${response.status} - ${errorText}`)
-      return []
-    }
+    // Remove duplicates and return
+    return removeDuplicateEvents(allEvents).slice(0, baseSize)
 
-    const data = await response.json()
-
-    if (data.status === "OK" && data.data && Array.isArray(data.data)) {
-      logger.info(`RapidAPI returned ${data.data.length} events`)
-      return data.data.map((event: any, index: number) => transformRapidApiEvent(event, index))
-    }
-
-    if (data.error) {
-      logger.error(`RapidAPI returned error: ${data.error}`)
-    }
-
-    logger.info("RapidAPI returned no events")
-    return []
   } catch (error) {
     logger.error("RapidAPI search failed", {
       error: formatErrorMessage(error),
@@ -295,6 +394,93 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
     })
     return []
   }
+}
+
+// Execute a single RapidAPI search
+async function executeRapidApiSearch(params: EventSearchParams): Promise<EventDetailProps[]> {
+  const url = new URL("https://real-time-events-search.p.rapidapi.com/search-events")
+
+  // Enhanced parameter handling
+  if (params.keyword) {
+    url.searchParams.set("query", params.keyword)
+  } else {
+    // Default search for popular events if no keyword
+    url.searchParams.set("query", "concert music festival entertainment")
+  }
+
+  if (params.location) {
+    url.searchParams.set("location", params.location)
+  }
+
+  // Enhanced date handling
+  if (params.startDateTime) {
+    const date = new Date(params.startDateTime)
+    url.searchParams.set("start_date", date.toISOString().split("T")[0])
+  } else {
+    // Default to today
+    url.searchParams.set("start_date", new Date().toISOString().split("T")[0])
+  }
+
+  // Add end date for better filtering
+  if (params.endDateTime) {
+    const endDate = new Date(params.endDateTime)
+    url.searchParams.set("end_date", endDate.toISOString().split("T")[0])
+  } else {
+    // Default to 3 months from now
+    const futureDate = new Date()
+    futureDate.setMonth(futureDate.getMonth() + 3)
+    url.searchParams.set("end_date", futureDate.toISOString().split("T")[0])
+  }
+
+  url.searchParams.set("limit", String(Math.min(params.size || 50, 100))) // Increased limit
+  url.searchParams.set("is_virtual", "false")
+
+  // Add additional parameters for better results
+  url.searchParams.set("sort", "date")
+  url.searchParams.set("include_description", "true")
+  url.searchParams.set("include_venue", "true")
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "X-RapidAPI-Key": serverEnv.RAPIDAPI_KEY,
+      "X-RapidAPI-Host": serverEnv.RAPIDAPI_HOST || "real-time-events-search.p.rapidapi.com",
+      "Content-Type": "application/json",
+    },
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      logger.error("RapidAPI authentication failed - check API key")
+      return []
+    }
+    if (response.status === 403) {
+      logger.error("RapidAPI access forbidden - check subscription")
+      return []
+    }
+    if (response.status === 429) {
+      logger.warn("RapidAPI rate limit exceeded")
+      return []
+    }
+
+    const errorText = await response.text().catch(() => "Unknown error")
+    logger.error(`RapidAPI error: ${response.status} - ${errorText}`)
+    return []
+  }
+
+  const data = await response.json()
+
+  if (data.status === "OK" && data.data && Array.isArray(data.data)) {
+    logger.info(`RapidAPI returned ${data.data.length} events for query: ${params.keyword}`)
+    return data.data.map((event: any, index: number) => transformRapidApiEvent(event, index))
+  }
+
+  if (data.error) {
+    logger.error(`RapidAPI returned error: ${data.error}`)
+  }
+
+  logger.info("RapidAPI returned no events")
+  return []
 }
 
 // Search events from Eventbrite
@@ -575,6 +761,92 @@ async function searchPredictHQEvents(params: EventSearchParams): Promise<EventDe
   }
 }
 
+// Enhanced date/time parsing utility
+function parseEventDateTime(dateTimeString: string): { date: Date; isValid: boolean } {
+  if (!dateTimeString) return { date: new Date(), isValid: false }
+
+  try {
+    // Handle various date formats
+    let parsedDate: Date
+
+    // ISO 8601 format (most common)
+    if (dateTimeString.includes('T') || dateTimeString.includes('Z')) {
+      parsedDate = new Date(dateTimeString)
+    }
+    // Unix timestamp (seconds)
+    else if (/^\d{10}$/.test(dateTimeString)) {
+      parsedDate = new Date(parseInt(dateTimeString) * 1000)
+    }
+    // Unix timestamp (milliseconds)
+    else if (/^\d{13}$/.test(dateTimeString)) {
+      parsedDate = new Date(parseInt(dateTimeString))
+    }
+    // Date-only format (YYYY-MM-DD)
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(dateTimeString)) {
+      parsedDate = new Date(dateTimeString + 'T00:00:00')
+    }
+    // US format (MM/DD/YYYY)
+    else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateTimeString)) {
+      parsedDate = new Date(dateTimeString)
+    }
+    // European format (DD/MM/YYYY)
+    else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateTimeString)) {
+      const parts = dateTimeString.split('/')
+      parsedDate = new Date(`${parts[1]}/${parts[0]}/${parts[2]}`)
+    }
+    // Default fallback
+    else {
+      parsedDate = new Date(dateTimeString)
+    }
+
+    // Validate the parsed date
+    const isValid = !isNaN(parsedDate.getTime()) &&
+                   parsedDate.getTime() > Date.now() - (365 * 24 * 60 * 60 * 1000) && // Not older than 1 year
+                   parsedDate.getTime() < Date.now() + (2 * 365 * 24 * 60 * 60 * 1000) // Not more than 2 years in future
+
+    return { date: parsedDate, isValid }
+  } catch {
+    return { date: new Date(), isValid: false }
+  }
+}
+
+// Enhanced time formatting with timezone support
+function formatEventDateTime(date: Date, timezone?: string): { formattedDate: string; formattedTime: string } {
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: timezone || undefined
+    }
+
+    const timeOptions: Intl.DateTimeFormatOptions = {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timezone || undefined
+    }
+
+    const formattedDate = date.toLocaleDateString("en-US", options)
+    const formattedTime = date.toLocaleTimeString("en-US", timeOptions)
+
+    return { formattedDate, formattedTime }
+  } catch {
+    // Fallback formatting
+    const formattedDate = date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+    const formattedTime = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    return { formattedDate, formattedTime }
+  }
+}
+
 // Transform RapidAPI event data
 function transformRapidApiEvent(event: any, index: number): EventDetailProps {
   const numericId = Math.abs(
@@ -584,20 +856,23 @@ function transformRapidApiEvent(event: any, index: number): EventDetailProps {
     }, 0) || Math.floor(Math.random() * 10000) + index,
   )
 
-  const startDate = event.start_time ? new Date(event.start_time) : new Date()
-  const endDate = event.end_time ? new Date(event.end_time) : null
+  // Enhanced date/time parsing
+  const startDateTime = parseEventDateTime(event.start_time || event.date || event.start_date)
+  const endDateTime = event.end_time ? parseEventDateTime(event.end_time) : null
 
-  const formattedDate = startDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
+  let formattedDate = "Date TBA"
+  let formattedTime = "Time TBA"
 
-  const formattedTime = startDate.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
+  if (startDateTime.isValid) {
+    const formatted = formatEventDateTime(startDateTime.date, event.timezone)
+    formattedDate = formatted.formattedDate
+    formattedTime = formatted.formattedTime
+  } else {
+    // Fallback to current date if parsing fails
+    const fallbackFormatted = formatEventDateTime(new Date())
+    formattedDate = fallbackFormatted.formattedDate
+    formattedTime = fallbackFormatted.formattedTime
+  }
 
   // Extract price
   let price = "Price TBA"

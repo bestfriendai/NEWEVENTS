@@ -429,48 +429,117 @@ class UnifiedEventsService {
   }
 
   /**
-   * Store events in Supabase
+   * Enhanced store events in Supabase with better data handling
    */
   private async storeEvents(events: EventDetailProps[], source: 'rapidapi' | 'ticketmaster'): Promise<void> {
     try {
-      const databaseEvents: DatabaseEvent[] = events.map(event => ({
-        external_id: (event as any).externalId || `${source}_${event.id}`,
-        source,
-        title: event.title,
-        description: event.description,
-        category: event.category,
-        start_date: this.parseEventDateTime(event.date, event.time),
-        location_name: event.location,
-        location_address: event.address,
-        location_lat: event.coordinates?.lat,
-        location_lng: event.coordinates?.lng,
-        price_min: this.extractMinPrice(event.price),
-        price_max: this.extractMaxPrice(event.price),
-        price_currency: "USD",
-        image_url: event.image,
-        organizer_name: event.organizer?.name,
-        organizer_avatar: event.organizer?.logo,
-        attendee_count: event.attendees,
-        ticket_links: (event as any).ticketLinks || [],
-        tags: [],
-        is_active: true,
-      }))
-
-      // Use upsert to avoid duplicates
-      const { error } = await this.supabase
-        .from("events")
-        .upsert(databaseEvents, {
-          onConflict: "external_id,source",
-          ignoreDuplicates: false,
-        })
-
-      if (error) {
-        logger.error("Error storing events", { error: error.message })
-      } else {
-        logger.info(`Stored ${databaseEvents.length} events from ${source}`)
+      if (!events || events.length === 0) {
+        logger.info("No events to store")
+        return
       }
+
+      const databaseEvents = events.map(event => {
+        // Enhanced external ID generation
+        const externalId = (event as any).externalId ||
+                          (event as any).event_id ||
+                          `${source}_${event.id}_${Date.now()}`
+
+        // Enhanced image URL validation and processing
+        let imageUrl = event.image
+        if (imageUrl && !this.isValidImageUrl(imageUrl)) {
+          imageUrl = "/community-event.png"
+        }
+
+        // Enhanced date parsing with better error handling
+        const startDate = this.parseEventDateTimeEnhanced(event.date, event.time)
+
+        // Extract tags from various sources
+        const tags = this.extractEventTags(event, source)
+
+        return {
+          external_id: externalId,
+          source,
+          title: event.title?.substring(0, 500) || "Untitled Event", // Limit title length
+          description: event.description?.substring(0, 2000) || "", // Ensure string, not null
+          category: event.category?.substring(0, 100) || null,
+          start_date: startDate,
+          location_name: event.location?.substring(0, 255) || null,
+          location_address: event.address?.substring(0, 500) || null,
+          location_lat: this.validateCoordinate(event.coordinates?.lat, 'lat'),
+          location_lng: this.validateCoordinate(event.coordinates?.lng, 'lng'),
+          price_min: this.extractMinPrice(event.price),
+          price_max: this.extractMaxPrice(event.price),
+          price_currency: "USD",
+          image_url: imageUrl,
+          organizer_name: event.organizer?.name?.substring(0, 255) || null,
+          organizer_avatar: event.organizer?.logo || null, // Remove avatar reference
+          attendee_count: Math.max(0, Math.min(event.attendees || 0, 1000000)), // Reasonable bounds
+          ticket_links: this.validateTicketLinks((event as any).ticketLinks || []),
+          tags,
+          is_active: true,
+        }
+      })
+
+      // Batch insert with better error handling
+      const batchSize = 50 // Process in smaller batches
+      const batches = []
+
+      for (let i = 0; i < databaseEvents.length; i += batchSize) {
+        batches.push(databaseEvents.slice(i, i + batchSize))
+      }
+
+      let totalStored = 0
+      let totalErrors = 0
+
+      for (const batch of batches) {
+        try {
+          const { error, count } = await this.supabase
+            .from("events")
+            .upsert(batch, {
+              onConflict: "external_id,source",
+              ignoreDuplicates: false,
+            })
+            .select('id', { count: 'exact', head: false })
+
+          if (error) {
+            logger.error("Error storing event batch", {
+              error: error.message,
+              batchSize: batch.length,
+              source
+            })
+            totalErrors += batch.length
+          } else {
+            totalStored += count || batch.length
+            logger.debug(`Stored batch of ${batch.length} events from ${source}`)
+          }
+        } catch (batchError) {
+          logger.error("Batch processing error", {
+            error: batchError,
+            batchSize: batch.length,
+            source
+          })
+          totalErrors += batch.length
+        }
+      }
+
+      logger.info(`Event storage completed for ${source}`, {
+        component: "UnifiedEventsService",
+        action: "storeEvents",
+        metadata: {
+          source,
+          totalEvents: events.length,
+          totalStored,
+          totalErrors,
+          successRate: totalStored / events.length
+        }
+      })
+
     } catch (error) {
-      logger.error("Error in storeEvents", { error })
+      logger.error("Error in storeEvents", {
+        error: error instanceof Error ? error.message : String(error),
+        source,
+        eventCount: events.length
+      })
     }
   }
 
@@ -672,6 +741,121 @@ class UnifiedEventsService {
     const images = categoryImages[category] || categoryImages["General Events"]
     const randomIndex = Math.floor(Math.random() * images.length)
     return images[randomIndex]
+  }
+
+  /**
+   * Enhanced image URL validation
+   */
+  private isValidImageUrl(url: string): boolean {
+    if (!url || typeof url !== "string") return false
+
+    try {
+      const urlObj = new URL(url)
+      if (!["http:", "https:"].includes(urlObj.protocol)) return false
+
+      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".avif"]
+      const imageServices = [
+        "images.unsplash.com", "img.evbuc.com", "s1.ticketm.net", "media.ticketmaster.com",
+        "tmol-prd.s3.amazonaws.com", "livenationinternational.com", "cdn.evbuc.com",
+        "eventbrite.com", "rapidapi.com", "pexels.com", "pixabay.com", "cloudinary.com",
+        "amazonaws.com", "googleusercontent.com", "fbcdn.net", "cdninstagram.com"
+      ]
+
+      const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext))
+      const isFromImageService = imageServices.some(service => url.toLowerCase().includes(service.toLowerCase()))
+
+      return hasImageExtension || isFromImageService
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Enhanced date/time parsing
+   */
+  private parseEventDateTimeEnhanced(date: string, time?: string): string {
+    try {
+      if (!date) return new Date().toISOString()
+
+      let dateTime: Date
+
+      // Try parsing the date
+      if (date.includes('T') || date.includes('Z')) {
+        dateTime = new Date(date)
+      } else {
+        // Combine date and time if available
+        const dateStr = time ? `${date} ${time}` : date
+        dateTime = new Date(dateStr)
+      }
+
+      // Validate the parsed date
+      if (isNaN(dateTime.getTime())) {
+        return new Date().toISOString()
+      }
+
+      return dateTime.toISOString()
+    } catch {
+      return new Date().toISOString()
+    }
+  }
+
+  /**
+   * Extract tags from event data
+   */
+  private extractEventTags(event: EventDetailProps, source: string): string[] {
+    const tags: string[] = []
+
+    // Add source as a tag
+    tags.push(source)
+
+    // Add category as a tag
+    if (event.category) {
+      tags.push(event.category.toLowerCase())
+    }
+
+    // Extract tags from title and description
+    const text = `${event.title} ${event.description}`.toLowerCase()
+    const commonTags = [
+      'music', 'concert', 'festival', 'comedy', 'theater', 'sports', 'art', 'food',
+      'business', 'conference', 'workshop', 'nightlife', 'community', 'dance'
+    ]
+
+    commonTags.forEach(tag => {
+      if (text.includes(tag)) {
+        tags.push(tag)
+      }
+    })
+
+    // Remove duplicates and limit to 10 tags
+    return [...new Set(tags)].slice(0, 10)
+  }
+
+  /**
+   * Validate coordinate values
+   */
+  private validateCoordinate(coord: number | undefined, type: 'lat' | 'lng'): number | null {
+    if (typeof coord !== 'number' || isNaN(coord)) return null
+
+    if (type === 'lat') {
+      return coord >= -90 && coord <= 90 ? coord : null
+    } else {
+      return coord >= -180 && coord <= 180 ? coord : null
+    }
+  }
+
+  /**
+   * Validate and clean ticket links
+   */
+  private validateTicketLinks(links: any[]): any[] {
+    if (!Array.isArray(links)) return []
+
+    return links
+      .filter(link => link && typeof link === 'object' && link.link)
+      .map(link => ({
+        source: link.source || 'Tickets',
+        link: link.link
+      }))
+      .slice(0, 5) // Limit to 5 ticket links
   }
 }
 
