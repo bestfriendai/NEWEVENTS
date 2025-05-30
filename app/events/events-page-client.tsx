@@ -104,6 +104,9 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
 
   const [searchRadius, setSearchRadius] = useState(25) // Default 25 mile radius
   const [sortBy, setSortBy] = useState("date")
+  const [priceFilter, setPriceFilter] = useState<{ min?: number; max?: number }>({})
+  const [dateFilter, setDateFilter] = useState<{ start?: string; end?: string }>({})
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   // API status is handled internally by the events service
 
@@ -143,6 +146,10 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
         radius: searchRadius,
         size: 50,
         keyword: "events", // Add a general keyword to help find events
+        sort: sortBy,
+        priceRange: priceFilter.min || priceFilter.max ? priceFilter : undefined,
+        startDateTime: dateFilter.start,
+        endDateTime: dateFilter.end,
       }
 
       const result: EventSearchResult = await fetchEvents(searchParams)
@@ -184,7 +191,7 @@ export function EventsPageClient({ initialLocation, onLocationChange }: EventsPa
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [searchRadius, sortBy, priceFilter, dateFilter])
 
   // Search for events by location query
   const handleLocationSearch = useCallback(async () => {

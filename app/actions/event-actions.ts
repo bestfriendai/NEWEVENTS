@@ -288,4 +288,4 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
 // export { testRapidApiConnection, getEventsByCategory }
 
 // Export types
-export type { EventSearchParams, EventSearchResult }
+export type { EventSearchParams }

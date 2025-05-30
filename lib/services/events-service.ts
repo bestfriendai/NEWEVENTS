@@ -15,6 +15,15 @@ export interface EventSearchParams {
   endDate?: string
   limit?: number
   offset?: number
+  keyword?: string
+  priceRange?: {
+    min?: number
+    max?: number
+  }
+  sortBy?: 'date' | 'price' | 'popularity' | 'distance'
+  sortOrder?: 'asc' | 'desc'
+  includeVirtual?: boolean
+  minRating?: number
 }
 
 export interface EventsResponse {
@@ -46,7 +55,7 @@ class EventsService {
         metadata: params,
       })
 
-      // Convert service params to API params
+      // Convert service params to API params with enhanced filtering
       const apiParams: APIEventSearchParams = {
         coordinates: params.lat && params.lng ? { lat: params.lat, lng: params.lng } : undefined,
         radius: params.radius || 25, // Default 25km radius
@@ -55,7 +64,11 @@ class EventsService {
         endDateTime: params.endDate,
         page: Math.floor((params.offset || 0) / (params.limit || 50)),
         size: params.limit || 50,
-        sort: "date"
+        sort: params.sortBy || "date",
+        keyword: params.keyword,
+        priceRange: params.priceRange,
+        includeVirtual: params.includeVirtual,
+        minRating: params.minRating
       }
 
       // Use the real API to search events

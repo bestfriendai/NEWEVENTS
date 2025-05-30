@@ -233,7 +233,7 @@ function transformTicketmasterEvent(apiEvent: any): EventDetailProps {
     image,
     organizer: {
       name: apiEvent._embedded?.attractions?.[0]?.name || "Event Organizer",
-      avatar: apiEvent._embedded?.attractions?.[0]?.images?.[0]?.url || "/avatar-1.png",
+      logo: apiEvent._embedded?.attractions?.[0]?.images?.[0]?.url || "/avatar-1.png",
     },
     attendees: Math.floor(Math.random() * 1000) + 50,
     isFavorite: false,
