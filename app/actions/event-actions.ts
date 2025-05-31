@@ -40,7 +40,7 @@ export async function fetchEvents(params: {
       lat: params.coordinates?.lat,
       lng: params.coordinates?.lng,
       radius: params.radius || 25,
-      limit: params.size || 20,
+      limit: Math.max(params.size || 20, 50), // Increase minimum limit to 50
       offset: (params.page || 0) * (params.size || 20),
       category: params.categories?.[0], // Use first category for now
     }
@@ -96,7 +96,7 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
       40.7128, // NYC lat
       -74.006, // NYC lng
       50, // radius
-      limit
+      Math.max(limit, 20), // Ensure we get at least 20 events
     )
 
     logger.info("Server action: getFeaturedEvents completed", {
@@ -177,7 +177,7 @@ export async function getEventsByCategory(category: string, limit = 30): Promise
     const searchResult = await unifiedEventsService.searchEvents({
       query: category,
       category: category,
-      limit,
+      limit: Math.max(limit, 50), // Increase minimum to 50
     })
 
     const categoryEvents = searchResult.events

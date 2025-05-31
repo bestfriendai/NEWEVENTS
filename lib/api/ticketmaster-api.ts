@@ -84,6 +84,26 @@ class TicketmasterRateLimiter {
 
 const rateLimiter = new TicketmasterRateLimiter()
 
+// Enhanced date formatting for Ticketmaster API
+function formatTicketmasterDate(dateString: string): string {
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      // If invalid date, return current date
+      return new Date().toISOString()
+    }
+    // Ensure the date is in the correct format: YYYY-MM-DDTHH:mm:ssZ
+    return date.toISOString()
+  } catch (error) {
+    logger.warn("Failed to format Ticketmaster date", {
+      component: "ticketmaster-api",
+      action: "date_format_error",
+      metadata: { originalDate: dateString, error: formatErrorMessage(error) },
+    })
+    return new Date().toISOString()
+  }
+}
+
 export async function searchTicketmasterEvents(params: TicketmasterSearchParams): Promise<TicketmasterSearchResult> {
   return measurePerformance("searchTicketmasterEvents", async () => {
     const startTime = Date.now()
@@ -155,18 +175,38 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
 
       // Search parameters with validation
       if (params.keyword) queryParams.append("keyword", params.keyword.trim())
-      if (params.startDateTime && isValidDateTime(params.startDateTime)) {
-        queryParams.append("startDateTime", params.startDateTime)
+
+      // Enhanced date handling with proper formatting
+      if (params.startDateTime) {
+        const formattedStartDate = formatTicketmasterDate(params.startDateTime)
+        queryParams.append("startDateTime", formattedStartDate)
+        logger.debug("Formatted start date", {
+          component: "ticketmaster-api",
+          original: params.startDateTime,
+          formatted: formattedStartDate,
+        })
+      } else {
+        // Default to current time if no start date provided
+        const now = new Date()
+        queryParams.append("startDateTime", now.toISOString())
       }
-      if (params.endDateTime && isValidDateTime(params.endDateTime)) {
-        queryParams.append("endDateTime", params.endDateTime)
+
+      if (params.endDateTime) {
+        const formattedEndDate = formatTicketmasterDate(params.endDateTime)
+        queryParams.append("endDateTime", formattedEndDate)
+        logger.debug("Formatted end date", {
+          component: "ticketmaster-api",
+          original: params.endDateTime,
+          formatted: formattedEndDate,
+        })
       }
+
       if (params.classificationName) {
         queryParams.append("classificationName", params.classificationName.trim())
       }
 
       // Pagination with validation
-      queryParams.append("size", Math.min(params.size || 50, 200).toString())
+      queryParams.append("size", Math.min(params.size || 100, 200).toString()) // Increase default from 50 to 100
       queryParams.append("page", Math.max(params.page || 0, 0).toString())
 
       // Sort and additional options
@@ -174,6 +214,12 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       queryParams.append("includeSpellcheck", "yes")
 
       const url = `https://app.ticketmaster.com/discovery/v2/events.json?${queryParams.toString()}`
+
+      logger.debug("Ticketmaster API request", {
+        component: "ticketmaster-api",
+        url: url.replace(apiKey, "***"),
+        params: queryParams.toString().replace(apiKey, "***"),
+      })
 
       const response = await withRetry(() => fetch(url), { maxAttempts: 3, baseDelay: 1000 })
 
@@ -186,7 +232,7 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
         logger.error("Ticketmaster API error", {
           component: "ticketmaster-api",
           action: "api_error",
-          metadata: { status: response.status, error, responseTime },
+          metadata: { status: response.status, error, responseTime, errorText },
         })
 
         return {
@@ -285,6 +331,18 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
 // Enhanced error handling
 function handleTicketmasterError(status: number, errorText: string): string {
   switch (status) {
+    case 400:
+      // Parse the error response for more specific error messages
+      try {
+        const errorData = JSON.parse(errorText)
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          const errorMessages = errorData.errors.map((err: any) => err.detail || err.code || "Unknown error")
+          return `Ticketmaster API error: ${errorMessages.join(", ")}`
+        }
+      } catch {
+        // If parsing fails, fall back to generic message
+      }
+      return `Invalid request parameters: ${errorText}`
     case 401:
       return "Invalid Ticketmaster API key - please check your credentials"
     case 403:

@@ -1,10 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { env, serverEnv } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
-import { rapidAPIEventsService } from "./rapidapi-events"
 import { searchTicketmasterEvents, type TicketmasterSearchParams } from "./ticketmaster-api"
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import { imageService } from "@/lib/services/image-service"
 
 export interface UnifiedEventSearchParams {
   lat?: number
@@ -33,7 +31,7 @@ export interface UnifiedEventsResponse {
 interface DatabaseEvent {
   id?: number
   external_id: string
-  source: 'rapidapi' | 'ticketmaster'
+  source: "rapidapi" | "ticketmaster"
   title: string
   description: string
   category: string
@@ -61,10 +59,7 @@ class UnifiedEventsService {
   private supabase
 
   constructor() {
-    this.supabase = createClient(
-      env.NEXT_PUBLIC_SUPABASE_URL!,
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   }
 
   /**
@@ -81,7 +76,7 @@ class UnifiedEventsService {
       const sources = { rapidapi: 0, ticketmaster: 0, cached: 0 }
       const allEvents: EventDetailProps[] = []
 
-      // First, check for cached events in Supabase
+      // First, check for cached events in Supabase (quick check)
       const cachedEvents = await this.getCachedEvents(params)
       if (cachedEvents.length > 0) {
         allEvents.push(...cachedEvents)
@@ -89,34 +84,57 @@ class UnifiedEventsService {
         logger.info(`Found ${cachedEvents.length} cached events`)
       }
 
-      // If we don't have enough cached events, fetch from APIs
+      // If we don't have enough cached events, fetch from APIs in parallel
       const remainingLimit = (params.limit || 50) - allEvents.length
       if (remainingLimit > 0) {
-        // Fetch from RapidAPI
+        const apiLimit = Math.max(remainingLimit, 30) // Increased minimum
+
+        // Run API calls in parallel for better performance
+        const apiPromises: Promise<{ source: string; events: EventDetailProps[] }>[] = []
+
+        // RapidAPI promise with better error handling
         if (serverEnv.RAPIDAPI_KEY) {
-          try {
-            const rapidApiEvents = await this.fetchFromRapidAPI(params, Math.ceil(remainingLimit / 2))
-            if (rapidApiEvents.length > 0) {
-              await this.storeEvents(rapidApiEvents, 'rapidapi')
-              allEvents.push(...rapidApiEvents)
-              sources.rapidapi = rapidApiEvents.length
-            }
-          } catch (error) {
-            logger.error("RapidAPI fetch failed", { error })
-          }
+          apiPromises.push(
+            this.fetchFromRapidAPI(params, apiLimit)
+              .then((events) => ({ source: "rapidapi", events }))
+              .catch((error) => {
+                logger.error("RapidAPI fetch failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                })
+                return { source: "rapidapi", events: [] }
+              }),
+          )
         }
 
-        // Fetch from Ticketmaster
+        // Ticketmaster promise with better error handling
         if (serverEnv.TICKETMASTER_API_KEY) {
-          try {
-            const ticketmasterEvents = await this.fetchFromTicketmaster(params, Math.ceil(remainingLimit / 2))
-            if (ticketmasterEvents.length > 0) {
-              await this.storeEvents(ticketmasterEvents, 'ticketmaster')
-              allEvents.push(...ticketmasterEvents)
-              sources.ticketmaster = ticketmasterEvents.length
-            }
-          } catch (error) {
-            logger.error("Ticketmaster fetch failed", { error })
+          apiPromises.push(
+            this.fetchFromTicketmaster(params, apiLimit)
+              .then((events) => ({ source: "ticketmaster", events }))
+              .catch((error) => {
+                logger.error("Ticketmaster fetch failed", {
+                  error: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                })
+                return { source: "ticketmaster", events: [] }
+              }),
+          )
+        }
+
+        // Wait for all API calls to complete
+        const apiResults = await Promise.all(apiPromises)
+
+        // Process results and store events
+        for (const result of apiResults) {
+          if (result.events.length > 0) {
+            // Store events in background (don't wait)
+            this.storeEvents(result.events, result.source as "rapidapi" | "ticketmaster").catch((error) =>
+              logger.error(`Failed to store ${result.source} events`, { error }),
+            )
+
+            allEvents.push(...result.events)
+            sources[result.source as keyof typeof sources] = result.events.length
           }
         }
       }
@@ -124,7 +142,7 @@ class UnifiedEventsService {
       // Remove duplicates and apply final filtering
       const uniqueEvents = this.removeDuplicates(allEvents)
       const filteredEvents = this.applyFilters(uniqueEvents, params)
-      
+
       // Apply pagination
       const offset = params.offset || 0
       const limit = params.limit || 50
@@ -229,100 +247,71 @@ class UnifiedEventsService {
   }
 
   /**
-   * Fetch events from RapidAPI
+   * Fetch events from RapidAPI with enhanced error handling
    */
   private async fetchFromRapidAPI(params: UnifiedEventSearchParams, limit: number): Promise<EventDetailProps[]> {
     try {
-      // Build query for RapidAPI
-      let query = params.query || ""
-      if (params.category && params.category !== "all") {
-        query = query ? `${query} ${params.category}` : params.category
+      // Check if API key is available
+      if (!serverEnv.RAPIDAPI_KEY) {
+        logger.warn("RapidAPI key not configured")
+        return []
       }
 
-      // Add location to query if provided
-      if (params.lat && params.lng) {
-        // For RapidAPI, we'll search by general location terms
-        query = query ? `${query} events` : "events"
+      // Use the enhanced RapidAPI search from events-api.ts
+      const { searchRapidApiEvents } = await import("./events-api")
+
+      // Build enhanced search parameters
+      const searchParams = {
+        keyword: params.query,
+        location: params.lat && params.lng ? `${params.lat},${params.lng}` : undefined,
+        coordinates: params.lat && params.lng ? { lat: params.lat, lng: params.lng } : undefined,
+        radius: params.radius || 25,
+        startDateTime: params.startDate || new Date().toISOString(), // Only future events
+        endDateTime: params.endDate,
+        size: Math.min(limit, 100),
+        sort: "date",
       }
 
-      if (!query) {
-        query = "events" // Default search term
-      }
-
-      const rapidApiEvents = await rapidAPIEventsService.searchEvents({
-        query,
-        date: params.startDate || "any",
-        is_virtual: false,
-        start: 0,
+      logger.debug("RapidAPI search parameters", {
+        component: "UnifiedEventsService",
+        action: "fetchFromRapidAPI",
+        metadata: { searchParams },
       })
 
-      // Transform RapidAPI events to our format with direct image usage
-      const transformedEvents: EventDetailProps[] = rapidApiEvents.slice(0, limit).map((event, index) => {
-        const category = rapidAPIEventsService.categorizeEvent(event)
-        const title = event.name || "Untitled Event"
-        
-        // Use the thumbnail directly from RapidAPI, fallback to category image if not available
-        const eventImage = event.thumbnail && event.thumbnail.startsWith('http')
-          ? event.thumbnail
-          : this.getCategoryImage(category)
-        
-        // Format ticket links properly
-        const ticketLinks = event.ticket_links?.map(link => ({
-          source: link.source || "Buy Tickets",
-          link: link.link,
-          price: undefined
-        })) || []
+      const events = await searchRapidApiEvents(searchParams)
 
-        // Add event link if available
-        if (event.link && !ticketLinks.some(tl => tl.link === event.link)) {
-          ticketLinks.unshift({
-            source: "Event Details",
-            link: event.link,
-            price: undefined
-          })
-        }
-        
-        return {
-          id: this.generateNumericId(event.event_id),
-          title,
-          description: event.description || "No description available",
-          category,
-          date: this.formatDate(event.start_time),
-          time: this.formatTime(event.start_time),
-          location: event.venue?.name || "Venue TBA",
-          address: event.venue?.full_address || "Address TBA",
-          price: "Check Event",
-          image: eventImage,
-          organizer: {
-            name: event.publisher || "Event Organizer",
-            logo: "/avatar-1.png",
-          },
-          attendees: Math.floor(Math.random() * 500) + 50,
-          isFavorite: false,
-          coordinates: event.venue?.latitude && event.venue?.longitude ? {
-            lat: event.venue.latitude,
-            lng: event.venue.longitude,
-          } : undefined,
-          ticketLinks,
-          source: 'rapidapi' as const,
-          externalId: event.event_id,
-        }
+      // Filter out past events
+      const futureEvents = events.filter((event) => {
+        const eventDate = new Date(event.date)
+        return eventDate >= new Date()
       })
 
-      return transformedEvents
+      logger.info(`RapidAPI returned ${events.length} events, ${futureEvents.length} are future events`)
+      return futureEvents
     } catch (error) {
-      logger.error("RapidAPI fetch error", { error })
+      logger.error("RapidAPI fetch error", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        hasApiKey: !!serverEnv.RAPIDAPI_KEY,
+        apiHost: serverEnv.RAPIDAPI_HOST,
+      })
       return []
     }
   }
 
   /**
-   * Fetch events from Ticketmaster
+   * Fetch events from Ticketmaster with enhanced error handling
    */
   private async fetchFromTicketmaster(params: UnifiedEventSearchParams, limit: number): Promise<EventDetailProps[]> {
     try {
+      // Check if API key is available
+      if (!serverEnv.TICKETMASTER_API_KEY) {
+        logger.warn("Ticketmaster API key not configured")
+        return []
+      }
+
       const ticketmasterParams: TicketmasterSearchParams = {
-        size: limit,
+        size: Math.min(limit, 200),
         page: 0,
       }
 
@@ -342,34 +331,66 @@ class UnifiedEventsService {
         ticketmasterParams.classificationName = this.mapCategoryToTicketmaster(params.category)
       }
 
-      // Add date range
-      if (params.startDate) {
-        ticketmasterParams.startDateTime = params.startDate
-      }
+      // Ensure we only get future events with proper date formatting
+      const now = new Date()
+      ticketmasterParams.startDateTime = params.startDate || now.toISOString()
+
       if (params.endDate) {
         ticketmasterParams.endDateTime = params.endDate
+      } else {
+        // Default to 6 months from now
+        const futureDate = new Date()
+        futureDate.setMonth(futureDate.getMonth() + 6)
+        ticketmasterParams.endDateTime = futureDate.toISOString()
       }
 
-      const result = await searchTicketmasterEvents(ticketmasterParams)
-      
-      // Add source and external ID to events with direct image usage
-      const eventsWithSource = result.events.map((event) => {
-        // Use Ticketmaster image directly, fallback to category image if not available
-        const eventImage = event.image && event.image.startsWith('http')
-          ? event.image
-          : this.getCategoryImage(event.category)
-
-        return {
-          ...event,
-          image: eventImage,
-          source: 'ticketmaster' as const,
-          externalId: `tm_${event.id}`,
-        }
+      logger.debug("Ticketmaster search parameters", {
+        component: "UnifiedEventsService",
+        action: "fetchFromTicketmaster",
+        metadata: { ticketmasterParams },
       })
 
-      return eventsWithSource
+      const result = await searchTicketmasterEvents(ticketmasterParams)
+
+      if (result.error) {
+        logger.warn("Ticketmaster API returned error", { error: result.error })
+        return []
+      }
+
+      // Enhanced image processing for each event
+      const eventsWithEnhancedImages = await Promise.all(
+        result.events.map(async (event) => {
+          try {
+            const { imageService } = await import("../services/image-service")
+            const imageResult = await imageService.validateAndEnhanceImage(event.image, event.category, event.title)
+
+            return {
+              ...event,
+              image: imageResult.url,
+              source: "ticketmaster" as const,
+              externalId: `tm_${event.id}`,
+            }
+          } catch (imageError) {
+            logger.warn("Failed to enhance Ticketmaster event image", {
+              eventId: event.id,
+              error: imageError instanceof Error ? imageError.message : String(imageError),
+            })
+            return {
+              ...event,
+              source: "ticketmaster" as const,
+              externalId: `tm_${event.id}`,
+            }
+          }
+        }),
+      )
+
+      return eventsWithEnhancedImages
     } catch (error) {
-      logger.error("Ticketmaster fetch error", { error })
+      logger.error("Ticketmaster fetch error", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        hasApiKey: !!serverEnv.TICKETMASTER_API_KEY,
+      })
       return []
     }
   }
@@ -379,11 +400,19 @@ class UnifiedEventsService {
    */
   private async getCachedEvents(params: UnifiedEventSearchParams): Promise<EventDetailProps[]> {
     try {
+      logger.info("Fetching cached events", {
+        component: "UnifiedEventsService",
+        action: "getCachedEvents",
+        metadata: params,
+      })
+
+      const now = new Date()
+
       let query = this.supabase
         .from("events")
         .select("*")
         .eq("is_active", true)
-        .gte("start_date", new Date().toISOString())
+        .gte("start_date", now.toISOString()) // Only future events
         .order("start_date", { ascending: true })
 
       // Apply location-based filtering if coordinates provided
@@ -409,136 +438,172 @@ class UnifiedEventsService {
         query = query.lte("start_date", params.endDate)
       }
 
-      // Limit to recent events (last 24 hours) to avoid stale data
-      const oneDayAgo = new Date()
-      oneDayAgo.setHours(oneDayAgo.getHours() - 24)
-      query = query.gte("created_at", oneDayAgo.toISOString())
+      // Only get events cached in the last 4 hours for freshness
+      const fourHoursAgo = new Date()
+      fourHoursAgo.setHours(fourHoursAgo.getHours() - 4)
+      query = query.gte("created_at", fourHoursAgo.toISOString())
 
       const { data, error } = await query.limit(params.limit || 50)
 
       if (error) {
-        logger.error("Error fetching cached events", { error: error.message })
+        logger.error("Supabase query error in getCachedEvents", {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        })
         return []
       }
 
-      return (data || []).map(this.transformDatabaseEventToProps)
+      if (!data || data.length === 0) {
+        logger.info("No cached events found", { params })
+        return []
+      }
+
+      logger.info(`Found ${data.length} cached events`, { count: data.length })
+
+      // Enhanced image processing for cached events with better error handling
+      const eventsWithEnhancedImages = await Promise.allSettled(
+        data.map(async (dbEvent) => {
+          try {
+            const event = this.transformDatabaseEventToProps(dbEvent)
+
+            // Skip image validation for cached events if they already have valid images
+            if (event.image && event.image.startsWith("http")) {
+              return event
+            }
+
+            const { imageService } = await import("../services/image-service")
+            const imageResult = await imageService.validateAndEnhanceImage(event.image, event.category, event.title)
+
+            return {
+              ...event,
+              image: imageResult.url,
+            }
+          } catch (error) {
+            logger.warn("Error processing cached event image", {
+              eventId: dbEvent.id,
+              error: error instanceof Error ? error.message : String(error),
+            })
+
+            // Return event with fallback image on error
+            const event = this.transformDatabaseEventToProps(dbEvent)
+            return {
+              ...event,
+              image: this.getCategoryImage(event.category),
+            }
+          }
+        }),
+      )
+
+      // Filter out failed results and extract successful ones
+      const successfulEvents = eventsWithEnhancedImages
+        .filter((result): result is PromiseFulfilledResult<EventDetailProps> => result.status === "fulfilled")
+        .map((result) => result.value)
+
+      return successfulEvents
     } catch (error) {
-      logger.error("Error in getCachedEvents", { error })
+      logger.error("Error in getCachedEvents", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        params,
+      })
       return []
     }
   }
 
   /**
-   * Enhanced store events in Supabase with better data handling
+   * Store events in Supabase
    */
-  private async storeEvents(events: EventDetailProps[], source: 'rapidapi' | 'ticketmaster'): Promise<void> {
+  private async storeEvents(events: EventDetailProps[], source: "rapidapi" | "ticketmaster"): Promise<void> {
     try {
-      if (!events || events.length === 0) {
-        logger.info("No events to store")
-        return
-      }
-
-      const databaseEvents = events.map(event => {
-        // Enhanced external ID generation
-        const externalId = (event as any).externalId ||
-                          (event as any).event_id ||
-                          `${source}_${event.id}_${Date.now()}`
-
-        // Enhanced image URL validation and processing
-        let imageUrl = event.image
-        if (imageUrl && !this.isValidImageUrl(imageUrl)) {
-          imageUrl = "/community-event.png"
-        }
-
-        // Enhanced date parsing with better error handling
-        const startDate = this.parseEventDateTimeEnhanced(event.date, event.time)
-
-        // Extract tags from various sources
-        const tags = this.extractEventTags(event, source)
-
-        return {
-          external_id: externalId,
-          source,
-          title: event.title?.substring(0, 500) || "Untitled Event", // Limit title length
-          description: event.description?.substring(0, 2000) || "", // Ensure string, not null
-          category: event.category?.substring(0, 100) || null,
-          start_date: startDate,
-          location_name: event.location?.substring(0, 255) || null,
-          location_address: event.address?.substring(0, 500) || null,
-          location_lat: this.validateCoordinate(event.coordinates?.lat, 'lat'),
-          location_lng: this.validateCoordinate(event.coordinates?.lng, 'lng'),
-          price_min: this.extractMinPrice(event.price),
-          price_max: this.extractMaxPrice(event.price),
-          price_currency: "USD",
-          image_url: imageUrl,
-          organizer_name: event.organizer?.name?.substring(0, 255) || null,
-          organizer_avatar: event.organizer?.logo || null, // Remove avatar reference
-          attendee_count: Math.max(0, Math.min(event.attendees || 0, 1000000)), // Reasonable bounds
-          ticket_links: this.validateTicketLinks((event as any).ticketLinks || []),
-          tags,
-          is_active: true,
-        }
+      logger.info(`Storing ${events.length} events from ${source}`, {
+        component: "UnifiedEventsService",
+        action: "storeEvents",
+        metadata: { source, count: events.length },
       })
 
-      // Batch insert with better error handling
-      const batchSize = 50 // Process in smaller batches
-      const batches = []
+      const databaseEvents: DatabaseEvent[] = events.map((event) => ({
+        external_id: (event as any).externalId || `${source}_${event.id}`,
+        source,
+        title: event.title,
+        description: event.description,
+        category: event.category,
+        start_date: this.parseEventDateTime(event.date, event.time),
+        location_name: event.location,
+        location_address: event.address,
+        location_lat: event.coordinates?.lat || null,
+        location_lng: event.coordinates?.lng || null,
+        price_min: this.extractMinPrice(event.price),
+        price_max: this.extractMaxPrice(event.price),
+        price_currency: "USD",
+        image_url: event.image,
+        organizer_name: event.organizer?.name,
+        organizer_avatar: event.organizer?.logo,
+        attendee_count: event.attendees,
+        ticket_links: (event as any).ticketLinks || [],
+        tags: [],
+        is_active: true,
+      }))
 
-      for (let i = 0; i < databaseEvents.length; i += batchSize) {
-        batches.push(databaseEvents.slice(i, i + batchSize))
-      }
+      // Store events individually to avoid constraint conflicts
+      let storedCount = 0
+      let skippedCount = 0
 
-      let totalStored = 0
-      let totalErrors = 0
-
-      for (const batch of batches) {
+      for (const event of databaseEvents) {
         try {
-          const { error, count } = await this.supabase
+          // Check if event already exists
+          const { data: existing, error: selectError } = await this.supabase
             .from("events")
-            .upsert(batch, {
-              onConflict: "external_id,source",
-              ignoreDuplicates: false,
-            })
-            .select('id', { count: 'exact', head: false })
+            .select("id")
+            .eq("external_id", event.external_id)
+            .eq("source", event.source)
+            .maybeSingle()
 
-          if (error) {
-            logger.error("Error storing event batch", {
-              error: error.message,
-              batchSize: batch.length,
-              source
+          if (selectError) {
+            logger.error("Error checking existing event", {
+              error: selectError.message,
+              eventId: event.external_id,
             })
-            totalErrors += batch.length
-          } else {
-            totalStored += count || batch.length
-            logger.debug(`Stored batch of ${batch.length} events from ${source}`)
+            continue
           }
-        } catch (batchError) {
-          logger.error("Batch processing error", {
-            error: batchError,
-            batchSize: batch.length,
-            source
+
+          if (existing) {
+            skippedCount++
+            continue
+          }
+
+          // Insert new event
+          const { error: insertError } = await this.supabase.from("events").insert(event)
+
+          if (insertError) {
+            logger.error("Error inserting event", {
+              error: insertError.message,
+              code: insertError.code,
+              eventId: event.external_id,
+              title: event.title,
+            })
+          } else {
+            storedCount++
+          }
+        } catch (eventError) {
+          logger.error("Error processing individual event", {
+            error: eventError instanceof Error ? eventError.message : String(eventError),
+            eventId: event.external_id,
           })
-          totalErrors += batch.length
         }
       }
 
       logger.info(`Event storage completed for ${source}`, {
-        component: "UnifiedEventsService",
-        action: "storeEvents",
-        metadata: {
-          source,
-          totalEvents: events.length,
-          totalStored,
-          totalErrors,
-          successRate: totalStored / events.length
-        }
+        total: databaseEvents.length,
+        stored: storedCount,
+        skipped: skippedCount,
       })
-
     } catch (error) {
       logger.error("Error in storeEvents", {
         error: error instanceof Error ? error.message : String(error),
         source,
-        eventCount: events.length
+        batchSize: events.length,
       })
     }
   }
@@ -564,10 +629,13 @@ class UnifiedEventsService {
       },
       attendees: dbEvent.attendee_count || 0,
       isFavorite: false,
-      coordinates: dbEvent.location_lat && dbEvent.location_lng ? {
-        lat: dbEvent.location_lat,
-        lng: dbEvent.location_lng,
-      } : undefined,
+      coordinates:
+        dbEvent.location_lat && dbEvent.location_lng
+          ? {
+              lat: dbEvent.location_lat,
+              lng: dbEvent.location_lng,
+            }
+          : undefined,
       ticketLinks: dbEvent.ticket_links || [],
     }
   }
@@ -577,7 +645,7 @@ class UnifiedEventsService {
    */
   private removeDuplicates(events: EventDetailProps[]): EventDetailProps[] {
     const seen = new Set<string>()
-    return events.filter(event => {
+    return events.filter((event) => {
       const key = `${event.title.toLowerCase()}_${event.location.toLowerCase()}_${event.date}`
       if (seen.has(key)) {
         return false
@@ -595,14 +663,9 @@ class UnifiedEventsService {
 
     // Filter by location radius if coordinates provided
     if (params.lat && params.lng && params.radius) {
-      filtered = filtered.filter(event => {
+      filtered = filtered.filter((event) => {
         if (!event.coordinates) return false
-        const distance = this.calculateDistance(
-          params.lat!,
-          params.lng!,
-          event.coordinates.lat,
-          event.coordinates.lng
-        )
+        const distance = this.calculateDistance(params.lat!, params.lng!, event.coordinates.lat, event.coordinates.lng)
         return distance <= params.radius!
       })
     }
@@ -623,7 +686,7 @@ class UnifiedEventsService {
     let hash = 0
     for (let i = 0; i < externalId.length; i++) {
       const char = externalId.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
+      hash = (hash << 5) - hash + char
       hash = hash & hash // Convert to 32-bit integer
     }
     return Math.abs(hash)
@@ -673,16 +736,16 @@ class UnifiedEventsService {
   }
 
   private extractMinPrice(priceString: string): number | undefined {
-    const match = priceString.match(/\$(\d+(?:\.\d{2})?)/);
-    return match ? parseFloat(match[1]) : undefined;
+    const match = priceString.match(/\$(\d+(?:\.\d{2})?)/)
+    return match ? Number.parseFloat(match[1]) : undefined
   }
 
   private extractMaxPrice(priceString: string): number | undefined {
-    const matches = priceString.match(/\$(\d+(?:\.\d{2})?)/g);
+    const matches = priceString.match(/\$(\d+(?:\.\d{2})?)/g)
     if (matches && matches.length > 1) {
-      return parseFloat(matches[1].replace('$', ''));
+      return Number.parseFloat(matches[1].replace("$", ""))
     }
-    return this.extractMinPrice(priceString);
+    return this.extractMinPrice(priceString)
   }
 
   private formatPrice(min?: number, max?: number, currency = "USD"): string {
@@ -701,10 +764,10 @@ class UnifiedEventsService {
 
   private mapCategoryToTicketmaster(category: string): string {
     const mapping: Record<string, string> = {
-      "Concerts": "Music",
+      Concerts: "Music",
       "Club Events": "Music",
       "Day Parties": "Music",
-      "Parties": "Music",
+      Parties: "Music",
       "General Events": "Miscellaneous",
     }
     return mapping[category] || category
@@ -731,10 +794,10 @@ class UnifiedEventsService {
    */
   private getCategoryImage(category: string): string {
     const categoryImages: Record<string, string[]> = {
-      "Concerts": ["/event-1.png", "/event-2.png", "/event-3.png"],
+      Concerts: ["/event-1.png", "/event-2.png", "/event-3.png"],
       "Club Events": ["/event-4.png", "/event-5.png", "/event-6.png"],
       "Day Parties": ["/event-7.png", "/event-8.png", "/event-9.png"],
-      "Parties": ["/event-10.png", "/event-11.png", "/event-12.png"],
+      Parties: ["/event-10.png", "/event-11.png", "/event-12.png"],
       "General Events": ["/community-event.png"],
     }
 
@@ -755,14 +818,26 @@ class UnifiedEventsService {
 
       const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".avif"]
       const imageServices = [
-        "images.unsplash.com", "img.evbuc.com", "s1.ticketm.net", "media.ticketmaster.com",
-        "tmol-prd.s3.amazonaws.com", "livenationinternational.com", "cdn.evbuc.com",
-        "eventbrite.com", "rapidapi.com", "pexels.com", "pixabay.com", "cloudinary.com",
-        "amazonaws.com", "googleusercontent.com", "fbcdn.net", "cdninstagram.com"
+        "images.unsplash.com",
+        "img.evbuc.com",
+        "s1.ticketm.net",
+        "media.ticketmaster.com",
+        "tmol-prd.s3.amazonaws.com",
+        "livenationinternational.com",
+        "cdn.evbuc.com",
+        "eventbrite.com",
+        "rapidapi.com",
+        "pexels.com",
+        "pixabay.com",
+        "cloudinary.com",
+        "amazonaws.com",
+        "googleusercontent.com",
+        "fbcdn.net",
+        "cdninstagram.com",
       ]
 
-      const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext))
-      const isFromImageService = imageServices.some(service => url.toLowerCase().includes(service.toLowerCase()))
+      const hasImageExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
+      const isFromImageService = imageServices.some((service) => url.toLowerCase().includes(service.toLowerCase()))
 
       return hasImageExtension || isFromImageService
     } catch {
@@ -780,7 +855,7 @@ class UnifiedEventsService {
       let dateTime: Date
 
       // Try parsing the date
-      if (date.includes('T') || date.includes('Z')) {
+      if (date.includes("T") || date.includes("Z")) {
         dateTime = new Date(date)
       } else {
         // Combine date and time if available
@@ -816,11 +891,23 @@ class UnifiedEventsService {
     // Extract tags from title and description
     const text = `${event.title} ${event.description}`.toLowerCase()
     const commonTags = [
-      'music', 'concert', 'festival', 'comedy', 'theater', 'sports', 'art', 'food',
-      'business', 'conference', 'workshop', 'nightlife', 'community', 'dance'
+      "music",
+      "concert",
+      "festival",
+      "comedy",
+      "theater",
+      "sports",
+      "art",
+      "food",
+      "business",
+      "conference",
+      "workshop",
+      "nightlife",
+      "community",
+      "dance",
     ]
 
-    commonTags.forEach(tag => {
+    commonTags.forEach((tag) => {
       if (text.includes(tag)) {
         tags.push(tag)
       }
@@ -833,10 +920,10 @@ class UnifiedEventsService {
   /**
    * Validate coordinate values
    */
-  private validateCoordinate(coord: number | undefined, type: 'lat' | 'lng'): number | null {
-    if (typeof coord !== 'number' || isNaN(coord)) return null
+  private validateCoordinate(coord: number | undefined, type: "lat" | "lng"): number | null {
+    if (typeof coord !== "number" || isNaN(coord)) return null
 
-    if (type === 'lat') {
+    if (type === "lat") {
       return coord >= -90 && coord <= 90 ? coord : null
     } else {
       return coord >= -180 && coord <= 180 ? coord : null
@@ -850,10 +937,10 @@ class UnifiedEventsService {
     if (!Array.isArray(links)) return []
 
     return links
-      .filter(link => link && typeof link === 'object' && link.link)
-      .map(link => ({
-        source: link.source || 'Tickets',
-        link: link.link
+      .filter((link) => link && typeof link === "object" && link.link)
+      .map((link) => ({
+        source: link.source || "Tickets",
+        link: link.link,
       }))
       .slice(0, 5) // Limit to 5 ticket links
   }

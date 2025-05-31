@@ -148,13 +148,13 @@ This document summarizes the comprehensive improvements made to the events page 
 ## Usage
 
 ### Testing the Improvements
-```bash
+\`\`\`bash
 # Test the enhanced events API
 curl "http://localhost:3000/api/test-enhanced-events?lat=40.7128&lng=-74.006&limit=50"
 
 # Use the enhanced events API directly
 curl "http://localhost:3000/api/events/enhanced?lat=40.7128&lng=-74.006&limit=100&radius=50"
-```
+\`\`\`
 
 ### Expected Results
 - **More Events**: 2-5x more events per search due to multiple strategies
@@ -165,13 +165,13 @@ curl "http://localhost:3000/api/events/enhanced?lat=40.7128&lng=-74.006&limit=10
 ## Configuration
 
 ### Environment Variables Required
-```env
+\`\`\`env
 RAPIDAPI_KEY=your_rapidapi_key
 RAPIDAPI_HOST=real-time-events-search.p.rapidapi.com
 TICKETMASTER_API_KEY=your_ticketmaster_key
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+\`\`\`
 
 ## Monitoring
 

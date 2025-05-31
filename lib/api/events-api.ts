@@ -104,6 +104,16 @@ function isValidImageUrl(url: string): boolean {
       "eventbrite.com",
       "rapidapi.com",
 
+      // Google services
+      "encrypted-tbn0.gstatic.com",
+      "lh3.googleusercontent.com",
+      "lh4.googleusercontent.com",
+      "lh5.googleusercontent.com",
+      "lh6.googleusercontent.com",
+      "images.google.com",
+      "ssl.gstatic.com",
+      "gstatic.com",
+
       // Image hosting services
       "pexels.com",
       "pixabay.com",
@@ -140,18 +150,19 @@ function isValidImageUrl(url: string): boolean {
       "spotify.com",
       "last.fm",
       "bandcamp.com",
-      "soundcloud.com"
+      "soundcloud.com",
     ]
 
-    const hasImageExtension = imageExtensions.some(ext => url.toLowerCase().includes(ext))
-    const isFromImageService = imageServices.some(service => url.toLowerCase().includes(service.toLowerCase()))
+    const hasImageExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
+    const isFromImageService = imageServices.some((service) => url.toLowerCase().includes(service.toLowerCase()))
 
     // Additional checks for image URLs without extensions
-    const hasImageParams = url.toLowerCase().includes('image') ||
-                          url.toLowerCase().includes('photo') ||
-                          url.toLowerCase().includes('picture') ||
-                          url.toLowerCase().includes('img') ||
-                          url.toLowerCase().includes('thumb')
+    const hasImageParams =
+      url.toLowerCase().includes("image") ||
+      url.toLowerCase().includes("photo") ||
+      url.toLowerCase().includes("picture") ||
+      url.toLowerCase().includes("img") ||
+      url.toLowerCase().includes("thumb")
 
     // Check for common image URL patterns
     const imageUrlPatterns = [
@@ -162,11 +173,12 @@ function isValidImageUrl(url: string): boolean {
       /\/media\//i,
       /\/assets\//i,
       /\/uploads?\//i,
-      /\/gallery\//i
+      /\/gallery\//i,
     ]
 
-    const hasImagePattern = imageUrlPatterns.some(pattern => pattern.test(url))
+    const hasImagePattern = imageUrlPatterns.some((pattern) => pattern.test(url))
 
+    // Be more permissive - accept if any of these conditions are met
     return hasImageExtension || isFromImageService || hasImageParams || hasImagePattern
   } catch {
     return false
@@ -236,9 +248,6 @@ function extractRapidApiImage(event: any): string {
     event.facebook_image,
     event.twitter_image,
     event.instagram_image,
-
-    // Category-based fallback images
-    getCategoryImage(event.category || event.type || ""),
   ]
 
   for (const imageUrl of imageSources) {
@@ -250,30 +259,67 @@ function extractRapidApiImage(event: any): string {
           eventTitle: event.name || event.title,
           imageUrl,
           imageSource: getImageSourceType(imageUrl, imageSources),
-        }
+        },
       })
       return imageUrl
     }
   }
 
-  return "/community-event.png"
+  // If no valid image found, return category-based fallback
+  return getCategoryImage(event.category || event.type || "")
 }
 
 // Helper function to identify image source type for debugging
 function getImageSourceType(foundUrl: string, allSources: any[]): string {
-  const index = allSources.findIndex(source => source === foundUrl)
+  const index = allSources.findIndex((source) => source === foundUrl)
   const sourceTypes = [
-    "primary_image", "thumbnail", "photo", "picture", "banner", "cover_image",
-    "poster", "featured_image", "event_image", "main_image",
-    "nested_images_url", "nested_images_original", "nested_images_large",
-    "nested_images_medium", "nested_images_direct", "photos_url", "photos_original", "photos_direct",
-    "image_large", "image_medium", "image_small", "thumbnail_large", "thumbnail_medium",
-    "venue_image", "venue_photo", "venue_banner", "venue_cover", "venue_images_url",
-    "venue_images_original", "venue_images_direct",
-    "organizer_image", "organizer_logo", "organizer_avatar", "organizer_photo", "organizer_banner",
-    "artist_image", "artist_photo", "performer_image", "performer_photo",
-    "artists_image", "artists_photo", "performers_image", "performers_photo",
-    "facebook_image", "twitter_image", "instagram_image", "category_fallback"
+    "primary_image",
+    "thumbnail",
+    "photo",
+    "picture",
+    "banner",
+    "cover_image",
+    "poster",
+    "featured_image",
+    "event_image",
+    "main_image",
+    "nested_images_url",
+    "nested_images_original",
+    "nested_images_large",
+    "nested_images_medium",
+    "nested_images_direct",
+    "photos_url",
+    "photos_original",
+    "photos_direct",
+    "image_large",
+    "image_medium",
+    "image_small",
+    "thumbnail_large",
+    "thumbnail_medium",
+    "venue_image",
+    "venue_photo",
+    "venue_banner",
+    "venue_cover",
+    "venue_images_url",
+    "venue_images_original",
+    "venue_images_direct",
+    "organizer_image",
+    "organizer_logo",
+    "organizer_avatar",
+    "organizer_photo",
+    "organizer_banner",
+    "artist_image",
+    "artist_photo",
+    "performer_image",
+    "performer_photo",
+    "artists_image",
+    "artists_photo",
+    "performers_image",
+    "performers_photo",
+    "facebook_image",
+    "twitter_image",
+    "instagram_image",
+    "category_fallback",
   ]
   return sourceTypes[index] || "unknown"
 }
@@ -283,20 +329,20 @@ function getCategoryImage(category: string): string {
   const categoryLower = category.toLowerCase()
 
   const categoryMap: { [key: string]: string } = {
-    "music": "/images/categories/music-default.jpg",
-    "concert": "/images/categories/music-default.jpg",
-    "festival": "/images/categories/festival-default.jpg",
-    "sports": "/images/categories/sports-default.jpg",
-    "theater": "/images/categories/theater-default.jpg",
-    "comedy": "/images/categories/comedy-default.jpg",
-    "dance": "/images/categories/dance-default.jpg",
-    "art": "/images/categories/art-default.jpg",
-    "food": "/images/categories/food-default.jpg",
-    "business": "/images/categories/business-default.jpg",
-    "conference": "/images/categories/conference-default.jpg",
-    "workshop": "/images/categories/workshop-default.jpg",
-    "nightlife": "/images/categories/nightlife-default.jpg",
-    "community": "/images/categories/community-default.jpg",
+    music: "/images/categories/music-default.jpg",
+    concert: "/images/categories/music-default.jpg",
+    festival: "/images/categories/festival-default.jpg",
+    sports: "/images/categories/sports-default.jpg",
+    theater: "/images/categories/theater-default.jpg",
+    comedy: "/images/categories/comedy-default.jpg",
+    dance: "/images/categories/dance-default.jpg",
+    art: "/images/categories/art-default.jpg",
+    food: "/images/categories/food-default.jpg",
+    business: "/images/categories/business-default.jpg",
+    conference: "/images/categories/conference-default.jpg",
+    workshop: "/images/categories/workshop-default.jpg",
+    nightlife: "/images/categories/nightlife-default.jpg",
+    community: "/images/categories/community-default.jpg",
   }
 
   for (const [key, imagePath] of Object.entries(categoryMap)) {
@@ -308,8 +354,8 @@ function getCategoryImage(category: string): string {
   return "/community-event.png"
 }
 
-// Enhanced search events from RapidAPI with multiple strategies
-async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDetailProps[]> {
+// Enhanced search events from RapidAPI with multiple strategies - EXPORTED FUNCTION
+export async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDetailProps[]> {
   if (!rateLimiter.checkRapidApiLimit()) {
     logger.warn("RapidAPI rate limit exceeded")
     return []
@@ -333,7 +379,7 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
       searchStrategies.push({
         query: params.keyword || "events entertainment",
         location: params.location,
-        size: Math.floor(baseSize / 3)
+        size: Math.floor(baseSize / 3),
       })
     }
 
@@ -343,7 +389,7 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
       searchStrategies.push({
         query: popularCategories[i],
         location: params.location,
-        size: Math.floor(baseSize / 4)
+        size: Math.floor(baseSize / 4),
       })
     }
 
@@ -352,7 +398,7 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
       searchStrategies.push({
         query: "entertainment events",
         location: params.location,
-        size: Math.floor(baseSize / 3)
+        size: Math.floor(baseSize / 3),
       })
     }
 
@@ -365,7 +411,7 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
           ...params,
           keyword: strategy.query,
           location: strategy.location,
-          size: strategy.size
+          size: strategy.size,
         })
         return events
       } catch (error) {
@@ -377,15 +423,14 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
     const results = await Promise.allSettled(searchPromises)
 
     // Collect all successful results
-    results.forEach(result => {
-      if (result.status === 'fulfilled') {
+    results.forEach((result) => {
+      if (result.status === "fulfilled") {
         allEvents.push(...result.value)
       }
     })
 
     // Remove duplicates and return
     return removeDuplicateEvents(allEvents).slice(0, baseSize)
-
   } catch (error) {
     logger.error("RapidAPI search failed", {
       error: formatErrorMessage(error),
@@ -398,89 +443,220 @@ async function searchRapidApiEvents(params: EventSearchParams): Promise<EventDet
 
 // Execute a single RapidAPI search
 async function executeRapidApiSearch(params: EventSearchParams): Promise<EventDetailProps[]> {
-  const url = new URL("https://real-time-events-search.p.rapidapi.com/search-events")
+  try {
+    const url = new URL("https://real-time-events-search.p.rapidapi.com/search-events")
 
-  // Enhanced parameter handling
-  if (params.keyword) {
-    url.searchParams.set("query", params.keyword)
-  } else {
-    // Default search for popular events if no keyword
-    url.searchParams.set("query", "concert music festival entertainment")
-  }
-
-  if (params.location) {
-    url.searchParams.set("location", params.location)
-  }
-
-  // Enhanced date handling
-  if (params.startDateTime) {
-    const date = new Date(params.startDateTime)
-    url.searchParams.set("start_date", date.toISOString().split("T")[0])
-  } else {
-    // Default to today
-    url.searchParams.set("start_date", new Date().toISOString().split("T")[0])
-  }
-
-  // Add end date for better filtering
-  if (params.endDateTime) {
-    const endDate = new Date(params.endDateTime)
-    url.searchParams.set("end_date", endDate.toISOString().split("T")[0])
-  } else {
-    // Default to 3 months from now
-    const futureDate = new Date()
-    futureDate.setMonth(futureDate.getMonth() + 3)
-    url.searchParams.set("end_date", futureDate.toISOString().split("T")[0])
-  }
-
-  url.searchParams.set("limit", String(Math.min(params.size || 50, 100))) // Increased limit
-  url.searchParams.set("is_virtual", "false")
-
-  // Add additional parameters for better results
-  url.searchParams.set("sort", "date")
-  url.searchParams.set("include_description", "true")
-  url.searchParams.set("include_venue", "true")
-
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      "X-RapidAPI-Key": serverEnv.RAPIDAPI_KEY,
-      "X-RapidAPI-Host": serverEnv.RAPIDAPI_HOST || "real-time-events-search.p.rapidapi.com",
-      "Content-Type": "application/json",
-    },
-  })
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      logger.error("RapidAPI authentication failed - check API key")
-      return []
-    }
-    if (response.status === 403) {
-      logger.error("RapidAPI access forbidden - check subscription")
-      return []
-    }
-    if (response.status === 429) {
-      logger.warn("RapidAPI rate limit exceeded")
-      return []
+    // Enhanced parameter handling
+    if (params.keyword) {
+      url.searchParams.set("query", params.keyword)
+    } else {
+      // Default search for popular events if no keyword
+      url.searchParams.set("query", "concert music festival entertainment")
     }
 
-    const errorText = await response.text().catch(() => "Unknown error")
-    logger.error(`RapidAPI error: ${response.status} - ${errorText}`)
+    if (params.location) {
+      url.searchParams.set("location", params.location)
+    }
+
+    // Enhanced date handling - ensure we only get future events
+    const now = new Date()
+    const today = now.toISOString().split("T")[0]
+
+    if (params.startDateTime) {
+      const startDate = new Date(params.startDateTime)
+      if (startDate > now) {
+        url.searchParams.set("start_date", startDate.toISOString().split("T")[0])
+      } else {
+        url.searchParams.set("start_date", today)
+      }
+    } else {
+      url.searchParams.set("start_date", today)
+    }
+
+    // Add end date for better filtering - default to 6 months from now
+    if (params.endDateTime) {
+      const endDate = new Date(params.endDateTime)
+      url.searchParams.set("end_date", endDate.toISOString().split("T")[0])
+    } else {
+      const futureDate = new Date()
+      futureDate.setMonth(futureDate.getMonth() + 6)
+      url.searchParams.set("end_date", futureDate.toISOString().split("T")[0])
+    }
+
+    url.searchParams.set("limit", String(Math.min(params.size || 50, 100)))
+    url.searchParams.set("is_virtual", "false")
+    url.searchParams.set("sort", "date")
+    url.searchParams.set("include_description", "true")
+    url.searchParams.set("include_venue", "true")
+
+    logger.debug("RapidAPI request details", {
+      component: "events-api",
+      action: "executeRapidApiSearch",
+      metadata: {
+        url: url.toString(),
+        hasApiKey: !!serverEnv.RAPIDAPI_KEY,
+        apiHost: serverEnv.RAPIDAPI_HOST,
+      },
+    })
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "X-RapidAPI-Key": serverEnv.RAPIDAPI_KEY,
+        "X-RapidAPI-Host": serverEnv.RAPIDAPI_HOST || "real-time-events-search.p.rapidapi.com",
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        logger.error("RapidAPI authentication failed - check API key")
+        return []
+      }
+      if (response.status === 403) {
+        logger.error("RapidAPI access forbidden - check subscription")
+        return []
+      }
+      if (response.status === 429) {
+        logger.warn("RapidAPI rate limit exceeded")
+        return []
+      }
+
+      const errorText = await response.text().catch(() => "Unknown error")
+      logger.error(`RapidAPI error: ${response.status} - ${errorText}`)
+      return []
+    }
+
+    const data = await response.json()
+
+    if (data.status === "OK" && data.data && Array.isArray(data.data)) {
+      logger.info(`RapidAPI returned ${data.data.length} events for query: ${params.keyword}`)
+
+      // Transform events and filter out past events
+      const transformedEvents = await Promise.all(
+        data.data.map(async (event: any, index: number) => {
+          const transformedEvent = await transformRapidApiEventWithImages(event, index)
+          return transformedEvent
+        }),
+      )
+
+      // Filter out past events
+      const futureEvents = transformedEvents.filter((event) => {
+        const eventDate = new Date(event.date)
+        return eventDate >= now
+      })
+
+      logger.info(`Filtered to ${futureEvents.length} future events`)
+      return futureEvents
+    }
+
+    if (data.error) {
+      logger.error(`RapidAPI returned error: ${data.error}`)
+    }
+
+    logger.info("RapidAPI returned no events")
+    return []
+  } catch (error) {
+    logger.error("RapidAPI search execution failed", {
+      error: formatErrorMessage(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return []
   }
+}
 
-  const data = await response.json()
+// Enhanced transform function with image service integration
+async function transformRapidApiEventWithImages(event: any, index: number): Promise<EventDetailProps> {
+  const numericId = Math.abs(
+    event.event_id?.split("").reduce((a: number, b: string) => {
+      a = (a << 5) - a + b.charCodeAt(0)
+      return a & a
+    }, 0) || Math.floor(Math.random() * 10000) + index,
+  )
 
-  if (data.status === "OK" && data.data && Array.isArray(data.data)) {
-    logger.info(`RapidAPI returned ${data.data.length} events for query: ${params.keyword}`)
-    return data.data.map((event: any, index: number) => transformRapidApiEvent(event, index))
+  // Enhanced date/time parsing
+  const startDateTime = parseEventDateTime(event.start_time || event.date || event.start_date)
+  const endDateTime = event.end_time ? parseEventDateTime(event.end_time) : null
+
+  let formattedDate = "Date TBA"
+  let formattedTime = "Time TBA"
+
+  if (startDateTime.isValid) {
+    const formatted = formatEventDateTime(startDateTime.date, event.timezone)
+    formattedDate = formatted.formattedDate
+    formattedTime = formatted.formattedTime
   }
 
-  if (data.error) {
-    logger.error(`RapidAPI returned error: ${data.error}`)
+  // Extract price
+  let price = "Price TBA"
+  if (event.is_free) {
+    price = "Free"
+  } else if (event.min_price && event.max_price) {
+    if (event.min_price === event.max_price) {
+      price = `$${event.min_price}`
+    } else {
+      price = `$${event.min_price} - $${event.max_price}`
+    }
+  } else if (event.min_price) {
+    price = `From $${event.min_price}`
   }
 
-  logger.info("RapidAPI returned no events")
-  return []
+  // Extract category
+  const category = event.category || extractCategoryFromTags(event.tags || []) || "Event"
+
+  // Extract ticket links
+  const ticketLinks = []
+  if (event.ticket_links) {
+    ticketLinks.push(
+      ...event.ticket_links.map((link: any) => ({
+        source: link.source || "Tickets",
+        link: link.link || "#",
+      })),
+    )
+  }
+
+  // Enhanced image extraction with validation
+  const rawImageUrl = extractRapidApiImage(event)
+
+  // Try to use image service if available, otherwise use raw URL
+  let finalImageUrl = rawImageUrl
+  try {
+    const { imageService } = await import("../services/image-service")
+    const imageResult = await imageService.validateAndEnhanceImage(
+      rawImageUrl,
+      category,
+      event.name || event.title || "Untitled Event",
+    )
+    finalImageUrl = imageResult.url
+  } catch (error) {
+    logger.warn("Image service not available, using raw image URL", {
+      error: formatErrorMessage(error),
+    })
+  }
+
+  return {
+    id: numericId,
+    title: event.name || event.title || "Untitled Event",
+    description: event.description || "No description available.",
+    category,
+    date: formattedDate,
+    time: formattedTime,
+    location: event.venue?.name || event.venue_name || "Venue TBA",
+    address: event.venue?.full_address || event.venue_address || "Address TBA",
+    price,
+    image: finalImageUrl,
+    organizer: {
+      name: event.organizer || event.venue?.name || "Event Organizer",
+      avatar: "/avatar-1.png",
+    },
+    attendees: Math.floor(Math.random() * 1000) + 50,
+    isFavorite: false,
+    coordinates:
+      event.venue?.latitude && event.venue?.longitude
+        ? { lat: Number(event.venue.latitude), lng: Number(event.venue.longitude) }
+        : undefined,
+    ticketLinks,
+  }
 }
 
 // Search events from Eventbrite
@@ -658,7 +834,7 @@ function transformEventbriteEvent(event: any): EventDetailProps {
           logoOriginal: event.logo?.original?.url,
           image: event.image?.url,
           organizerLogo: event.organizer?.logo?.url,
-        }
+        },
       },
     })
   }
@@ -770,20 +946,20 @@ function parseEventDateTime(dateTimeString: string): { date: Date; isValid: bool
     let parsedDate: Date
 
     // ISO 8601 format (most common)
-    if (dateTimeString.includes('T') || dateTimeString.includes('Z')) {
+    if (dateTimeString.includes("T") || dateTimeString.includes("Z")) {
       parsedDate = new Date(dateTimeString)
     }
     // Unix timestamp (seconds)
     else if (/^\d{10}$/.test(dateTimeString)) {
-      parsedDate = new Date(parseInt(dateTimeString) * 1000)
+      parsedDate = new Date(Number.parseInt(dateTimeString) * 1000)
     }
     // Unix timestamp (milliseconds)
     else if (/^\d{13}$/.test(dateTimeString)) {
-      parsedDate = new Date(parseInt(dateTimeString))
+      parsedDate = new Date(Number.parseInt(dateTimeString))
     }
     // Date-only format (YYYY-MM-DD)
     else if (/^\d{4}-\d{2}-\d{2}$/.test(dateTimeString)) {
-      parsedDate = new Date(dateTimeString + 'T00:00:00')
+      parsedDate = new Date(dateTimeString + "T00:00:00")
     }
     // US format (MM/DD/YYYY)
     else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateTimeString)) {
@@ -791,7 +967,7 @@ function parseEventDateTime(dateTimeString: string): { date: Date; isValid: bool
     }
     // European format (DD/MM/YYYY)
     else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateTimeString)) {
-      const parts = dateTimeString.split('/')
+      const parts = dateTimeString.split("/")
       parsedDate = new Date(`${parts[1]}/${parts[0]}/${parts[2]}`)
     }
     // Default fallback
@@ -800,9 +976,10 @@ function parseEventDateTime(dateTimeString: string): { date: Date; isValid: bool
     }
 
     // Validate the parsed date
-    const isValid = !isNaN(parsedDate.getTime()) &&
-                   parsedDate.getTime() > Date.now() - (365 * 24 * 60 * 60 * 1000) && // Not older than 1 year
-                   parsedDate.getTime() < Date.now() + (2 * 365 * 24 * 60 * 60 * 1000) // Not more than 2 years in future
+    const isValid =
+      !isNaN(parsedDate.getTime()) &&
+      parsedDate.getTime() > Date.now() - 365 * 24 * 60 * 60 * 1000 && // Not older than 1 year
+      parsedDate.getTime() < Date.now() + 2 * 365 * 24 * 60 * 60 * 1000 // Not more than 2 years in future
 
     return { date: parsedDate, isValid }
   } catch {
@@ -817,14 +994,14 @@ function formatEventDateTime(date: Date, timezone?: string): { formattedDate: st
       year: "numeric",
       month: "long",
       day: "numeric",
-      timeZone: timezone || undefined
+      timeZone: timezone || undefined,
     }
 
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-      timeZone: timezone || undefined
+      timeZone: timezone || undefined,
     }
 
     const formattedDate = date.toLocaleDateString("en-US", options)
@@ -844,188 +1021,6 @@ function formatEventDateTime(date: Date, timezone?: string): { formattedDate: st
       hour12: true,
     })
     return { formattedDate, formattedTime }
-  }
-}
-
-// Transform RapidAPI event data
-function transformRapidApiEvent(event: any, index: number): EventDetailProps {
-  const numericId = Math.abs(
-    event.event_id?.split("").reduce((a: number, b: string) => {
-      a = (a << 5) - a + b.charCodeAt(0)
-      return a & a
-    }, 0) || Math.floor(Math.random() * 10000) + index,
-  )
-
-  // Enhanced date/time parsing
-  const startDateTime = parseEventDateTime(event.start_time || event.date || event.start_date)
-  const endDateTime = event.end_time ? parseEventDateTime(event.end_time) : null
-
-  let formattedDate = "Date TBA"
-  let formattedTime = "Time TBA"
-
-  if (startDateTime.isValid) {
-    const formatted = formatEventDateTime(startDateTime.date, event.timezone)
-    formattedDate = formatted.formattedDate
-    formattedTime = formatted.formattedTime
-  } else {
-    // Fallback to current date if parsing fails
-    const fallbackFormatted = formatEventDateTime(new Date())
-    formattedDate = fallbackFormatted.formattedDate
-    formattedTime = fallbackFormatted.formattedTime
-  }
-
-  // Extract price
-  let price = "Price TBA"
-  if (event.is_free) {
-    price = "Free"
-  } else if (event.min_price && event.max_price) {
-    if (event.min_price === event.max_price) {
-      price = `$${event.min_price}`
-    } else {
-      price = `$${event.min_price} - $${event.max_price}`
-    }
-  } else if (event.min_price) {
-    price = `From $${event.min_price}`
-  }
-
-  // Extract category
-  const category = event.category || extractCategoryFromTags(event.tags || []) || "Event"
-
-  // Extract ticket links
-  const ticketLinks = []
-  if (event.ticket_links) {
-    ticketLinks.push(
-      ...event.ticket_links.map((link: any) => ({
-        source: link.source || "Tickets",
-        link: link.link || "#",
-      })),
-    )
-  }
-
-  // Extract the best available image
-  const image = extractRapidApiImage(event)
-
-  // Debug logging for image extraction
-  if (image !== "/community-event.png") {
-    logger.info("RapidAPI event image found", {
-      component: "events-api",
-      action: "image_extraction",
-      metadata: {
-        eventTitle: event.name || event.title,
-        imageUrl: image,
-        originalImages: {
-          image: event.image,
-          thumbnail: event.thumbnail,
-          photo: event.photo,
-        }
-      },
-    })
-  }
-
-  return {
-    id: numericId,
-    title: event.name || event.title || "Untitled Event",
-    description: event.description || "No description available.",
-    category,
-    date: formattedDate,
-    time: formattedTime,
-    location: event.venue?.name || event.venue_name || "Venue TBA",
-    address: event.venue?.full_address || event.venue_address || "Address TBA",
-    price,
-    image,
-    organizer: {
-      name: event.organizer || event.venue?.name || "Event Organizer",
-      avatar: "/avatar-1.png",
-    },
-    attendees: Math.floor(Math.random() * 1000) + 50,
-    isFavorite: false,
-    coordinates:
-      event.venue?.latitude && event.venue?.longitude
-        ? { lat: Number(event.venue.latitude), lng: Number(event.venue.longitude) }
-        : undefined,
-    ticketLinks,
-  }
-}
-
-// Enhanced image extraction for PredictHQ events
-function extractPredictHQImage(event: any): string {
-  // PredictHQ doesn't provide images, so we'll use category-based placeholders
-  const category = event.category?.toLowerCase() || ""
-
-  // Category-based image mapping
-  const categoryImages: { [key: string]: string } = {
-    "concerts": "/images/categories/music.jpg",
-    "music": "/images/categories/music.jpg",
-    "festivals": "/images/categories/festival.jpg",
-    "sports": "/images/categories/sports.jpg",
-    "conferences": "/images/categories/business.jpg",
-    "performing-arts": "/images/categories/arts.jpg",
-    "community": "/images/categories/community.jpg",
-    "academic": "/images/categories/education.jpg",
-    "expos": "/images/categories/expo.jpg",
-    "politics": "/images/categories/politics.jpg",
-  }
-
-  // Try to find a category-specific image
-  for (const [key, imagePath] of Object.entries(categoryImages)) {
-    if (category.includes(key)) {
-      return imagePath
-    }
-  }
-
-  // Default fallback
-  return "/community-event.png"
-}
-
-// Transform PredictHQ event data
-function transformPredictHQEvent(event: any): EventDetailProps {
-  const numericId = Math.abs(
-    event.id?.split("").reduce((a: number, b: string) => {
-      a = (a << 5) - a + b.charCodeAt(0)
-      return a & a
-    }, 0) || Math.floor(Math.random() * 10000),
-  )
-
-  const startDate = event.start ? new Date(event.start) : new Date()
-  const endDate = event.end ? new Date(event.end) : null
-
-  const formattedDate = startDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
-
-  const formattedTime = startDate.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-
-  // Extract the best available image (category-based for PredictHQ)
-  const image = extractPredictHQImage(event)
-
-  return {
-    id: numericId,
-    title: event.title || "Untitled Event",
-    description: event.description || "No description available.",
-    category: event.category || "Event",
-    date: formattedDate,
-    time: formattedTime,
-    location: event.venue?.name || event.location?.[0] || "Venue TBA",
-    address: event.location?.join(", ") || "Address TBA",
-    price: "Price TBA",
-    image,
-    organizer: {
-      name: "Event Organizer",
-      avatar: "/avatar-1.png",
-    },
-    attendees: event.phq_attendance || Math.floor(Math.random() * 1000) + 50,
-    isFavorite: false,
-    coordinates:
-      event.location && event.location.length >= 2
-        ? { lat: Number(event.location[1]), lng: Number(event.location[0]) }
-        : undefined,
-    ticketLinks: [],
   }
 }
 
@@ -1140,9 +1135,6 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           }),
       )
 
-      // Disabled other sources for now - focusing on RapidAPI and Ticketmaster only
-      logger.info("Using RapidAPI and Ticketmaster sources only")
-
       // Wait for all searches to complete
       const results = await Promise.allSettled(searchPromises)
 
@@ -1203,8 +1195,6 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
           apiStatus: {
             ticketmaster: sources.includes("Ticketmaster"),
             rapidapi: sources.includes("RapidAPI"),
-            eventbrite: sources.includes("Eventbrite"),
-            predicthq: sources.includes("PredictHQ"),
           },
         },
       })
@@ -1551,14 +1541,10 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
 export async function testApiConnections(): Promise<{
   ticketmaster: boolean
   rapidapi: boolean
-  eventbrite: boolean
-  predicthq: boolean
 }> {
   const results = {
     ticketmaster: false,
     rapidapi: false,
-    eventbrite: false,
-    predicthq: false,
   }
 
   // Test Ticketmaster
@@ -1575,22 +1561,6 @@ export async function testApiConnections(): Promise<{
     results.rapidapi = rapidEvents.length >= 0 // Even 0 results means API is working
   } catch (error) {
     logger.error("RapidAPI test failed", { error: formatErrorMessage(error) })
-  }
-
-  // Test Eventbrite
-  try {
-    const ebEvents = await searchEventbriteEvents({ keyword: "test", size: 1 })
-    results.eventbrite = ebEvents.length >= 0
-  } catch (error) {
-    logger.error("Eventbrite test failed", { error: formatErrorMessage(error) })
-  }
-
-  // Test PredictHQ
-  try {
-    const phqEvents = await searchPredictHQEvents({ keyword: "test", size: 1 })
-    results.predicthq = phqEvents.length >= 0
-  } catch (error) {
-    logger.error("PredictHQ test failed", { error: formatErrorMessage(error) })
   }
 
   return results
@@ -1622,6 +1592,57 @@ function generateFallbackEvents(count: number): EventDetailProps[] {
     })
   }
   return fallbackEvents
+}
+
+// Transform PredictHQ event data
+function transformPredictHQEvent(event: any): EventDetailProps {
+  const numericId = event.id ? Number.parseInt(event.id) : Math.floor(Math.random() * 10000)
+
+  const startDate = event.start ? new Date(event.start) : new Date()
+
+  const formattedDate = startDate.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+
+  const formattedTime = startDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+
+  // Extract price - PredictHQ doesn't directly provide price
+  const price = "Price TBA"
+
+  // Extract venue information
+  const venue = event.venue || {}
+  const location = event.location || []
+  const fullAddress = location.join(", ") || "Address TBA"
+
+  // Extract the best available image - PredictHQ doesn't directly provide images
+  const image = "/community-event.png"
+
+  return {
+    id: numericId,
+    title: event.title || "Untitled Event",
+    description: event.description || "No description available.",
+    category: event.category || "Event",
+    date: formattedDate,
+    time: formattedTime,
+    location: venue.name || "Venue TBA",
+    address: fullAddress,
+    price,
+    image,
+    organizer: {
+      name: event.brand || "Event Organizer",
+      avatar: "/avatar-1.png",
+    },
+    attendees: Math.floor(Math.random() * 1000) + 50,
+    isFavorite: false,
+    coordinates: event.location ? { lat: Number(event.location[0]), lng: Number(event.location[1]) } : undefined,
+    ticketLinks: event.url ? [{ source: "PredictHQ", link: event.url }] : [],
+  }
 }
 
 // Export types

@@ -62,7 +62,7 @@ This document outlines the comprehensive improvements made to the events backend
 - Automatic timestamp updates
 
 **Table Structure**:
-```sql
+\`\`\`sql
 CREATE TABLE events (
   id BIGSERIAL PRIMARY KEY,
   external_id TEXT NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE events (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT unique_external_event UNIQUE (external_id, source)
 );
-```
+\`\`\`
 
 ### 4. Updated Events Service (`lib/services/events-service.ts`)
 
@@ -204,15 +204,15 @@ Comprehensive test suite that validates:
 - Performance metrics
 
 ### Usage
-```bash
+\`\`\`bash
 npm run test:events
 # or
 npx ts-node scripts/test-unified-events.ts
-```
+\`\`\`
 
 ## Environment Variables Required
 
-```env
+\`\`\`env
 # RapidAPI
 RAPIDAPI_KEY=your_rapidapi_key
 RAPIDAPI_HOST=real-time-events-search.p.rapidapi.com
@@ -223,7 +223,7 @@ TICKETMASTER_API_KEY=your_ticketmaster_api_key
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+\`\`\`
 
 ## Migration Guide
 
