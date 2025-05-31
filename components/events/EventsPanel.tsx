@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, MapPin, Navigation, Filter, Calendar, Users, X, Heart, Clock } from "lucide-react"
+import { Search, MapPin, Navigation, Filter, Calendar, X, Heart, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -194,9 +194,6 @@ export function EventsPanel({
           <p className="text-sm text-gray-300 leading-relaxed">{event.description}</p>
 
           <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center text-gray-400">
-              <Users className="h-4 w-4 mr-2 text-purple-400" /> {event.attendees} attending
-            </div>
             <div className="text-lg font-semibold text-purple-400">{event.price}</div>
           </div>
 

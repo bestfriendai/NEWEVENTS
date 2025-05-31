@@ -10,7 +10,6 @@ import {
   Map,
   Calendar,
   MapPin,
-  Users,
   Star,
   Heart,
   Share2,
@@ -49,6 +48,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AppLayout } from "@/components/app-layout"
 import { fetchEvents, getFeaturedEvents } from "@/app/actions/event-actions"
 import type { EventDetailProps } from "@/components/event-detail-modal"
+import { EventDetailModal } from "@/components/event-detail-modal"
 import { LocationSetupScreen } from "@/components/events/LocationSetupScreen"
 import { useDebounce } from "@/hooks/use-debounce"
 import { cn } from "@/lib/utils"
@@ -166,10 +166,6 @@ function EventCard({
 
                 <div className="flex items-center justify-between">
                   <span className="text-purple-400 font-semibold text-xs">{event.price}</span>
-                  <div className="flex items-center text-xs text-gray-400">
-                    <Users className="h-3 w-3 mr-1" />
-                    <span>{event.attendees || 0}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -256,10 +252,6 @@ function EventCard({
 
                 <div className="flex items-center justify-between">
                   <span className="text-purple-400 font-semibold text-sm">{event.price}</span>
-                  <div className="flex items-center text-xs text-gray-400">
-                    <Users className="h-3 w-3 mr-1" />
-                    <span>{event.attendees || 0}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -295,15 +287,7 @@ function EventCard({
             </Badge>
           </div>
 
-          {/* Featured Badge */}
-          {event.isFeatured && (
-            <div className="absolute top-3 right-3">
-              <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                Featured
-              </Badge>
-            </div>
-          )}
+
 
           {/* Action Buttons */}
           <div className="absolute bottom-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -344,12 +328,6 @@ function EventCard({
             <h3 className="font-bold text-white text-lg line-clamp-2 group-hover:text-purple-400 transition-colors duration-300">
               {event.title}
             </h3>
-            {event.rating && (
-              <div className="flex items-center space-x-1 text-sm ml-2">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-gray-300">{event.rating}</span>
-              </div>
-            )}
           </div>
 
           <p className="text-gray-400 text-sm mb-4 line-clamp-2">{event.description}</p>
@@ -372,13 +350,10 @@ function EventCard({
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center text-gray-300">
-                <Users className="h-4 w-4 mr-2 text-purple-400" />
-                <span>{event.attendees || 0} attending</span>
-              </div>
+              <div className="text-lg font-semibold text-purple-400">{event.price}</div>
               <div className="flex items-center">
                 <Avatar className="h-6 w-6 mr-2">
-                  <AvatarImage src={event.organizer?.avatar || "/placeholder.svg"} />
+                  <AvatarImage src={event.organizer?.logo || "/placeholder.svg"} />
                   <AvatarFallback className="text-xs bg-purple-600">{event.organizer?.name?.[0] || "O"}</AvatarFallback>
                 </Avatar>
                 <span className="text-xs text-gray-400 truncate max-w-20">{event.organizer?.name || "Organizer"}</span>
@@ -888,9 +863,7 @@ function EventsPageContent() {
       filtered = filtered.filter((event) => filters.categories.includes(event.category?.toLowerCase()))
     }
 
-    if (filters.showFeaturedOnly) {
-      filtered = filtered.filter((event) => event.isFeatured)
-    }
+
 
     if (filters.showFreeOnly) {
       filtered = filtered.filter((event) => event.price?.toLowerCase().includes("free") || event.price === "$0")
@@ -1225,6 +1198,14 @@ function EventsPageContent() {
         onClose={() => setShowFilters(false)}
         filters={filters}
         onFiltersChange={setFilters}
+      />
+
+      {/* Event Detail Modal */}
+      <EventDetailModal
+        event={selectedEvent}
+        isOpen={!!selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+        onFavorite={(id) => toggleFavorite(id)}
       />
     </div>
   )

@@ -34,6 +34,17 @@ interface RapidAPIEvent {
   }
   tags: string[]
   language: string
+  // Price information (may not always be available)
+  price?: {
+    min?: number
+    max?: number
+    currency?: string
+    is_free?: boolean
+  }
+  // Alternative price fields that might be present
+  min_price?: number
+  max_price?: number
+  is_free?: boolean
 }
 
 interface EventSearchParams {
@@ -170,6 +181,63 @@ class RapidAPIEventsService {
 
     // General Events (default)
     return "General Events"
+  }
+
+  extractPrice(event: RapidAPIEvent): string {
+    // Check if event is explicitly free
+    if (event.is_free === true || event.price?.is_free === true) {
+      return "Free"
+    }
+
+    // Try to extract price from structured price object
+    if (event.price) {
+      const { min, max, currency = "USD" } = event.price
+      if (min !== undefined && max !== undefined) {
+        if (min === max) {
+          return `$${min}`
+        } else {
+          return `$${min} - $${max}`
+        }
+      } else if (min !== undefined) {
+        return `From $${min}`
+      }
+    }
+
+    // Try to extract from direct price fields
+    if (event.min_price !== undefined && event.max_price !== undefined) {
+      if (event.min_price === event.max_price) {
+        return `$${event.min_price}`
+      } else {
+        return `$${event.min_price} - $${event.max_price}`
+      }
+    } else if (event.min_price !== undefined) {
+      return `From $${event.min_price}`
+    }
+
+    // Try to extract price from description or name
+    const text = `${event.name} ${event.description}`.toLowerCase()
+
+    // Look for free indicators
+    if (text.includes("free") || text.includes("no charge") || text.includes("complimentary")) {
+      return "Free"
+    }
+
+    // Look for price patterns in text
+    const priceMatch = text.match(/\$(\d+(?:\.\d{2})?)/g)
+    if (priceMatch && priceMatch.length > 0) {
+      const prices = priceMatch.map(p => parseFloat(p.replace('$', '')))
+      const minPrice = Math.min(...prices)
+      const maxPrice = Math.max(...prices)
+
+      if (minPrice === maxPrice) {
+        return `$${minPrice}`
+      } else {
+        return `$${minPrice} - $${maxPrice}`
+      }
+    }
+
+    // Default fallback
+    return "Price TBA"
   }
 }
 

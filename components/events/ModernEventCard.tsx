@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { Calendar, MapPin, Users, Heart, Star, TrendingUp, Navigation } from "lucide-react"
+import { Calendar, MapPin, Heart, Star, TrendingUp, Navigation } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -126,10 +126,7 @@ export function ModernEventCard({ event, onSelect, className, index = 0 }: Event
               <MapPin className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" />
               <span className="line-clamp-1">{event.location}</span>
             </div>
-            <div className="flex items-center">
-              <Users className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" />
-              <span>{event.attendees.toLocaleString()} attending</span>
-            </div>
+
             <div className="flex items-center">
               <Navigation className="h-4 w-4 mr-2 text-purple-400 flex-shrink-0" />
               <span>{event.distance} away</span>

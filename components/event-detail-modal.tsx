@@ -5,7 +5,7 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, MapPin, Users, Heart, ExternalLink } from "lucide-react"
+import { Calendar, Clock, MapPin, Heart, ExternalLink } from "lucide-react"
 import { EventMap } from "@/components/event-map"
 
 // EventDetailProps interface definition
@@ -20,7 +20,7 @@ export interface EventDetailProps {
   category: string
   price: string
   image?: string
-  attendees: number
+  attendees?: number
   organizer: {
     name: string
     description?: string
@@ -112,10 +112,6 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
               <span>{event.location}</span>
             </div>
             <div className="text-sm pl-6">{event.address}</div>
-            <div className="flex items-center text-sm">
-              <Users className="h-4 w-4 mr-2 text-gray-500" />
-              <span>{event.attendees} attending</span>
-            </div>
           </div>
 
           <div className="space-y-2">

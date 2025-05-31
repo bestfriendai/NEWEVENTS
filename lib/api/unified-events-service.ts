@@ -87,7 +87,7 @@ class UnifiedEventsService {
       // If we don't have enough cached events, fetch from APIs in parallel
       const remainingLimit = (params.limit || 50) - allEvents.length
       if (remainingLimit > 0) {
-        const apiLimit = Math.max(remainingLimit, 30) // Increased minimum
+        const apiLimit = Math.max(remainingLimit, 50) // Increased minimum to get more events
 
         // Run API calls in parallel for better performance
         const apiPromises: Promise<{ source: string; events: EventDetailProps[] }>[] = []
@@ -311,7 +311,7 @@ class UnifiedEventsService {
       }
 
       const ticketmasterParams: TicketmasterSearchParams = {
-        size: Math.min(limit, 200),
+        size: Math.min(limit, 200), // Ticketmaster allows up to 200 per request
         page: 0,
       }
 
@@ -357,23 +357,43 @@ class UnifiedEventsService {
         return []
       }
 
-      // Enhanced image processing for each event
-      const eventsWithEnhancedImages = await Promise.all(
+      // Enhanced image processing and geocoding for each event
+      const eventsWithEnhancedData = await Promise.all(
         result.events.map(async (event) => {
           try {
+            // Enhance images
             const { imageService } = await import("../services/image-service")
-            const imageResult = await imageService.validateAndEnhanceImage(event.image, event.category, event.title)
+            const imageResult = await imageService.validateAndEnhanceImage(event.image || "", event.category, event.title)
+
+            // Add geocoding for missing coordinates
+            let coordinates = event.coordinates
+            if (!coordinates && event.address && event.address !== "Address TBA") {
+              try {
+                const { geocodingService } = await import("../services/geocoding-service")
+                const geocodingResult = await geocodingService.geocodeAddress(event.address, event.location)
+                if (geocodingResult.success && geocodingResult.coordinates) {
+                  coordinates = geocodingResult.coordinates
+                }
+              } catch (geocodingError) {
+                logger.warn("Failed to geocode Ticketmaster event", {
+                  eventId: event.id,
+                  address: event.address,
+                  error: geocodingError instanceof Error ? geocodingError.message : String(geocodingError),
+                })
+              }
+            }
 
             return {
               ...event,
               image: imageResult.url,
+              coordinates,
               source: "ticketmaster" as const,
               externalId: `tm_${event.id}`,
             }
-          } catch (imageError) {
-            logger.warn("Failed to enhance Ticketmaster event image", {
+          } catch (error) {
+            logger.warn("Failed to enhance Ticketmaster event data", {
               eventId: event.id,
-              error: imageError instanceof Error ? imageError.message : String(imageError),
+              error: error instanceof Error ? error.message : String(error),
             })
             return {
               ...event,
@@ -384,7 +404,7 @@ class UnifiedEventsService {
         }),
       )
 
-      return eventsWithEnhancedImages
+      return eventsWithEnhancedData
     } catch (error) {
       logger.error("Ticketmaster fetch error", {
         error: error instanceof Error ? error.message : String(error),
@@ -474,7 +494,7 @@ class UnifiedEventsService {
             }
 
             const { imageService } = await import("../services/image-service")
-            const imageResult = await imageService.validateAndEnhanceImage(event.image, event.category, event.title)
+            const imageResult = await imageService.validateAndEnhanceImage(event.image || "", event.category, event.title)
 
             return {
               ...event,
@@ -532,8 +552,8 @@ class UnifiedEventsService {
         start_date: this.parseEventDateTime(event.date, event.time),
         location_name: event.location,
         location_address: event.address,
-        location_lat: event.coordinates?.lat || null,
-        location_lng: event.coordinates?.lng || null,
+        location_lat: event.coordinates?.lat || undefined,
+        location_lng: event.coordinates?.lng || undefined,
         price_min: this.extractMinPrice(event.price),
         price_max: this.extractMaxPrice(event.price),
         price_currency: "USD",
@@ -627,7 +647,6 @@ class UnifiedEventsService {
         name: dbEvent.organizer_name || "Event Organizer",
         logo: dbEvent.organizer_avatar || "/avatar-1.png",
       },
-      attendees: dbEvent.attendee_count || 0,
       isFavorite: false,
       coordinates:
         dbEvent.location_lat && dbEvent.location_lng

@@ -97,6 +97,18 @@ class ImageService {
         "googleusercontent.com",
         "fbcdn.net",
         "cdninstagram.com",
+        "encrypted-tbn0.gstatic.com", // Google Images
+        "encrypted-tbn1.gstatic.com",
+        "encrypted-tbn2.gstatic.com",
+        "encrypted-tbn3.gstatic.com",
+        "lh3.googleusercontent.com",
+        "lh4.googleusercontent.com",
+        "lh5.googleusercontent.com",
+        "lh6.googleusercontent.com",
+        "i.imgur.com",
+        "imgur.com",
+        "cdn.pixabay.com",
+        "images.pexels.com",
       ]
 
       const hasImageExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))

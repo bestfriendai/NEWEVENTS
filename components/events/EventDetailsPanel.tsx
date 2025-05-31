@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { X, Calendar, Clock, MapPin, Users, Heart, ExternalLink, Share2, Ticket } from "lucide-react"
+import { X, Calendar, Clock, MapPin, Heart, ExternalLink, Share2, Ticket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
@@ -173,14 +173,7 @@ export function EventDetailsPanel({ event, onClose }: EventDetailsPanelProps) {
                 {event.address && <div className="text-sm text-gray-400">{event.address}</div>}
               </div>
             </div>
-            <div className="flex items-center text-gray-300">
-              <Users className="h-5 w-5 mr-3 text-purple-400 flex-shrink-0" />
-              <span>
-                {typeof event.attendees === "number"
-                  ? `${event.attendees.toLocaleString()} attending`
-                  : event.attendees}
-              </span>
-            </div>
+
           </div>
 
           <Separator className="my-6 bg-gray-800" />

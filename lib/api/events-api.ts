@@ -587,18 +587,24 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
     formattedTime = formatted.formattedTime
   }
 
-  // Extract price
+  // Extract price using enhanced extraction
   let price = "Price TBA"
-  if (event.is_free) {
-    price = "Free"
-  } else if (event.min_price && event.max_price) {
-    if (event.min_price === event.max_price) {
-      price = `$${event.min_price}`
-    } else {
-      price = `$${event.min_price} - $${event.max_price}`
+  try {
+    const { rapidAPIEventsService } = await import("./rapidapi-events")
+    price = rapidAPIEventsService.extractPrice(event)
+  } catch (error) {
+    // Fallback to basic price extraction
+    if (event.is_free) {
+      price = "Free"
+    } else if (event.min_price && event.max_price) {
+      if (event.min_price === event.max_price) {
+        price = `$${event.min_price}`
+      } else {
+        price = `$${event.min_price} - $${event.max_price}`
+      }
+    } else if (event.min_price) {
+      price = `From $${event.min_price}`
     }
-  } else if (event.min_price) {
-    price = `From $${event.min_price}`
   }
 
   // Extract category
