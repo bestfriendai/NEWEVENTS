@@ -2,7 +2,7 @@
 export const clientEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-  // Removed NEXT_PUBLIC_EVENTBRITE_API_KEY from client environment
+  NEXT_PUBLIC_MAPBOX_API_KEY: process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "",
   NEXT_PUBLIC_PREDICTHQ_API_KEY: process.env.NEXT_PUBLIC_PREDICTHQ_API_KEY || "",
 } as const
 
@@ -58,6 +58,7 @@ export const API_CONFIG = {
   maps: {
     mapbox: {
       apiKey: serverEnv.MAPBOX_API_KEY, // Server-side only
+      clientApiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY, // Client-side
     },
     tomtom: {
       apiKey: serverEnv.TOMTOM_API_KEY,

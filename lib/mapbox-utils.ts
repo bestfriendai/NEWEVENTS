@@ -43,6 +43,11 @@ export function loadMapbox(): Promise<any> {
 
     script.onload = () => {
       if ((window as any).mapboxgl) {
+        // Set the access token immediately after loading
+        const mapboxApiKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
+        if (mapboxApiKey) {
+          ;(window as any).mapboxgl.accessToken = mapboxApiKey
+        }
         mapboxLoaded = true
         resolve((window as any).mapboxgl)
       } else {
@@ -84,9 +89,16 @@ export async function createMap(container: HTMLElement | string, options: any = 
   try {
     const mapboxgl = await loadMapbox()
 
-    // Check if access token is already set (should be set server-side)
+    // Check if access token is set, if not try to set it
     if (!(mapboxgl as any).accessToken) {
-      throw new Error("Mapbox access token is not configured")
+      const mapboxApiKey = process.env.NEXT_PUBLIC_MAPBOX_API_KEY
+      if (mapboxApiKey) {
+        ;(mapboxgl as any).accessToken = mapboxApiKey
+      } else {
+        throw new Error(
+          "Mapbox access token is not configured. Please set NEXT_PUBLIC_MAPBOX_API_KEY environment variable.",
+        )
+      }
     }
 
     const defaultOptions = {
