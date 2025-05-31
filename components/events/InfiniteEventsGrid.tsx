@@ -5,17 +5,13 @@
  * Optimized for performance with virtual scrolling and intersection observer
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useIntersection } from '@mantine/hooks'
-import { useInfiniteEventsQuery, useEventAnalytics } from '@/hooks/use-events-query'
-import { EventCard } from '@/components/events/EventCard'
-import { EventCardSkeleton } from '@/components/events/EventCardSkeleton'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { RefreshCw, Wifi, WifiOff } from 'lucide-react'
-import { logger } from '@/lib/utils/logger'
-import type { EventDetailProps } from '@/components/event-detail-modal'
+import { useState, useEffect, useRef, useCallback } from "react"
+import { motion } from "framer-motion"
+import { Loader2 } from "lucide-react"
+import { fetchEvents } from "@/app/actions/event-actions"
+import type { EventDetailProps } from "@/components/event-detail-modal"
+import { EventCardSkeleton } from "@/components/ui/event-skeleton" // Fixed import path
+import { cn } from "@/lib/utils"
 
 interface InfiniteEventsGridProps {
   searchParams: {
@@ -25,7 +21,6 @@ interface InfiniteEventsGridProps {
     category?: string
     query?: string
     startDate?: string
-    endDate?: string
   }
   onEventSelect: (event: EventDetailProps) => void
   onToggleFavorite: (eventId: number) => void
@@ -38,272 +33,285 @@ export function InfiniteEventsGrid({
   onEventSelect,
   onToggleFavorite,
   favoriteEvents,
-  className = ''
+  className,
 }: InfiniteEventsGridProps) {
-  const [isOnline, setIsOnline] = useState(true)
-  const loadMoreRef = useRef<HTMLDivElement>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
-  
+  const [events, setEvents] = useState<EventDetailProps[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const loader = useRef<HTMLDivElement>(null)
+
+  // Function to load events
+  const loadEvents = useCallback(async () => {
+    if (!searchParams.lat || !searchParams.lng) return
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const result = await fetchEvents({
+        coordinates: { lat: searchParams.lat, lng: searchParams.lng, name: "Current Location" },
+        radius: searchParams.radius || 25,
+        categories: searchParams.category ? [searchParams.category] : undefined,
+        keyword: searchParams.query,
+        page,
+        size: 12,
+      })
+
+      if (result.error) {
+        setError(result.error.message)
+      } else {
+        // Add coordinates to events for map display
+        const eventsWithCoords = result.events.map((event) => ({
+          ...event,
+          coordinates: event.coordinates || {
+            lat: searchParams.lat! + (Math.random() - 0.5) * 0.1,
+            lng: searchParams.lng! + (Math.random() - 0.5) * 0.1,
+          },
+        }))
+
+        setEvents((prev) => [...prev, ...eventsWithCoords])
+        setHasMore(page < result.totalPages - 1)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load events")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query, page])
+
+  // Initial load - only reset when search params change, not on every render
+  useEffect(() => {
+    if (searchParams.lat && searchParams.lng) {
+      setEvents([])
+      setPage(0)
+      setHasMore(true)
+    }
+  }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query])
+
   // Intersection observer for infinite scroll
-  const { ref: intersectionRef, entry } = useIntersection({
-    root: null,
-    rootMargin: '100px', // Load more when 100px from bottom
-    threshold: 0.1,
-  })
-  
-  // Infinite query hook
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isRefetching
-  } = useInfiniteEventsQuery(searchParams, {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-  })
-  
-  // Analytics tracking
-  const { trackEvent } = useEventAnalytics()
-  
-  // Network status monitoring
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-    
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          setPage((prevPage) => prevPage + 1)
+        }
+      },
+      { threshold: 1.0 },
+    )
+
+    if (loader.current) {
+      observer.observe(loader.current)
+    }
+
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-  
-  // Infinite scroll trigger
-  useEffect(() => {
-    if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage && isOnline) {
-      logger.info('Loading more events via intersection observer')
-      fetchNextPage()
-    }
-  }, [entry?.isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage, isOnline])
-  
-  // Track page view
-  useEffect(() => {
-    trackEvent({
-      type: 'view',
-      eventId: 0, // Page view
-      metadata: { 
-        page: 'infinite-events-grid',
-        searchParams,
-        timestamp: new Date().toISOString()
+      if (loader.current) {
+        observer.unobserve(loader.current)
       }
-    })
-  }, [searchParams, trackEvent])
-  
-  // Handle event click with analytics
-  const handleEventClick = useCallback((event: EventDetailProps) => {
-    trackEvent({
-      type: 'click',
-      eventId: event.id,
-      metadata: {
-        source: 'infinite-grid',
-        position: allEvents.findIndex(e => e.id === event.id),
-        searchParams
-      }
-    })
-    onEventSelect(event)
-  }, [trackEvent, onEventSelect, searchParams])
-  
-  // Handle favorite toggle with analytics
-  const handleFavoriteToggle = useCallback((eventId: number) => {
-    const isFavorite = favoriteEvents.has(eventId)
-    trackEvent({
-      type: isFavorite ? 'unfavorite' : 'favorite',
-      eventId,
-      metadata: { source: 'infinite-grid' }
-    })
-    onToggleFavorite(eventId)
-  }, [trackEvent, onToggleFavorite, favoriteEvents])
-  
-  // Flatten all events from pages
-  const allEvents = data?.pages.flatMap(page => page.events) || []
-  const totalCount = data?.pages[0]?.totalCount || 0
-  
-  // Manual load more function
-  const handleLoadMore = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-  
-  // Retry function
-  const handleRetry = useCallback(() => {
-    refetch()
-  }, [refetch])
-  
-  // Loading state
-  if (isLoading) {
+  }, [hasMore, isLoading])
+
+  // Load events when page changes or initial load
+  useEffect(() => {
+    if (searchParams.lat && searchParams.lng && (page === 0 || page > 0)) {
+      loadEvents()
+    }
+  }, [loadEvents, page])
+
+  // Import the EventCard component from the events page
+  const EventCard = ({ event, index }: { event: EventDetailProps; index: number }) => {
+    const isFavorite = favoriteEvents.has(event.id)
+
     return (
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${className}`}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <EventCardSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
-  
-  // Error state
-  if (isError) {
-    return (
-      <div className={`flex flex-col items-center justify-center py-12 ${className}`}>
-        <Alert className="max-w-md">
-          <WifiOff className="h-4 w-4" />
-          <AlertDescription>
-            {!isOnline 
-              ? "You're offline. Please check your internet connection."
-              : `Failed to load events: ${error?.message || 'Unknown error'}`
-            }
-          </AlertDescription>
-        </Alert>
-        <Button 
-          onClick={handleRetry} 
-          className="mt-4"
-          disabled={isRefetching || !isOnline}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
-          Try Again
-        </Button>
-      </div>
-    )
-  }
-  
-  // Empty state
-  if (allEvents.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center py-12 ${className}`}>
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            No events found
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Try adjusting your search criteria or location.
-          </p>
-          <Button onClick={handleRetry} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
-    )
-  }
-  
-  return (
-    <div className={className}>
-      {/* Network status indicator */}
-      {!isOnline && (
-        <Alert className="mb-6">
-          <WifiOff className="h-4 w-4" />
-          <AlertDescription>
-            You're offline. Showing cached events.
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Events count */}
-      <div className="mb-6 text-sm text-gray-600 dark:text-gray-400">
-        Showing {allEvents.length} of {totalCount} events
-        {!isOnline && ' (cached)'}
-      </div>
-      
-      {/* Events grid */}
-      <div 
-        ref={gridRef}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: index * 0.1 }}
+        whileHover={{ y: -8, scale: 1.02 }}
+        className="cursor-pointer group"
+        onClick={() => onEventSelect(event)}
       >
-        <AnimatePresence mode="popLayout">
-          {allEvents.map((event, index) => (
-            <motion.div
-              key={`${event.id}-${event.source || 'unknown'}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ 
-                duration: 0.3, 
-                delay: Math.min(index * 0.05, 0.5) // Stagger animation, max 0.5s delay
-              }}
-              layout
-            >
-              <EventCard
-                event={event}
-                isFavorite={favoriteEvents.has(event.id)}
-                onToggleFavorite={() => handleFavoriteToggle(event.id)}
-                onClick={() => handleEventClick(event)}
-                index={index}
-                className="h-full"
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-      
-      {/* Load more trigger and button */}
-      <div className="mt-8 flex flex-col items-center space-y-4">
-        {/* Intersection observer target */}
-        <div ref={intersectionRef} className="h-1" />
-        
-        {/* Loading more indicator */}
-        {isFetchingNextPage && (
-          <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Loading more events...</span>
+        <div className="bg-[#1A1D25]/80 backdrop-blur-md border border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 overflow-hidden rounded-lg group-hover:shadow-2xl group-hover:shadow-purple-500/20">
+          <div className="relative h-48 overflow-hidden">
+            <img
+              src={event.image || "/placeholder.svg?height=200&width=300&text=Event"}
+              alt={event.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            {/* Category Badge */}
+            <div className="absolute top-3 left-3">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs px-2 py-1 rounded-full shadow-lg">
+                {event.category || "Event"}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="absolute bottom-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <button
+                className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 backdrop-blur-sm border-0 rounded-full flex items-center justify-center"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleFavorite(event.id)
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill={isFavorite ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={isFavorite ? "text-red-500" : "text-white"}
+                >
+                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Price */}
+            <div className="absolute bottom-3 left-3">
+              <div className="bg-black/70 rounded-full px-3 py-1 backdrop-blur-sm">
+                <span className="text-white font-bold text-sm">{event.price || "Free"}</span>
+              </div>
+            </div>
           </div>
-        )}
-        
-        {/* Manual load more button */}
-        {hasNextPage && !isFetchingNextPage && (
-          <Button 
-            onClick={handleLoadMore}
-            variant="outline"
-            className="min-w-[200px]"
-            disabled={!isOnline}
+
+          <div className="p-6">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="font-bold text-white text-lg line-clamp-2 group-hover:text-purple-400 transition-colors duration-300">
+                {event.title}
+              </h3>
+            </div>
+
+            <p className="text-gray-400 text-sm mb-4 line-clamp-2">{event.description}</p>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center text-gray-300">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-2 text-purple-400"
+                >
+                  <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                  <line x1="16" x2="16" y1="2" y2="6" />
+                  <line x1="8" x2="8" y1="2" y2="6" />
+                  <line x1="3" x2="21" y1="10" y2="10" />
+                </svg>
+                <span>{event.date}</span>
+              </div>
+
+              <div className="flex items-center text-gray-300">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-2 text-purple-400"
+                >
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span className="line-clamp-1">{event.location}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return (
+    <div className={cn("w-full", className)}>
+      {/* Grid of events */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {events.map((event, index) => (
+          <EventCard key={event.id} event={event} index={index} />
+        ))}
+
+        {/* Loading skeletons */}
+        {isLoading && Array.from({ length: 4 }).map((_, i) => <EventCardSkeleton key={`skeleton-${i}`} />)}
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="text-center my-8 p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+          <p className="text-red-200">{error}</p>
+          <button
+            className="mt-2 px-4 py-2 bg-red-800/50 hover:bg-red-800/70 text-white rounded-md"
+            onClick={() => {
+              setPage(0)
+              setEvents([])
+              loadEvents()
+            }}
           >
-            {isOnline ? (
-              <>
-                Load More Events
-                <span className="ml-2 text-xs text-gray-500">
-                  ({totalCount - allEvents.length} remaining)
-                </span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4 mr-2" />
-                Offline
-              </>
-            )}
-          </Button>
-        )}
-        
-        {/* End of results */}
-        {!hasNextPage && allEvents.length > 0 && (
-          <div className="text-center text-gray-600 dark:text-gray-400 py-4">
-            <p>You've reached the end of the events list!</p>
-            <Button 
-              onClick={handleRetry} 
-              variant="ghost" 
-              size="sm" 
-              className="mt-2"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh for new events
-            </Button>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="flex justify-center my-8">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-5 w-5 text-purple-400 animate-spin" />
+            <span className="text-gray-400">Loading more events...</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* End of results message */}
+      {!isLoading && !hasMore && events.length > 0 && (
+        <div className="text-center my-8">
+          <p className="text-gray-400">You've reached the end of the results</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && events.length === 0 && !error && (
+        <div className="text-center my-16">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-900/20 mb-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-purple-400"
+            >
+              <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">No events found</h3>
+          <p className="text-gray-400 max-w-md mx-auto">
+            We couldn't find any events matching your criteria. Try adjusting your filters or search terms.
+          </p>
+        </div>
+      )}
+
+      {/* Invisible loader element for intersection observer */}
+      <div ref={loader} className="h-4" />
     </div>
   )
 }

@@ -2,81 +2,84 @@
 
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Filter } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Filter, type LucideIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface Category {
+  id: string
+  name: string
+  icon: LucideIcon
+  color: string
+}
 
 interface CategoryTabsProps {
+  categories: Category[]
   activeTab: string
   setActiveTab: (tab: string) => void
   onFilterClick: () => void
 }
 
-export function CategoryTabs({ activeTab, setActiveTab, onFilterClick }: CategoryTabsProps) {
+export function CategoryTabs({ categories, activeTab, setActiveTab, onFilterClick }: CategoryTabsProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2, duration: 0.4 }}
-      className="mb-8"
-    >
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-100">Party Events</h2>
+    <div className="flex flex-col space-y-4 mb-6">
+      {/* Category Pills */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        {categories.map((category) => {
+          const Icon = category.icon
+          const isActive = activeTab === category.id
+
+          return (
+            <motion.div key={category.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                variant={isActive ? "default" : "outline"}
+                onClick={() => setActiveTab(category.id)}
+                className={cn(
+                  "relative overflow-hidden transition-all duration-300",
+                  isActive
+                    ? `${category.color} text-white border-transparent shadow-lg`
+                    : "bg-[#1A1D25] border-gray-700 text-gray-300 hover:bg-gray-800 hover:border-gray-600",
+                )}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {category.name}
+
+                {/* Active indicator */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-white/10 rounded-md"
+                    initial={false}
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </Button>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Filter Button and Stats */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Badge variant="secondary" className="bg-[#1A1D25] text-gray-300">
+            RapidAPI Live Events
+          </Badge>
+          <Badge variant="outline" className="border-purple-500 text-purple-400">
+            Party & Nightlife
+          </Badge>
+        </div>
+
         <Button
           variant="outline"
-          className="bg-[#1A1D25] hover:bg-[#22252F] text-gray-300 border-gray-800 rounded-xl transition-colors duration-300"
+          size="sm"
           onClick={onFilterClick}
+          className="border-gray-700 hover:bg-gray-800 md:hidden"
         >
-          <Filter className="mr-2 h-4 w-4 text-purple-400" />
+          <Filter className="w-4 h-4 mr-2" />
           Filters
         </Button>
       </div>
-
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-[#1A1D25] p-1 rounded-xl mb-6 w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
-          <TabsTrigger
-            value="all"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            All
-          </TabsTrigger>
-          <TabsTrigger
-            value="techno"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            Techno
-          </TabsTrigger>
-          <TabsTrigger
-            value="house"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            House
-          </TabsTrigger>
-          <TabsTrigger
-            value="hiphop"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            Hip-Hop
-          </TabsTrigger>
-          <TabsTrigger
-            value="dnb"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            Drum & Bass
-          </TabsTrigger>
-          <TabsTrigger
-            value="retro"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            Retro
-          </TabsTrigger>
-          <TabsTrigger
-            value="festival"
-            className="data-[state=active]:bg-[#22252F] data-[state=active]:text-purple-400 rounded-lg transition-all duration-300"
-          >
-            Festivals
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-    </motion.div>
+    </div>
   )
 }

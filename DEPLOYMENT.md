@@ -13,7 +13,7 @@
 
 Create `.env.local` file in the project root:
 
-```env
+\`\`\`env
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
@@ -31,21 +31,21 @@ NODE_ENV=production
 NEXT_PUBLIC_ENABLE_ANALYTICS=true
 NEXT_PUBLIC_ENABLE_REALTIME=true
 NEXT_PUBLIC_ENABLE_PERFORMANCE_MONITORING=false
-```
+\`\`\`
 
 ### **2. Install Dependencies**
 
-```bash
+\`\`\`bash
 # Install all dependencies
 npm install
 
 # Verify installation
 npm run build
-```
+\`\`\`
 
 ### **3. Database Setup**
 
-```bash
+\`\`\`bash
 # Login to Supabase
 supabase login
 
@@ -57,11 +57,11 @@ supabase db push
 
 # Verify tables are created
 supabase db diff
-```
+\`\`\`
 
 ### **4. Deploy Edge Functions**
 
-```bash
+\`\`\`bash
 # Deploy events search function
 supabase functions deploy events-search
 
@@ -70,24 +70,24 @@ supabase functions deploy event-analytics
 
 # Verify deployment
 supabase functions list
-```
+\`\`\`
 
 ### **5. Configure Supabase Settings**
 
 #### **A. Enable PostGIS Extension**
 In Supabase Dashboard → SQL Editor:
-```sql
+\`\`\`sql
 CREATE EXTENSION IF NOT EXISTS postgis;
-```
+\`\`\`
 
 #### **B. Set up Row Level Security**
-```sql
+\`\`\`sql
 -- Enable RLS on events table
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
 -- Create policies (already in migrations)
 -- Policies are automatically created by the migration
-```
+\`\`\`
 
 #### **C. Configure Realtime**
 In Supabase Dashboard → Settings → API:
@@ -102,14 +102,14 @@ In Supabase Dashboard → Settings → API:
 3. Import your Git repository
 4. Configure build settings:
 
-```json
+\`\`\`json
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
   "devCommand": "npm run dev"
 }
-```
+\`\`\`
 
 #### **B. Environment Variables**
 Add all environment variables from `.env.local` to Vercel:
@@ -118,7 +118,7 @@ Add all environment variables from `.env.local` to Vercel:
 3. Set appropriate environments (Production, Preview, Development)
 
 #### **C. Deploy**
-```bash
+\`\`\`bash
 # Deploy to Vercel
 vercel --prod
 
@@ -126,23 +126,23 @@ vercel --prod
 npm install -g vercel
 vercel login
 vercel
-```
+\`\`\`
 
 ### **7. Alternative Deployment Options**
 
 #### **A. Netlify**
-```bash
+\`\`\`bash
 # Install Netlify CLI
 npm install -g netlify-cli
 
 # Login and deploy
 netlify login
 netlify deploy --prod --dir=.next
-```
+\`\`\`
 
 #### **B. Docker Deployment**
 Create `Dockerfile`:
-```dockerfile
+\`\`\`dockerfile
 FROM node:18-alpine
 
 WORKDIR /app
@@ -154,16 +154,16 @@ RUN npm run build
 
 EXPOSE 3000
 CMD ["npm", "start"]
-```
+\`\`\`
 
 Deploy:
-```bash
+\`\`\`bash
 # Build image
 docker build -t dateai-events .
 
 # Run container
 docker run -p 3000:3000 --env-file .env.local dateai-events
-```
+\`\`\`
 
 ## 🔧 Post-Deployment Configuration
 
@@ -177,35 +177,35 @@ Check these endpoints:
 ### **2. Performance Monitoring**
 
 #### **A. Enable Analytics**
-```typescript
+\`\`\`typescript
 // In production, analytics are automatically enabled
 // Check the performance dashboard in development mode
-```
+\`\`\`
 
 #### **B. Monitor Edge Functions**
-```bash
+\`\`\`bash
 # Check function logs
 supabase functions logs events-search
 supabase functions logs event-analytics
-```
+\`\`\`
 
 ### **3. Database Optimization**
 
 #### **A. Create Indexes**
-```sql
+\`\`\`sql
 -- Verify indexes are created
 SELECT indexname, tablename FROM pg_indexes 
 WHERE tablename = 'events';
-```
+\`\`\`
 
 #### **B. Monitor Performance**
-```sql
+\`\`\`sql
 -- Check query performance
 SELECT query, mean_exec_time, calls 
 FROM pg_stat_statements 
 WHERE query LIKE '%events%'
 ORDER BY mean_exec_time DESC;
-```
+\`\`\`
 
 ## 📊 Monitoring & Maintenance
 
@@ -217,18 +217,18 @@ ORDER BY mean_exec_time DESC;
 - Use Vercel Analytics or Google PageSpeed Insights
 
 #### **B. Database Monitoring**
-```bash
+\`\`\`bash
 # Monitor database performance
 supabase db logs
 
 # Check connection pool
 supabase db status
-```
+\`\`\`
 
 ### **2. Cache Management**
 
 #### **A. Cache Warming**
-```typescript
+\`\`\`typescript
 // Warm cache for popular locations
 const popularLocations = [
   { lat: 40.7128, lng: -74.0060 }, // NYC
@@ -240,33 +240,33 @@ const popularLocations = [
 popularLocations.forEach(location => {
   prefetchEventsForLocation(queryClient, location.lat, location.lng)
 })
-```
+\`\`\`
 
 #### **B. Cache Invalidation**
-```typescript
+\`\`\`typescript
 // Clear cache when needed
 advancedCache.clearByTags([cacheTags.EVENTS])
 queryClient.invalidateQueries({ queryKey: ['events'] })
-```
+\`\`\`
 
 ### **3. Error Monitoring**
 
 #### **A. Set up Error Tracking**
-```bash
+\`\`\`bash
 # Install Sentry (optional)
 npm install @sentry/nextjs
 
 # Configure in next.config.js
-```
+\`\`\`
 
 #### **B. Monitor API Errors**
-```typescript
+\`\`\`typescript
 // Check API error rates
 const errorRate = apiErrors.current[endpoint] / totalRequests
 if (errorRate > 0.05) {
   // Alert or fallback
 }
-```
+\`\`\`
 
 ## 🔒 Security Checklist
 
@@ -290,30 +290,30 @@ if (errorRate > 0.05) {
 ### **Common Issues**
 
 #### **1. Edge Functions Not Working**
-```bash
+\`\`\`bash
 # Check function status
 supabase functions list
 
 # Redeploy if needed
 supabase functions deploy events-search --no-verify-jwt
-```
+\`\`\`
 
 #### **2. Database Connection Issues**
-```bash
+\`\`\`bash
 # Check database status
 supabase db status
 
 # Reset connection pool
 supabase db reset
-```
+\`\`\`
 
 #### **3. Cache Issues**
-```typescript
+\`\`\`typescript
 // Clear all caches
 advancedCache.clear()
 queryClient.clear()
 localStorage.clear()
-```
+\`\`\`
 
 #### **4. Performance Issues**
 - Check Web Vitals in browser dev tools

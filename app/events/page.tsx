@@ -9,7 +9,6 @@ import {
   Map,
   Calendar,
   MapPin,
-  Star,
   Heart,
   Share2,
   Sparkles,
@@ -18,7 +17,6 @@ import {
   Navigation,
   SlidersHorizontal,
   X,
-  ChevronDown,
   Zap,
   Music,
   Palette,
@@ -31,19 +29,13 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Activity,
-  Bell,
-  Settings,
   List,
-  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -59,14 +51,6 @@ import { cn } from "@/lib/utils"
 // New advanced components
 import { SmartSearchInput } from "@/components/search/SmartSearchInput"
 import { InfiniteEventsGrid } from "@/components/events/InfiniteEventsGrid"
-import { RealtimeNotifications } from "@/components/notifications/RealtimeNotifications"
-import { PerformanceDashboard } from "@/components/admin/PerformanceDashboard"
-
-// New hooks
-import { useOptimizedEventsPage } from "@/hooks/use-events-query"
-import { useRealtimeEvents } from "@/hooks/use-realtime-events"
-import { usePerformanceMonitor } from "@/hooks/use-performance-monitor"
-import { useSmartSearch } from "@/hooks/use-smart-search"
 
 // Dynamic import for Mapbox component to avoid SSR issues
 const EventsMap = dynamic(() => import("@/components/events/EventsMap"), {
@@ -190,92 +174,6 @@ function EventCard({
     )
   }
 
-  if (variant === "list") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3, delay: index * 0.05 }}
-        whileHover={{ x: 4 }}
-        className="cursor-pointer"
-        onClick={onClick}
-      >
-        <Card className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/30 hover:border-purple-500/50 transition-all duration-300">
-          <CardContent className="p-4">
-            <div className="flex space-x-4">
-              <div className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden">
-                <img
-                  src={event.image || "/placeholder.svg?height=96&width=96&text=Event"}
-                  alt={event.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <Badge
-                  className={`absolute bottom-1 left-1 bg-gradient-to-r ${category.color} text-white text-xs px-1 py-0.5`}
-                >
-                  <category.icon className="h-2 w-2" />
-                </Badge>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-white text-base line-clamp-1">{event.title}</h3>
-                  <div className="flex items-center space-x-1 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onToggleFavorite()
-                      }}
-                    >
-                      <Heart
-                        className={`h-3 w-3 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400 hover:text-red-400"}`}
-                      />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onShare()
-                      }}
-                    >
-                      <Share2 className="h-3 w-3 text-gray-400 hover:text-gray-300" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-xs text-gray-400 mb-2">
-                  <div className="flex items-center">
-                    <Calendar className="h-3 w-3 mr-1 text-purple-400" />
-                    <span>{event.date}</span>
-                    {event.time && (
-                      <>
-                        <Clock className="h-3 w-3 ml-2 mr-1 text-purple-400" />
-                        <span>{event.time}</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="h-3 w-3 mr-1 text-purple-400" />
-                    <span className="line-clamp-1">{event.location}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-purple-400 font-semibold text-sm">{event.price}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    )
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -301,8 +199,6 @@ function EventCard({
               {event.category}
             </Badge>
           </div>
-
-
 
           {/* Action Buttons */}
           <div className="absolute bottom-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -395,27 +291,6 @@ function EventCardSkeleton({ variant = "grid" }: { variant?: "grid" | "list" | "
               <div className="flex justify-between">
                 <Skeleton className="h-3 w-12 bg-gray-800" />
                 <Skeleton className="h-3 w-8 bg-gray-800" />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (variant === "list") {
-    return (
-      <Card className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/30">
-        <CardContent className="p-4">
-          <div className="flex space-x-4">
-            <Skeleton className="w-24 h-24 rounded-lg bg-gray-800" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-3/4 bg-gray-800" />
-              <Skeleton className="h-3 w-1/2 bg-gray-800" />
-              <Skeleton className="h-3 w-2/3 bg-gray-800" />
-              <div className="flex justify-between">
-                <Skeleton className="h-3 w-16 bg-gray-800" />
-                <Skeleton className="h-3 w-12 bg-gray-800" />
               </div>
             </div>
           </div>
@@ -612,92 +487,6 @@ function AdvancedFiltersPanel({
                 </div>
               </div>
 
-              {/* Price Range */}
-              <div className="mb-8">
-                <Label className="text-white text-base font-semibold mb-4 block">
-                  Price Range: ${filters.priceRange?.[0] || 0} - ${filters.priceRange?.[1] || 500}
-                </Label>
-                <div className="px-3">
-                  <Slider
-                    value={filters.priceRange || [0, 500]}
-                    onValueChange={(value) => onFiltersChange({ ...filters, priceRange: value })}
-                    max={500}
-                    step={10}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-sm text-gray-400 mt-2">
-                    <span>Free</span>
-                    <span>$500+</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Date Range */}
-              <div className="mb-8">
-                <Label className="text-white text-base font-semibold mb-4 block">Date Range</Label>
-                <Select
-                  value={filters.dateRange || "all"}
-                  onValueChange={(value) => onFiltersChange({ ...filters, dateRange: value })}
-                >
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="all">All Dates</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                    <SelectItem value="this-week">This Week</SelectItem>
-                    <SelectItem value="this-month">This Month</SelectItem>
-                    <SelectItem value="next-month">Next Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Distance */}
-              <div className="mb-8">
-                <Label className="text-white text-base font-semibold mb-4 block">
-                  Distance: {filters.distance || 25} miles
-                </Label>
-                <div className="px-3">
-                  <Slider
-                    value={[filters.distance || 25]}
-                    onValueChange={(value) => onFiltersChange({ ...filters, distance: value[0] })}
-                    max={100}
-                    step={5}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-sm text-gray-400 mt-2">
-                    <span>1 mile</span>
-                    <span>100+ miles</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Toggle Options */}
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center justify-between">
-                  <Label className="text-white">Featured Events Only</Label>
-                  <Switch
-                    checked={filters.showFeaturedOnly || false}
-                    onCheckedChange={(checked) => onFiltersChange({ ...filters, showFeaturedOnly: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-white">Free Events Only</Label>
-                  <Switch
-                    checked={filters.showFreeOnly || false}
-                    onCheckedChange={(checked) => onFiltersChange({ ...filters, showFreeOnly: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-white">Available Tickets</Label>
-                  <Switch
-                    checked={filters.availableTickets || false}
-                    onCheckedChange={(checked) => onFiltersChange({ ...filters, availableTickets: checked })}
-                  />
-                </div>
-              </div>
-
               {/* Actions */}
               <div className="flex gap-3">
                 <Button
@@ -730,7 +519,6 @@ function EventsPageContent() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("date")
   const [showFilters, setShowFilters] = useState(false)
-  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
   const [favoriteEvents, setFavoriteEvents] = useState<Set<number>>(new Set())
   const [filters, setFilters] = useState({
@@ -746,8 +534,8 @@ function EventsPageContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [featuredEvents, setFeaturedEvents] = useState<EventDetailProps[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isFeaturedLoading, setIsFeaturedLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isFeaturedLoading, setIsFeaturedLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
@@ -755,20 +543,20 @@ function EventsPageContent() {
 
   const debouncedSearch = useDebounce(searchQuery, 300)
 
-  // Advanced hooks for future use
-  const performanceMonitor = usePerformanceMonitor()
+  // SIMPLIFIED: Create stable search parameters
+  const searchParams = useMemo(() => {
+    if (!userLocation) return {}
 
-  // Search parameters for future optimized events query
-  const searchParams = useMemo(() => ({
-    lat: userLocation?.lat,
-    lng: userLocation?.lng,
-    radius: filters.distance,
-    category: selectedCategory !== "all" ? selectedCategory : undefined,
-    query: searchQuery || undefined,
-    startDate: filters.dateRange !== "all" ? new Date().toISOString() : undefined,
-  }), [userLocation, filters.distance, selectedCategory, searchQuery, filters.dateRange])
+    return {
+      lat: userLocation.lat,
+      lng: userLocation.lng,
+      radius: filters.distance,
+      category: selectedCategory !== "all" ? selectedCategory : undefined,
+      query: debouncedSearch || undefined,
+    }
+  }, [userLocation, filters.distance, selectedCategory, debouncedSearch])
 
-  // Check if user already has a location set
+  // Check if user already has a location set - ONLY RUN ONCE
   useEffect(() => {
     const savedLocation = localStorage.getItem("dateai-user-location")
     if (savedLocation) {
@@ -780,80 +568,86 @@ function EventsPageContent() {
         console.error("Invalid saved location:", e)
       }
     }
-  }, [])
+  }, []) // Empty dependency array - only run once
 
-  // Fetch events when search parameters change
-  useEffect(() => {
-    if (!hasLocation || !userLocation) return
+  // SIMPLIFIED: Load events function
+  const loadEvents = useCallback(async () => {
+    if (!userLocation) return
 
-    const loadEvents = async () => {
-      setIsLoading(true)
-      setError(null)
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        const apiCategory = selectedCategory !== "all" ? [selectedCategory] : undefined
+    try {
+      const result = await fetchEvents({
+        keyword: debouncedSearch || undefined,
+        coordinates: userLocation,
+        radius: filters.distance || 25,
+        categories: selectedCategory !== "all" ? [selectedCategory] : undefined,
+        page,
+        size: 12,
+        sort: sortBy,
+      })
 
-        const result = await fetchEvents({
-          keyword: debouncedSearch || undefined,
-          coordinates: userLocation,
-          radius: filters.distance || 25,
-          categories: apiCategory,
-          page,
-          size: 12,
-          sort: sortBy,
-        })
-
-        if (result.error) {
-          setError(result.error.message)
-        } else {
-          // Add coordinates to events for map display
-          const eventsWithCoords = result.events.map((event) => ({
-            ...event,
-            coordinates: event.coordinates || {
-              lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
-              lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
-            },
-          }))
-          setEvents(eventsWithCoords)
-          setTotalCount(result.totalCount)
-          setTotalPages(result.totalPages)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load events")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadEvents()
-  }, [hasLocation, userLocation, debouncedSearch, selectedCategory, sortBy, page, filters])
-
-  // Fetch featured events
-  useEffect(() => {
-    if (!hasLocation || !userLocation) return
-
-    const loadFeaturedEvents = async () => {
-      setIsFeaturedLoading(true)
-      try {
-        const featured = await getFeaturedEvents(6)
-        const featuredWithCoords = featured.map((event) => ({
+      if (result.error) {
+        setError(result.error.message)
+        setEvents([])
+      } else {
+        const eventsWithCoords = result.events.map((event) => ({
           ...event,
-          isFeatured: true,
           coordinates: event.coordinates || {
             lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
             lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
           },
         }))
-        setFeaturedEvents(featuredWithCoords)
-      } catch (err) {
-        console.error("Failed to load featured events:", err)
-      } finally {
-        setIsFeaturedLoading(false)
+        setEvents(eventsWithCoords)
+        setTotalCount(result.totalCount)
+        setTotalPages(result.totalPages)
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load events")
+      setEvents([])
+    } finally {
+      setIsLoading(false)
     }
+  }, [userLocation, debouncedSearch, filters.distance, selectedCategory, page, sortBy])
 
-    loadFeaturedEvents()
-  }, [hasLocation, userLocation])
+  // SIMPLIFIED: Load featured events
+  const loadFeaturedEvents = useCallback(async () => {
+    if (!userLocation) return
+
+    setIsFeaturedLoading(true)
+    try {
+      const featured = await getFeaturedEvents(6)
+      const featuredWithCoords = featured.map((event) => ({
+        ...event,
+        isFeatured: true,
+        coordinates: event.coordinates || {
+          lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
+          lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
+        },
+      }))
+      setFeaturedEvents(featuredWithCoords)
+    } catch (err) {
+      console.error("Failed to load featured events:", err)
+      setFeaturedEvents([])
+    } finally {
+      setIsFeaturedLoading(false)
+    }
+  }, [userLocation])
+
+  // SIMPLIFIED: Only load events when specific dependencies change
+  useEffect(() => {
+    if (userLocation) {
+      loadEvents()
+    }
+  }, [userLocation, debouncedSearch, selectedCategory, sortBy, page, filters.distance])
+
+  // SIMPLIFIED: Only load featured events when location changes
+  useEffect(() => {
+    if (userLocation) {
+      loadFeaturedEvents()
+    }
+  }, [userLocation])
 
   const handleLocationSet = useCallback((location: { lat: number; lng: number; name: string }) => {
     setUserLocation(location)
@@ -863,6 +657,7 @@ function EventsPageContent() {
 
   const handleLocationChange = useCallback(() => {
     setHasLocation(false)
+    setUserLocation(null)
     localStorage.removeItem("dateai-user-location")
   }, [])
 
@@ -890,37 +685,23 @@ function EventsPageContent() {
     }
   }, [])
 
-  // Filter events based on current filters
+  // SIMPLIFIED: Filter events based on current filters
   const filteredEvents = useMemo(() => {
     let filtered = events
 
-    // Apply category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((event) => event.category?.toLowerCase() === selectedCategory.toLowerCase())
-    }
-
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter((event) =>
-        event.title?.toLowerCase().includes(query) ||
-        event.description?.toLowerCase().includes(query) ||
-        event.location?.toLowerCase().includes(query) ||
-        event.category?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (event) =>
+          event.title?.toLowerCase().includes(query) ||
+          event.description?.toLowerCase().includes(query) ||
+          event.location?.toLowerCase().includes(query) ||
+          event.category?.toLowerCase().includes(query),
       )
     }
 
-    // Apply price filter
-    if (filters.priceRange) {
-      filtered = filtered.filter((event) => {
-        const price = event.price?.replace(/[^0-9.]/g, '') || '0'
-        const numPrice = parseFloat(price)
-        return numPrice >= filters.priceRange[0] && numPrice <= filters.priceRange[1]
-      })
-    }
-
     return filtered
-  }, [events, selectedCategory, searchQuery, filters])
+  }, [events, searchQuery])
 
   const handleMapError = useCallback((error: string) => {
     setMapError(error)
@@ -992,11 +773,6 @@ function EventsPageContent() {
             >
               <Filter className="h-4 w-4 mr-2" />
               Filters
-              {Object.keys(filters).length > 0 && (
-                <Badge className="ml-2 bg-purple-600 text-white text-xs px-1.5 py-0.5">
-                  {Object.keys(filters).length}
-                </Badge>
-              )}
             </Button>
 
             {/* Location Button */}
@@ -1008,18 +784,6 @@ function EventsPageContent() {
               <Navigation className="h-4 w-4 mr-2" />
               {userLocation?.name}
             </Button>
-
-            {/* Performance Dashboard Toggle (Development Only) */}
-            {process.env.NODE_ENV === 'development' && (
-              <Button
-                variant="outline"
-                onClick={() => setShowPerformanceDashboard(true)}
-                className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
-                title="Performance Dashboard"
-              >
-                <Activity className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         </div>
 
@@ -1094,10 +858,6 @@ function EventsPageContent() {
                       <p className="text-gray-400 text-sm">Hand-picked experiences you'll love</p>
                     </div>
                   </div>
-                  <Button variant="ghost" className="text-purple-400 hover:text-purple-300">
-                    View All
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  </Button>
                 </div>
 
                 <FeaturedEventsCarousel
@@ -1112,7 +872,7 @@ function EventsPageContent() {
               {/* Events Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {isLoading
-                  ? Array.from({ length: 16 }).map((_, i) => <EventCardSkeleton key={i} />) // Increased from 8 to 16 for better loading UX
+                  ? Array.from({ length: 8 }).map((_, i) => <EventCardSkeleton key={i} />)
                   : filteredEvents.map((event, index) => (
                       <EventCard
                         key={event.id}
@@ -1125,35 +885,6 @@ function EventsPageContent() {
                       />
                     ))}
               </div>
-
-              {/* Pagination */}
-              {!isLoading && !error && filteredEvents.length > 0 && totalPages > 1 && (
-                <div className="flex justify-center mt-12">
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      disabled={page === 0}
-                      className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
-                      <span className="text-white">
-                        Page {page + 1} of {totalPages}
-                      </span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => p + 1)}
-                      disabled={page >= totalPages - 1}
-                      className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               {/* Empty State */}
               {!isLoading && !error && filteredEvents.length === 0 && (
@@ -1170,13 +901,6 @@ function EventsPageContent() {
                       onClick={() => {
                         setSearchQuery("")
                         setSelectedCategory("all")
-                        setFilters({
-                          priceRange: [0, 500],
-                          distance: 25,
-                          dateRange: "all",
-                          timeOfDay: "all",
-                          eventType: "all",
-                        })
                       }}
                       className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                     >
@@ -1202,7 +926,10 @@ function EventsPageContent() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+                        setError(null)
+                        loadEvents()
+                      }}
                       className="ml-4 text-red-200 hover:text-red-100"
                     >
                       <RefreshCw className="h-3 w-3 mr-1" />
@@ -1291,36 +1018,6 @@ function EventsPageContent() {
         onClose={() => setSelectedEvent(null)}
         onFavorite={(id) => toggleFavorite(id)}
       />
-
-      {/* Real-time Notifications */}
-      <RealtimeNotifications
-        userLocation={userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : undefined}
-        radius={filters.distance}
-        maxNotifications={5}
-        autoHide={true}
-        autoHideDelay={8000}
-      />
-
-      {/* Performance Dashboard (Development Only) */}
-      {process.env.NODE_ENV === 'development' && showPerformanceDashboard && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-auto">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Performance Dashboard</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowPerformanceDashboard(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-4">
-              <PerformanceDashboard />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

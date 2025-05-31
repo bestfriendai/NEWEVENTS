@@ -22,11 +22,11 @@ This document outlines the comprehensive improvements made to the DateAI events 
 - **Materialized Views**: Pre-computed popular events
 
 ### **2. Supabase Edge Functions**
-```bash
+\`\`\`bash
 # Deploy edge functions
 supabase functions deploy events-search
 supabase functions deploy event-analytics
-```
+\`\`\`
 
 **Features:**
 - Edge computing for reduced latency
@@ -43,13 +43,13 @@ supabase functions deploy event-analytics
 ## 🚀 Frontend Performance
 
 ### **1. TanStack Query Integration**
-```typescript
+\`\`\`typescript
 // Smart caching with background updates
 const { data, isLoading } = useInfiniteEventsQuery(params, {
   staleTime: 5 * 60 * 1000, // 5 minutes
   cacheTime: 10 * 60 * 1000, // 10 minutes
 })
-```
+\`\`\`
 
 **Features:**
 - Intelligent caching with TTL
@@ -59,14 +59,14 @@ const { data, isLoading } = useInfiniteEventsQuery(params, {
 - Error recovery with exponential backoff
 
 ### **2. Advanced Caching System**
-```typescript
+\`\`\`typescript
 // Redis-like memory cache
 const cachedEvents = advancedCache.get(cacheKey)
 if (!cachedEvents) {
   const events = await fetchEvents()
   advancedCache.set(cacheKey, events, ttl, tags)
 }
-```
+\`\`\`
 
 **Features:**
 - LRU eviction policy
@@ -75,13 +75,13 @@ if (!cachedEvents) {
 - Performance monitoring
 
 ### **3. Real-time Features**
-```typescript
+\`\`\`typescript
 // WebSocket integration
 const { notifications, liveEvents } = useRealtimeEvents({
   userLocation,
   radius: 25
 })
-```
+\`\`\`
 
 **Features:**
 - Live event notifications
@@ -118,14 +118,14 @@ const { notifications, liveEvents } = useRealtimeEvents({
 ## 📊 Analytics & Monitoring
 
 ### **1. Event Analytics**
-```typescript
+\`\`\`typescript
 // Track user interactions
 analytics.trackEvent({
   type: 'view',
   eventId: event.id,
   metadata: { source: 'search' }
 })
-```
+\`\`\`
 
 **Metrics Tracked:**
 - Event views and clicks
@@ -134,10 +134,10 @@ analytics.trackEvent({
 - Performance metrics
 
 ### **2. Performance Monitoring**
-```typescript
+\`\`\`typescript
 // Web Vitals tracking
 const { metrics, performanceScore } = usePerformanceMonitor()
-```
+\`\`\`
 
 **Monitored Metrics:**
 - First Contentful Paint (FCP)
@@ -148,22 +148,22 @@ const { metrics, performanceScore } = usePerformanceMonitor()
 ## 🔧 Installation & Setup
 
 ### **1. Install Dependencies**
-```bash
+\`\`\`bash
 npm install @tanstack/react-query @tanstack/react-query-devtools @mantine/hooks framer-motion date-fns
-```
+\`\`\`
 
 ### **2. Database Setup**
-```bash
+\`\`\`bash
 # Run migrations
 supabase db push
 
 # Deploy edge functions
 supabase functions deploy events-search
 supabase functions deploy event-analytics
-```
+\`\`\`
 
 ### **3. Environment Variables**
-```env
+\`\`\`env
 # Required
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
@@ -177,7 +177,7 @@ RAPIDAPI_KEY=your_rapidapi_key
 NEXT_PUBLIC_ENABLE_ANALYTICS=true
 NEXT_PUBLIC_ENABLE_REALTIME=true
 NEXT_PUBLIC_ENABLE_PERFORMANCE_MONITORING=true
-```
+\`\`\`
 
 ## 🎯 New Features
 

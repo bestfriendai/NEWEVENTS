@@ -1,457 +1,290 @@
 "use client"
 
-/**
- * Performance Dashboard Component
- * Real-time monitoring of app performance, cache, and user metrics
- */
+import type React from "react"
 
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { 
-  Activity, 
-  Database, 
-  Zap, 
-  Users, 
-  Clock, 
-  TrendingUp,
-  Server,
-  Wifi,
-  BarChart3,
-  RefreshCw,
-  Download,
-  AlertTriangle
-} from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { usePerformanceMonitor } from '@/hooks/use-performance-monitor'
-import { useQueryClient } from '@tanstack/react-query'
-import { advancedCache } from '@/lib/cache/advanced-cache'
-import { cn } from '@/lib/utils'
+import { useState, useEffect } from "react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Activity, Clock, Database, Cpu, HardDrive, Network, AlertTriangle } from "lucide-react"
 
-interface PerformanceDashboardProps {
-  className?: string
-  refreshInterval?: number
-}
+export function PerformanceDashboard() {
+  const [activeTab, setActiveTab] = useState("overview")
+  const [metrics, setMetrics] = useState({
+    responseTime: 120, // ms
+    cacheHitRate: 78, // percentage
+    errorRate: 0.5, // percentage
+    apiCalls: 245, // count
+    dbQueries: 189, // count
+    memoryUsage: 68, // percentage
+    cpuUsage: 42, // percentage
+    networkLatency: 35, // ms
+  })
 
-export function PerformanceDashboard({ 
-  className,
-  refreshInterval = 5000 
-}: PerformanceDashboardProps) {
-  const [isVisible, setIsVisible] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  
-  const queryClient = useQueryClient()
-  const {
-    metrics,
-    events,
-    isMonitoring,
-    performanceScore,
-    trackApiCall,
-    exportMetrics
-  } = usePerformanceMonitor()
-
-  // Get cache statistics
-  const cacheStats = advancedCache.getStats()
-  
-  // Get query client statistics
-  const getQueryStats = () => {
-    const cache = queryClient.getQueryCache()
-    const queries = cache.getAll()
-    
-    return {
-      totalQueries: queries.length,
-      activeQueries: queries.filter(q => q.getObserversCount() > 0).length,
-      staleQueries: queries.filter(q => q.isStale()).length,
-      errorQueries: queries.filter(q => q.state.error !== null).length,
-    }
-  }
-
-  const queryStats = getQueryStats()
-
-  // Auto refresh
+  // Simulate metrics changing over time
   useEffect(() => {
-    if (!autoRefresh) return
-
     const interval = setInterval(() => {
-      // Trigger re-render to update stats
-      setIsVisible(prev => !prev)
-      setTimeout(() => setIsVisible(prev => !prev), 50)
-    }, refreshInterval)
+      setMetrics((prev) => ({
+        responseTime: Math.max(80, Math.min(200, prev.responseTime + (Math.random() - 0.5) * 20)),
+        cacheHitRate: Math.max(50, Math.min(95, prev.cacheHitRate + (Math.random() - 0.5) * 5)),
+        errorRate: Math.max(0, Math.min(5, prev.errorRate + (Math.random() - 0.5) * 0.3)),
+        apiCalls: prev.apiCalls + Math.floor(Math.random() * 3),
+        dbQueries: prev.dbQueries + Math.floor(Math.random() * 2),
+        memoryUsage: Math.max(30, Math.min(90, prev.memoryUsage + (Math.random() - 0.5) * 5)),
+        cpuUsage: Math.max(20, Math.min(80, prev.cpuUsage + (Math.random() - 0.5) * 8)),
+        networkLatency: Math.max(20, Math.min(100, prev.networkLatency + (Math.random() - 0.5) * 10)),
+      }))
+    }, 3000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval])
+  }, [])
 
-  // Calculate performance grade
-  const getPerformanceGrade = (score: number) => {
-    if (score >= 90) return { grade: 'A', color: 'text-green-600', bg: 'bg-green-100' }
-    if (score >= 80) return { grade: 'B', color: 'text-blue-600', bg: 'bg-blue-100' }
-    if (score >= 70) return { grade: 'C', color: 'text-yellow-600', bg: 'bg-yellow-100' }
-    if (score >= 60) return { grade: 'D', color: 'text-orange-600', bg: 'bg-orange-100' }
-    return { grade: 'F', color: 'text-red-600', bg: 'bg-red-100' }
-  }
-
-  const performanceGrade = getPerformanceGrade(performanceScore)
-
-  // Export performance data
-  const handleExport = () => {
-    const data = {
-      timestamp: new Date().toISOString(),
-      performance: exportMetrics(),
-      cache: cacheStats,
-      queries: queryStats,
-      system: {
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        memory: metrics.memoryUsage
-      }
-    }
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `performance-report-${Date.now()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Format bytes
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  // Format duration
-  const formatDuration = (ms: number) => {
-    if (ms < 1000) return `${Math.round(ms)}ms`
-    return `${(ms / 1000).toFixed(1)}s`
+  const getStatusColor = (value: number, thresholds: [number, number, number]) => {
+    const [good, warning, critical] = thresholds
+    if (value <= good) return "bg-green-500"
+    if (value <= warning) return "bg-yellow-500"
+    return "bg-red-500"
   }
 
   return (
-    <div className={cn("w-full space-y-6", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Performance Dashboard
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Real-time monitoring and analytics
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-2", autoRefresh && "animate-spin")} />
-            {autoRefresh ? 'Auto' : 'Manual'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </div>
-
-      {/* Performance Score */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Overall Performance Score
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <div className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold",
-              performanceGrade.bg,
-              performanceGrade.color
-            )}>
-              {performanceGrade.grade}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Score: {performanceScore}/100</span>
-                <Badge variant={performanceScore >= 80 ? "default" : "destructive"}>
-                  {isMonitoring ? 'Monitoring' : 'Stopped'}
-                </Badge>
-              </div>
-              <Progress value={performanceScore} className="h-2" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Page Load Time */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">Page Load</span>
-            </div>
-            <div className="text-2xl font-bold">
-              {formatDuration(metrics.pageLoadTime || 0)}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Target: &lt; 2s
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Cache Hit Rate */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Database className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">Cache Hit Rate</span>
-            </div>
-            <div className="text-2xl font-bold">
-              {Math.round(cacheStats.hitRate * 100)}%
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {cacheStats.hits} hits / {cacheStats.hits + cacheStats.misses} total
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Active Queries */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Server className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium">Active Queries</span>
-            </div>
-            <div className="text-2xl font-bold">
-              {queryStats.activeQueries}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {queryStats.totalQueries} total queries
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Network Status */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Wifi className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-medium">Network</span>
-            </div>
-            <div className="text-2xl font-bold">
-              {metrics.connectionType || 'Unknown'}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {metrics.isOnline ? 'Online' : 'Offline'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Metrics */}
-      <Tabs defaultValue="vitals" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="vitals">Web Vitals</TabsTrigger>
-          <TabsTrigger value="cache">Cache</TabsTrigger>
-          <TabsTrigger value="queries">Queries</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
+    <div className="w-full">
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 mb-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="api">API Performance</TabsTrigger>
+          <TabsTrigger value="database">Database</TabsTrigger>
+          <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
 
-        {/* Web Vitals */}
-        <TabsContent value="vitals" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">First Contentful Paint</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {formatDuration(metrics.firstContentfulPaint || 0)}
-                </div>
-                <Progress 
-                  value={Math.min(100, ((metrics.firstContentfulPaint || 0) / 1800) * 100)} 
-                  className="mt-2 h-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">Target: &lt; 1.8s</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Largest Contentful Paint</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {formatDuration(metrics.largestContentfulPaint || 0)}
-                </div>
-                <Progress 
-                  value={Math.min(100, ((metrics.largestContentfulPaint || 0) / 2500) * 100)} 
-                  className="mt-2 h-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">Target: &lt; 2.5s</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Cumulative Layout Shift</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">
-                  {(metrics.cumulativeLayoutShift || 0).toFixed(3)}
-                </div>
-                <Progress 
-                  value={Math.min(100, ((metrics.cumulativeLayoutShift || 0) / 0.25) * 100)} 
-                  className="mt-2 h-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">Target: &lt; 0.1</p>
-              </CardContent>
-            </Card>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title="Response Time"
+              value={`${Math.round(metrics.responseTime)} ms`}
+              icon={<Clock className="h-5 w-5" />}
+              status={getStatusColor(metrics.responseTime, [100, 150, 200])}
+              change="-5%"
+            />
+            <MetricCard
+              title="Cache Hit Rate"
+              value={`${Math.round(metrics.cacheHitRate)}%`}
+              icon={<Database className="h-5 w-5" />}
+              status={getStatusColor(100 - metrics.cacheHitRate, [20, 40, 60])}
+              change="+2%"
+            />
+            <MetricCard
+              title="Error Rate"
+              value={`${metrics.errorRate.toFixed(2)}%`}
+              icon={<AlertTriangle className="h-5 w-5" />}
+              status={getStatusColor(metrics.errorRate, [1, 2, 5])}
+              change="-0.1%"
+            />
+            <MetricCard
+              title="API Calls"
+              value={metrics.apiCalls.toString()}
+              icon={<Activity className="h-5 w-5" />}
+              status="bg-blue-500"
+              change="+24"
+            />
           </div>
 
-          {/* Memory Usage */}
-          {metrics.memoryUsage && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Memory Usage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-sm text-gray-500">Used</div>
-                    <div className="text-lg font-semibold">
-                      {formatBytes(metrics.memoryUsage.usedJSHeapSize)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Total</div>
-                    <div className="text-lg font-semibold">
-                      {formatBytes(metrics.memoryUsage.totalJSHeapSize)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Limit</div>
-                    <div className="text-lg font-semibold">
-                      {formatBytes(metrics.memoryUsage.jsHeapSizeLimit)}
-                    </div>
-                  </div>
-                </div>
-                <Progress 
-                  value={(metrics.memoryUsage.usedJSHeapSize / metrics.memoryUsage.jsHeapSizeLimit) * 100}
-                  className="mt-4 h-2"
-                />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* Cache Details */}
-        <TabsContent value="cache" className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">{cacheStats.hits}</div>
-                <div className="text-sm text-gray-500">Cache Hits</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">{cacheStats.misses}</div>
-                <div className="text-sm text-gray-500">Cache Misses</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{cacheStats.size}</div>
-                <div className="text-sm text-gray-500">Cache Size</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">{cacheStats.evictions}</div>
-                <div className="text-sm text-gray-500">Evictions</div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Query Details */}
-        <TabsContent value="queries" className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{queryStats.totalQueries}</div>
-                <div className="text-sm text-gray-500">Total Queries</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">{queryStats.activeQueries}</div>
-                <div className="text-sm text-gray-500">Active</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-600">{queryStats.staleQueries}</div>
-                <div className="text-sm text-gray-500">Stale</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">{queryStats.errorQueries}</div>
-                <div className="text-sm text-gray-500">Errors</div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Recent Events */}
-        <TabsContent value="events" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Recent Performance Events</CardTitle>
+              <CardTitle className="text-lg font-medium">Performance Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {events.slice(0, 10).map((event, index) => (
-                  <motion.div
-                    key={`${event.timestamp}-${index}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {event.type}
-                      </Badge>
-                      <span className="text-sm">{event.name}</span>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {event.duration ? formatDuration(event.duration) : '—'}
-                    </div>
-                  </motion.div>
-                ))}
-                {events.length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
-                    No performance events recorded
-                  </div>
-                )}
+              <div className="h-[200px] flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                <p className="text-gray-500 dark:text-gray-400">Performance chart would render here</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="api" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-medium">API Endpoints Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <EndpointRow endpoint="/api/events" responseTime={85} calls={124} errorRate={0.2} />
+                <EndpointRow endpoint="/api/events/featured" responseTime={112} calls={56} errorRate={0} />
+                <EndpointRow endpoint="/api/events/search" responseTime={178} calls={42} errorRate={1.2} />
+                <EndpointRow endpoint="/api/mapbox" responseTime={95} calls={23} errorRate={0.5} />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <MetricCard
+              title="DB Queries"
+              value={metrics.dbQueries.toString()}
+              icon={<Database className="h-5 w-5" />}
+              status="bg-blue-500"
+              change="+18"
+            />
+            <MetricCard
+              title="Query Time (avg)"
+              value="45 ms"
+              icon={<Clock className="h-5 w-5" />}
+              status="bg-green-500"
+              change="-3 ms"
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-medium">Database Tables</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <TableRow name="events" size="2.4 GB" records="12,458" />
+                <TableRow name="users" size="450 MB" records="8,932" />
+                <TableRow name="favorites" size="120 MB" records="24,567" />
+                <TableRow name="categories" size="5 MB" records="42" />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="system" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard
+              title="CPU Usage"
+              value={`${Math.round(metrics.cpuUsage)}%`}
+              icon={<Cpu className="h-5 w-5" />}
+              status={getStatusColor(metrics.cpuUsage, [50, 70, 90])}
+              change="+5%"
+            />
+            <MetricCard
+              title="Memory Usage"
+              value={`${Math.round(metrics.memoryUsage)}%`}
+              icon={<HardDrive className="h-5 w-5" />}
+              status={getStatusColor(metrics.memoryUsage, [60, 80, 90])}
+              change="+2%"
+            />
+            <MetricCard
+              title="Network Latency"
+              value={`${Math.round(metrics.networkLatency)} ms`}
+              icon={<Network className="h-5 w-5" />}
+              status={getStatusColor(metrics.networkLatency, [40, 60, 80])}
+              change="-3 ms"
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-medium">System Logs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-900 text-gray-300 p-4 rounded-lg font-mono text-sm h-[200px] overflow-y-auto">
+                <p className="text-green-400">[INFO] System started successfully</p>
+                <p className="text-blue-400">[DEBUG] Cache initialized with 256MB capacity</p>
+                <p className="text-yellow-400">[WARN] High memory usage detected (78%)</p>
+                <p className="text-blue-400">[DEBUG] API request to /events/featured completed in 112ms</p>
+                <p className="text-red-400">[ERROR] Failed to connect to external service: timeout</p>
+                <p className="text-blue-400">[DEBUG] Reconnecting to external service...</p>
+                <p className="text-green-400">[INFO] Successfully reconnected to external service</p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function MetricCard({
+  title,
+  value,
+  icon,
+  status,
+  change,
+}: {
+  title: string
+  value: string
+  icon: React.ReactNode
+  status: string
+  change: string
+}) {
+  const isPositive = change.startsWith("+")
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className={`p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300`}>
+              {icon}
+            </div>
+            <span className="font-medium text-sm">{title}</span>
+          </div>
+          <div className={`w-2 h-2 rounded-full ${status}`} />
+        </div>
+        <div className="mt-4">
+          <div className="text-2xl font-bold">{value}</div>
+          <div className={`text-xs ${isPositive ? "text-green-500" : "text-red-500"}`}>{change} from last period</div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EndpointRow({
+  endpoint,
+  responseTime,
+  calls,
+  errorRate,
+}: {
+  endpoint: string
+  responseTime: number
+  calls: number
+  errorRate: number
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-800 rounded-lg">
+      <div className="font-mono text-sm">{endpoint}</div>
+      <div className="flex items-center space-x-6">
+        <div className="flex flex-col items-end">
+          <div className="text-sm font-medium">{responseTime} ms</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Response Time</div>
+        </div>
+        <div className="flex flex-col items-end">
+          <div className="text-sm font-medium">{calls}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Calls</div>
+        </div>
+        <div className="flex flex-col items-end">
+          <div className={`text-sm font-medium ${errorRate > 1 ? "text-red-500" : "text-green-500"}`}>{errorRate}%</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Error Rate</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TableRow({
+  name,
+  size,
+  records,
+}: {
+  name: string
+  size: string
+  records: string
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-800 rounded-lg">
+      <div className="flex items-center space-x-2">
+        <Database className="h-4 w-4 text-blue-500" />
+        <span className="font-medium">{name}</span>
+      </div>
+      <div className="flex items-center space-x-6">
+        <div>
+          <Badge variant="outline">{size}</Badge>
+        </div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">{records} records</div>
+      </div>
     </div>
   )
 }
