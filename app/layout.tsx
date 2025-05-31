@@ -3,16 +3,30 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { QueryProvider } from "@/providers/query-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "DateAI - Discover Amazing Events",
-  description: "Find the perfect events for your next date or social gathering",
-  keywords: ["events", "dating", "social", "activities", "concerts", "festivals"],
+  description: "Find the perfect events for your next date or social gathering with AI-powered recommendations",
+  keywords: ["events", "dating", "social", "activities", "concerts", "festivals", "AI", "recommendations"],
   authors: [{ name: "DateAI Team" }],
   viewport: "width=device-width, initial-scale=1",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  robots: "index, follow",
+  openGraph: {
+    title: "DateAI - Discover Amazing Events",
+    description: "Find the perfect events for your next date or social gathering with AI-powered recommendations",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DateAI - Discover Amazing Events",
+    description: "Find the perfect events for your next date or social gathering with AI-powered recommendations",
+  }
 }
 
 export default function RootLayout({
@@ -22,10 +36,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Preload critical resources */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+
+        {/* Performance optimizations */}
+        <meta name="theme-color" content="#6366f1" />
+        <meta name="color-scheme" content="dark light" />
+
+        {/* PWA manifest */}
+        <link rel="manifest" href="/manifest.json" />
+
+        {/* Favicon */}
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <div className="min-h-screen bg-background">{children}</div>
-        </ThemeProvider>
+        <QueryProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <div className="min-h-screen bg-background">
+              {children}
+            </div>
+            <Toaster />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   )

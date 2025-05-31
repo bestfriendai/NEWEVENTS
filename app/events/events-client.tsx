@@ -145,7 +145,7 @@ export function EventsClient() {
   const [currentLocationName, setCurrentLocationName] = useState<string>("United States")
   const [mapLoadError, setMapLoadError] = useState<string | null>(null)
 
-  // Fetch real events from API
+  // Add progressive loading and better error handling
   const fetchEventsForLocation = async (
     lat: number,
     lng: number,
@@ -153,48 +153,66 @@ export function EventsClient() {
     retryCount = 0,
   ): Promise<SimpleEvent[]> => {
     try {
-      const response = await fetch(`/api/events/enhanced?lat=${lat}&lng=${lng}&radius=25&limit=100`)
+      // Show loading state immediately
+      setLoadingState("loading")
+      
+      // Use AbortController for timeout handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+      
+      const response = await fetch(
+        `/api/events/enhanced?lat=${lat}&lng=${lng}&radius=25&limit=200`, // Increased from 100 to 200
+        { signal: controller.signal }
+      )
+      clearTimeout(timeoutId)
+      
       if (!response.ok) {
         if (response.status === 429 && retryCount < 3) {
           // Implement exponential backoff
           const delay = 2 ** retryCount * 1000 // 1s, 2s, 4s
           logger.warn(`Rate limited. Retrying in ${delay}ms`, { component: "EventsClient", retryCount })
+          setLoadingState("retrying")
           await new Promise((resolve) => setTimeout(resolve, delay))
-          return fetchEventsForLocation(lat, lng, locationName, retryCount + 1) // Recursive call
+          return fetchEventsForLocation(lat, lng, locationName, retryCount + 1)
         }
         throw new Error(`Failed to fetch events: ${response.status} ${response.statusText}`)
       }
-
+      
       const data = await response.json()
+      
+      // Show partial results immediately if we have them
+      if (data.data?.events?.length > 0) {
+        setEvents(data.data.events.slice(0, 20)) // Increased from 10 to 20 for better initial load
+        setLoadingState("partial")
 
-      if (!data.success) {
-        throw new Error(data.error || "Failed to fetch events")
+        // Then process the rest in chunks for better performance
+        setTimeout(() => {
+          if (data.data.events.length > 20) {
+            setEvents(data.data.events.slice(0, 50)) // Load next 30 events
+            setTimeout(() => {
+              setEvents(data.data.events) // Load remaining events
+              setLoadingState("complete")
+            }, 200)
+          } else {
+            setEvents(data.data.events)
+            setLoadingState("complete")
+          }
+        }, 150)
+      } else {
+        setEvents(data.data?.events || [])
+        setLoadingState("complete")
       }
-
-      // Transform API events to SimpleEvent format
-      return data.data.events.map((event: any) => ({
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        date: event.date,
-        time: event.time,
-        location: event.location,
-        address: event.address,
-        category: event.category,
-        price: event.price,
-        coordinates: event.coordinates,
-        attendees: event.attendees,
-        isFavorite: event.isFavorite,
-        ticketLinks: [],
-        organizer: event.organizer,
-      }))
+      
+      return data.data?.events || []
     } catch (error) {
-      logger.error("Failed to fetch events", {
-        component: "EventsClient",
-        action: "fetchEventsForLocation",
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
-      throw error
+      // Handle errors gracefully
+      setLoadingState("error")
+      logger.error("Error fetching events", { error, locationName })
+      
+      // Show error message to user
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load events")
+      
+      return []
     }
   }
 

@@ -56,7 +56,7 @@ export function useEventsPage({ userLocation, hasLocation }: UseEventsPageProps)
           radius: filters.distance || 25,
           categories: apiCategory,
           page,
-          size: 12,
+          size: 24, // Increased from 12 to 24 for more events per page
           sort: sortBy,
         })
 

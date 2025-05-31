@@ -374,22 +374,22 @@ export async function searchRapidApiEvents(params: EventSearchParams): Promise<E
     const searchStrategies = []
     const baseSize = Math.min(params.size || 50, 100)
 
-    // Strategy 1: User's specific search
+    // Strategy 1: User's specific search (increased allocation)
     if (params.keyword || params.location) {
       searchStrategies.push({
         query: params.keyword || "events entertainment",
         location: params.location,
-        size: Math.floor(baseSize / 3),
+        size: Math.floor(baseSize / 2), // Increased from /3 to /2
       })
     }
 
-    // Strategy 2: Popular event categories
-    const popularCategories = ["concert", "music festival", "comedy show", "sports", "theater"]
-    for (let i = 0; i < Math.min(2, popularCategories.length); i++) {
+    // Strategy 2: Popular event categories (more categories, better allocation)
+    const popularCategories = ["concert", "music festival", "comedy show", "sports", "theater", "art", "food", "business", "conference"]
+    for (let i = 0; i < Math.min(4, popularCategories.length); i++) { // Increased from 2 to 4 categories
       searchStrategies.push({
         query: popularCategories[i],
         location: params.location,
-        size: Math.floor(baseSize / 4),
+        size: Math.floor(baseSize / 6), // Adjusted for more categories
       })
     }
 
@@ -401,6 +401,13 @@ export async function searchRapidApiEvents(params: EventSearchParams): Promise<E
         size: Math.floor(baseSize / 3),
       })
     }
+
+    // Strategy 4: Trending and popular events (NEW)
+    searchStrategies.push({
+      query: "trending popular events",
+      location: params.location,
+      size: Math.floor(baseSize / 4),
+    })
 
     const allEvents: EventDetailProps[] = []
 

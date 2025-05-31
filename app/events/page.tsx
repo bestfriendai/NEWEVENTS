@@ -32,6 +32,11 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Activity,
+  Bell,
+  Settings,
+  List,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,6 +57,18 @@ import { EventDetailModal } from "@/components/event-detail-modal"
 import { LocationSetupScreen } from "@/components/events/LocationSetupScreen"
 import { useDebounce } from "@/hooks/use-debounce"
 import { cn } from "@/lib/utils"
+
+// New advanced components
+import { SmartSearchInput } from "@/components/search/SmartSearchInput"
+import { InfiniteEventsGrid } from "@/components/events/InfiniteEventsGrid"
+import { RealtimeNotifications } from "@/components/notifications/RealtimeNotifications"
+import { PerformanceDashboard } from "@/components/admin/PerformanceDashboard"
+
+// New hooks
+import { useOptimizedEventsPage } from "@/hooks/use-events-query"
+import { useRealtimeEvents } from "@/hooks/use-realtime-events"
+import { usePerformanceMonitor } from "@/hooks/use-performance-monitor"
+import { useSmartSearch } from "@/hooks/use-smart-search"
 
 // Dynamic import for Mapbox component to avoid SSR issues
 const EventsMap = dynamic(() => import("@/components/events/EventsMap"), {
@@ -708,19 +725,27 @@ function AdvancedFiltersPanel({
 }
 
 function EventsPageContent() {
+  // Core state
   const [hasLocation, setHasLocation] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
-  const [viewMode, setViewMode] = useState<"grid" | "map">("grid")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"grid" | "map" | "infinite">("infinite")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("date")
   const [showFilters, setShowFilters] = useState(false)
+  const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
   const [favoriteEvents, setFavoriteEvents] = useState<Set<number>>(new Set())
-  const [filters, setFilters] = useState<any>({})
+  const [filters, setFilters] = useState({
+    priceRange: [0, 500],
+    distance: 25,
+    dateRange: "all",
+    timeOfDay: "all",
+    eventType: "all",
+  })
   const [mapError, setMapError] = useState<string | null>(null)
 
-  // State for API data
+  // Legacy state for compatibility
+  const [searchQuery, setSearchQuery] = useState("")
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [featuredEvents, setFeaturedEvents] = useState<EventDetailProps[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -731,6 +756,19 @@ function EventsPageContent() {
   const [totalCount, setTotalCount] = useState(0)
 
   const debouncedSearch = useDebounce(searchQuery, 300)
+
+  // Advanced hooks for future use
+  const performanceMonitor = usePerformanceMonitor()
+
+  // Search parameters for future optimized events query
+  const searchParams = useMemo(() => ({
+    lat: userLocation?.lat,
+    lng: userLocation?.lng,
+    radius: filters.distance,
+    category: selectedCategory !== "all" ? selectedCategory : undefined,
+    query: searchQuery || undefined,
+    startDate: filters.dateRange !== "all" ? new Date().toISOString() : undefined,
+  }), [userLocation, filters.distance, selectedCategory, searchQuery, filters.dateRange])
 
   // Check if user already has a location set
   useEffect(() => {
@@ -858,19 +896,33 @@ function EventsPageContent() {
   const filteredEvents = useMemo(() => {
     let filtered = events
 
-    // Apply filters
-    if (filters.categories?.length > 0) {
-      filtered = filtered.filter((event) => filters.categories.includes(event.category?.toLowerCase()))
+    // Apply category filter
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((event) => event.category?.toLowerCase() === selectedCategory.toLowerCase())
     }
 
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter((event) =>
+        event.title?.toLowerCase().includes(query) ||
+        event.description?.toLowerCase().includes(query) ||
+        event.location?.toLowerCase().includes(query) ||
+        event.category?.toLowerCase().includes(query)
+      )
+    }
 
-
-    if (filters.showFreeOnly) {
-      filtered = filtered.filter((event) => event.price?.toLowerCase().includes("free") || event.price === "$0")
+    // Apply price filter
+    if (filters.priceRange) {
+      filtered = filtered.filter((event) => {
+        const price = event.price?.replace(/[^0-9.]/g, '') || '0'
+        const numPrice = parseFloat(price)
+        return numPrice >= filters.priceRange[0] && numPrice <= filters.priceRange[1]
+      })
     }
 
     return filtered
-  }, [events, filters])
+  }, [events, selectedCategory, searchQuery, filters])
 
   const handleMapError = useCallback((error: string) => {
     setMapError(error)
@@ -905,23 +957,27 @@ function EventsPageContent() {
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Enhanced Search */}
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input
+            {/* Smart Search */}
+            <div className="w-80">
+              <SmartSearchInput
+                onSearch={(query) => setSearchQuery(query)}
                 placeholder="Search events, venues, artists..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 w-80 bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-purple-500/20"
+                className="bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-purple-500/20"
+                showInsights={true}
+                autoFocus={false}
               />
             </div>
 
             {/* View Toggle */}
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "grid" | "map")}>
+            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "grid" | "map" | "infinite")}>
               <TabsList className="bg-gray-800/50 border border-gray-700">
                 <TabsTrigger value="grid" className="data-[state=active]:bg-purple-600">
                   <Grid3X3 className="h-4 w-4 mr-2" />
                   Grid
+                </TabsTrigger>
+                <TabsTrigger value="infinite" className="data-[state=active]:bg-purple-600">
+                  <List className="h-4 w-4 mr-2" />
+                  Infinite
                 </TabsTrigger>
                 <TabsTrigger value="map" className="data-[state=active]:bg-purple-600">
                   <Map className="h-4 w-4 mr-2" />
@@ -954,6 +1010,18 @@ function EventsPageContent() {
               <Navigation className="h-4 w-4 mr-2" />
               {userLocation?.name}
             </Button>
+
+            {/* Performance Dashboard Toggle (Development Only) */}
+            {process.env.NODE_ENV === 'development' && (
+              <Button
+                variant="outline"
+                onClick={() => setShowPerformanceDashboard(true)}
+                className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
+                title="Performance Dashboard"
+              >
+                <Activity className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1001,7 +1069,19 @@ function EventsPageContent() {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === "grid" ? (
+        {viewMode === "infinite" ? (
+          <div className="h-full overflow-y-auto">
+            <div className="p-6">
+              <InfiniteEventsGrid
+                searchParams={searchParams}
+                onEventSelect={handleEventSelect}
+                onToggleFavorite={toggleFavorite}
+                favoriteEvents={favoriteEvents}
+                className="w-full"
+              />
+            </div>
+          </div>
+        ) : viewMode === "grid" ? (
           <div className="h-full overflow-y-auto">
             <div className="p-6">
               {/* Featured Events Section */}
@@ -1034,7 +1114,7 @@ function EventsPageContent() {
               {/* Events Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {isLoading
-                  ? Array.from({ length: 8 }).map((_, i) => <EventCardSkeleton key={i} />)
+                  ? Array.from({ length: 16 }).map((_, i) => <EventCardSkeleton key={i} />) // Increased from 8 to 16 for better loading UX
                   : filteredEvents.map((event, index) => (
                       <EventCard
                         key={event.id}
@@ -1092,7 +1172,13 @@ function EventsPageContent() {
                       onClick={() => {
                         setSearchQuery("")
                         setSelectedCategory("all")
-                        setFilters({})
+                        setFilters({
+                          priceRange: [0, 500],
+                          distance: 25,
+                          dateRange: "all",
+                          timeOfDay: "all",
+                          eventType: "all",
+                        })
                       }}
                       className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                     >
@@ -1207,6 +1293,36 @@ function EventsPageContent() {
         onClose={() => setSelectedEvent(null)}
         onFavorite={(id) => toggleFavorite(id)}
       />
+
+      {/* Real-time Notifications */}
+      <RealtimeNotifications
+        userLocation={userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : undefined}
+        radius={filters.distance}
+        maxNotifications={5}
+        autoHide={true}
+        autoHideDelay={8000}
+      />
+
+      {/* Performance Dashboard (Development Only) */}
+      {process.env.NODE_ENV === 'development' && showPerformanceDashboard && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-auto">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Performance Dashboard</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPerformanceDashboard(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <PerformanceDashboard />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

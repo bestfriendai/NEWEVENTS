@@ -106,6 +106,18 @@ class ImageService {
         "lh5.googleusercontent.com",
         "lh6.googleusercontent.com",
         "i.imgur.com",
+        // Additional image services for better coverage
+        "picsum.photos",
+        "via.placeholder.com",
+        "placehold.it",
+        "dummyimage.com",
+        "source.unsplash.com",
+        "images.pexels.com",
+        "cdn.pixabay.com",
+        "res.cloudinary.com",
+        "d2v9y0dukr6mq2.cloudfront.net", // AWS CloudFront
+        "images-na.ssl-images-amazon.com",
+        "m.media-amazon.com",
         "imgur.com",
         "cdn.pixabay.com",
         "images.pexels.com",
@@ -169,8 +181,41 @@ class ImageService {
       }
     }
 
-    // Default fallback
-    return "/community-event.png"
+    // Enhanced fallback with dynamic placeholder generation
+    return this.generateDynamicPlaceholder(category)
+  }
+
+  /**
+   * Generate dynamic placeholder image URL
+   */
+  private generateDynamicPlaceholder(category: string): string {
+    const colors = {
+      music: "6366f1", // Purple
+      concert: "8b5cf6", // Violet
+      sports: "10b981", // Green
+      theater: "f59e0b", // Amber
+      comedy: "ef4444", // Red
+      art: "ec4899", // Pink
+      food: "f97316", // Orange
+      business: "3b82f6", // Blue
+      conference: "6b7280", // Gray
+      default: "8b5cf6", // Default purple
+    }
+
+    const categoryLower = category.toLowerCase()
+    let color = colors.default
+
+    // Find matching color
+    for (const [key, value] of Object.entries(colors)) {
+      if (categoryLower.includes(key)) {
+        color = value
+        break
+      }
+    }
+
+    // Generate placeholder with category text
+    const encodedCategory = encodeURIComponent(category.toUpperCase())
+    return `https://via.placeholder.com/400x300/${color}/ffffff?text=${encodedCategory}`
   }
 }
 

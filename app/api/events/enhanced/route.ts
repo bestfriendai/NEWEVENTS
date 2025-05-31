@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category") || undefined
     const startDate = searchParams.get("startDate") || undefined
     const endDate = searchParams.get("endDate") || undefined
-    const limit = Math.min(Number.parseInt(searchParams.get("limit") || "100"), 200) // Increased default and max
+    const limit = Math.min(Number.parseInt(searchParams.get("limit") || "200"), 500) // Increased default to 200 and max to 500
     const offset = Number.parseInt(searchParams.get("offset") || "0")
 
     logger.info("Enhanced Events API request", {

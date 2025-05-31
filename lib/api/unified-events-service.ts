@@ -85,9 +85,9 @@ class UnifiedEventsService {
       }
 
       // If we don't have enough cached events, fetch from APIs in parallel
-      const remainingLimit = (params.limit || 50) - allEvents.length
+      const remainingLimit = (params.limit || 100) - allEvents.length // Increased default from 50 to 100
       if (remainingLimit > 0) {
-        const apiLimit = Math.max(remainingLimit, 50) // Increased minimum to get more events
+        const apiLimit = Math.max(remainingLimit, 100) // Increased minimum from 50 to 100
 
         // Run API calls in parallel for better performance
         const apiPromises: Promise<{ source: string; events: EventDetailProps[] }>[] = []

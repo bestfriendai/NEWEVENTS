@@ -218,8 +218,8 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
         queryParams.append("classificationName", params.classificationName.trim())
       }
 
-      // Pagination with validation
-      queryParams.append("size", Math.min(params.size || 100, 200).toString()) // Increase default from 50 to 100
+      // Pagination with validation - maximized for better event coverage
+      queryParams.append("size", Math.min(params.size || 200, 200).toString()) // Increased default from 100 to 200 (max allowed)
       queryParams.append("page", Math.max(params.page || 0, 0).toString())
 
       // Sort and additional options
