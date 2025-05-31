@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { useDebounce } from "@/hooks/use-debounce"
 import { fetchEvents, getFeaturedEvents } from "@/app/actions/event-actions"
+import { advancedCache, cacheKeys, cacheTags } from "@/lib/cache/advanced-cache"
+import { logger } from "@/lib/utils/logger"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 interface UseEventsPageProps {
@@ -50,6 +52,29 @@ export function useEventsPage({ userLocation, hasLocation }: UseEventsPageProps)
       try {
         const apiCategory = selectedCategory !== "all" ? [selectedCategory] : undefined
 
+        // Create cache key for this search
+        const cacheKey = cacheKeys.events.list({
+          keyword: debouncedSearch,
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          radius: filters.distance || 25,
+          categories: apiCategory,
+          page,
+          size: 24,
+          sort: sortBy,
+        })
+
+        // Try to get from cache first
+        const cachedResult = advancedCache.get(cacheKey)
+        if (cachedResult) {
+          logger.info('Events loaded from cache', { cacheKey })
+          setEvents(cachedResult.events)
+          setTotalCount(cachedResult.totalCount)
+          setTotalPages(cachedResult.totalPages)
+          setIsLoading(false)
+          return
+        }
+
         const result = await fetchEvents({
           keyword: debouncedSearch || undefined,
           coordinates: userLocation,
@@ -63,12 +88,31 @@ export function useEventsPage({ userLocation, hasLocation }: UseEventsPageProps)
         if (result.error) {
           setError(result.error.message)
         } else {
+          // Cache the successful result
+          advancedCache.set(
+            cacheKey,
+            {
+              events: result.events,
+              totalCount: result.totalCount,
+              totalPages: result.totalPages,
+            },
+            5 * 60 * 1000, // 5 minutes cache
+            [cacheTags.EVENTS, cacheTags.LOCATION_BASED]
+          )
+
           setEvents(result.events)
           setTotalCount(result.totalCount)
           setTotalPages(result.totalPages)
+
+          logger.info('Events loaded from API and cached', {
+            cacheKey,
+            eventsCount: result.events.length
+          })
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load events")
+        const errorMessage = err instanceof Error ? err.message : "Failed to load events"
+        setError(errorMessage)
+        logger.error('Failed to load events', { error: errorMessage })
       } finally {
         setIsLoading(false)
       }
