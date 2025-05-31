@@ -90,18 +90,31 @@ function formatTicketmasterDate(dateString: string): string {
     const date = new Date(dateString)
     if (isNaN(date.getTime())) {
       // If invalid date, return current date
-      return new Date().toISOString()
+      return formatDateForTicketmaster(new Date())
     }
-    // Ensure the date is in the correct format: YYYY-MM-DDTHH:mm:ssZ
-    return date.toISOString()
+    // Ensure the date is in the correct format: YYYY-MM-DDTHH:mm:ssZ (without milliseconds)
+    return formatDateForTicketmaster(date)
   } catch (error) {
     logger.warn("Failed to format Ticketmaster date", {
       component: "ticketmaster-api",
       action: "date_format_error",
       metadata: { originalDate: dateString, error: formatErrorMessage(error) },
     })
-    return new Date().toISOString()
+    return formatDateForTicketmaster(new Date())
   }
+}
+
+// Helper function to format date exactly as Ticketmaster expects
+function formatDateForTicketmaster(date: Date): string {
+  // Format: YYYY-MM-DDTHH:mm:ssZ (no milliseconds)
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  const hours = String(date.getUTCHours()).padStart(2, '0')
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`
 }
 
 export async function searchTicketmasterEvents(params: TicketmasterSearchParams): Promise<TicketmasterSearchResult> {
@@ -188,7 +201,7 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       } else {
         // Default to current time if no start date provided
         const now = new Date()
-        queryParams.append("startDateTime", now.toISOString())
+        queryParams.append("startDateTime", formatDateForTicketmaster(now))
       }
 
       if (params.endDateTime) {
@@ -409,11 +422,19 @@ function getBestImage(images: TicketmasterImage[]): string {
 function isValidImageUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url)
+    // Allow HTTPS URLs from trusted domains and common image hosting services
     return (
       parsedUrl.protocol === "https:" &&
       (parsedUrl.hostname.includes("ticketmaster") ||
         parsedUrl.hostname.includes("livenation") ||
-        parsedUrl.hostname.includes("tmol-prd"))
+        parsedUrl.hostname.includes("tmol-prd") ||
+        parsedUrl.hostname.includes("cloudinary") ||
+        parsedUrl.hostname.includes("amazonaws") ||
+        parsedUrl.hostname.includes("imgix") ||
+        parsedUrl.hostname.includes("fastly") ||
+        parsedUrl.hostname.includes("akamai") ||
+        // Allow common image file extensions
+        /\.(jpg|jpeg|png|gif|webp)$/i.test(parsedUrl.pathname))
     )
   } catch {
     return false
