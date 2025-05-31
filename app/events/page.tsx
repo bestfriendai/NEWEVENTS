@@ -584,7 +584,7 @@ function EventsPageContent() {
         radius: filters.distance || 25,
         categories: selectedCategory !== "all" ? [selectedCategory] : undefined,
         page,
-        size: 12,
+        size: 24,
         sort: sortBy,
       })
 
@@ -885,6 +885,37 @@ function EventsPageContent() {
                       />
                     ))}
               </div>
+
+              {/* Pagination Controls */}
+              {!isLoading && !error && totalPages > 1 && (
+                <div className="flex justify-center items-center space-x-4 mt-8">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPage(Math.max(0, page - 1))}
+                    disabled={page === 0}
+                    className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-400">
+                      Page {page + 1} of {totalPages}
+                    </span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              )}
 
               {/* Empty State */}
               {!isLoading && !error && filteredEvents.length === 0 && (

@@ -5,6 +5,8 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { QueryProvider } from "@/providers/query-provider"
 import { Toaster } from "@/components/ui/toaster"
+// Import the AuthProvider
+import { AuthProvider } from "@/lib/auth/auth-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
   keywords: ["events", "dating", "social", "activities", "concerts", "festivals", "AI", "recommendations"],
   authors: [{ name: "DateAI Team" }],
   viewport: "width=device-width, initial-scale=1",
-  generator: 'v0.dev',
+  generator: "v0.dev",
   robots: "index, follow",
   openGraph: {
     title: "DateAI - Discover Amazing Events",
@@ -26,9 +28,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "DateAI - Discover Amazing Events",
     description: "Find the perfect events for your next date or social gathering with AI-powered recommendations",
-  }
+  },
 }
 
+// Wrap the QueryProvider with the AuthProvider
 export default function RootLayout({
   children,
 }: {
@@ -53,14 +56,14 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={inter.className}>
-        <QueryProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <div className="min-h-screen bg-background">
-              {children}
-            </div>
-            <Toaster />
-          </ThemeProvider>
-        </QueryProvider>
+        <AuthProvider>
+          <QueryProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+              <div className="min-h-screen bg-background">{children}</div>
+              <Toaster />
+            </ThemeProvider>
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
   )

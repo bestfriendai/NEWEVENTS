@@ -384,8 +384,19 @@ export async function searchRapidApiEvents(params: EventSearchParams): Promise<E
     }
 
     // Strategy 2: Popular event categories (more categories, better allocation)
-    const popularCategories = ["concert", "music festival", "comedy show", "sports", "theater", "art", "food", "business", "conference"]
-    for (let i = 0; i < Math.min(4, popularCategories.length); i++) { // Increased from 2 to 4 categories
+    const popularCategories = [
+      "concert",
+      "music festival",
+      "comedy show",
+      "sports",
+      "theater",
+      "art",
+      "food",
+      "business",
+      "conference",
+    ]
+    for (let i = 0; i < Math.min(4, popularCategories.length); i++) {
+      // Increased from 2 to 4 categories
       searchStrategies.push({
         query: popularCategories[i],
         location: params.location,
@@ -558,15 +569,33 @@ async function executeRapidApiSearch(params: EventSearchParams): Promise<EventDe
     }
 
     if (data.error) {
-      logger.error(`RapidAPI returned error: ${data.error}`)
+      const errorMessage = typeof data.error === "object" ? JSON.stringify(data.error) : String(data.error)
+      logger.error(`RapidAPI returned error: ${errorMessage}`, {
+        component: "events-api",
+        action: "rapidapi_error",
+        metadata: {
+          url: url.toString().replace(serverEnv.RAPIDAPI_KEY, "***"),
+          errorData: data.error,
+          responseStatus: response.status,
+        },
+      })
+      return []
     }
 
     logger.info("RapidAPI returned no events")
     return []
   } catch (error) {
+    const errorMessage = formatErrorMessage(error)
     logger.error("RapidAPI search execution failed", {
-      error: formatErrorMessage(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      component: "events-api",
+      action: "rapidapi_execution_error",
+      metadata: {
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        hasApiKey: !!serverEnv.RAPIDAPI_KEY,
+        apiHost: serverEnv.RAPIDAPI_HOST,
+      },
     })
     return []
   }

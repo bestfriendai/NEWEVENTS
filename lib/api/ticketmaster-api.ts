@@ -30,9 +30,9 @@ export interface TicketmasterSearchResult {
 // Rate limiter for Ticketmaster API
 class TicketmasterRateLimiter {
   private requests: number[] = []
-  private readonly maxRequestsPerSecond = 5
-  private readonly maxRequestsPerMinute = 200
-  private readonly maxRequestsPerDay = 5000
+  private readonly maxRequestsPerSecond = 2 // Reduced from 5 to 2
+  private readonly maxRequestsPerMinute = 100 // Reduced from 200 to 100
+  private readonly maxRequestsPerDay = 2000 // Reduced from 5000 to 2000
 
   async waitIfNeeded(): Promise<void> {
     const now = Date.now()
@@ -59,14 +59,26 @@ class TicketmasterRateLimiter {
     if (recentMinuteRequests.length >= this.maxRequestsPerMinute) {
       const waitTime = 60 * 1000 - (now - Math.min(...recentMinuteRequests))
       if (waitTime > 0) {
+        logger.info("Waiting for Ticketmaster minute rate limit", { waitTime })
         await new Promise((resolve) => setTimeout(resolve, waitTime))
       }
     }
 
-    // Check per-second limit
+    // Check per-second limit with longer wait
     const recentSecondRequests = this.requests.filter((time) => now - time < 1000)
     if (recentSecondRequests.length >= this.maxRequestsPerSecond) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      logger.info("Waiting for Ticketmaster second rate limit")
+      await new Promise((resolve) => setTimeout(resolve, 2000)) // Wait 2 seconds instead of 1
+    }
+
+    // Add additional spacing between requests
+    if (this.requests.length > 0) {
+      const lastRequest = Math.max(...this.requests)
+      const timeSinceLastRequest = now - lastRequest
+      if (timeSinceLastRequest < 500) {
+        // Ensure at least 500ms between requests
+        await new Promise((resolve) => setTimeout(resolve, 500 - timeSinceLastRequest))
+      }
     }
 
     this.requests.push(now)
@@ -108,11 +120,11 @@ function formatTicketmasterDate(dateString: string): string {
 function formatDateForTicketmaster(date: Date): string {
   // Format: YYYY-MM-DDTHH:mm:ssZ (no milliseconds)
   const year = date.getUTCFullYear()
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(date.getUTCDate()).padStart(2, '0')
-  const hours = String(date.getUTCHours()).padStart(2, '0')
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(date.getUTCSeconds()).padStart(2, '0')
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(date.getUTCDate()).padStart(2, "0")
+  const hours = String(date.getUTCHours()).padStart(2, "0")
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0")
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0")
 
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`
 }
@@ -120,13 +132,19 @@ function formatDateForTicketmaster(date: Date): string {
 export async function searchTicketmasterEvents(params: TicketmasterSearchParams): Promise<TicketmasterSearchResult> {
   return measurePerformance("searchTicketmasterEvents", async () => {
     const startTime = Date.now()
+    let apiKey = ""
 
     try {
       // Get API key from server environment only
-      const apiKey = serverEnv.TICKETMASTER_API_KEY
+      apiKey = serverEnv.TICKETMASTER_API_KEY
 
-      if (!apiKey) {
-        logger.warn("Ticketmaster API key not configured")
+      // Enhanced API key validation
+      if (!apiKey || apiKey.trim().length === 0) {
+        logger.warn("Ticketmaster API key not configured or empty", {
+          component: "ticketmaster-api",
+          action: "missing_api_key",
+          metadata: { hasKey: !!apiKey, keyLength: apiKey ? apiKey.length : 0 },
+        })
         return {
           events: [],
           totalCount: 0,
@@ -218,8 +236,8 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
         queryParams.append("classificationName", params.classificationName.trim())
       }
 
-      // Pagination with validation - maximized for better event coverage
-      queryParams.append("size", Math.min(params.size || 200, 200).toString()) // Increased default from 100 to 200 (max allowed)
+      // Pagination with validation - more conservative for rate limiting
+      queryParams.append("size", Math.min(params.size || 50, 100).toString()) // Reduced from 200 to 100 max, default 50
       queryParams.append("page", Math.max(params.page || 0, 0).toString())
 
       // Sort and additional options
@@ -318,22 +336,27 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       const responseTime = Date.now() - startTime
       const errorMessage = formatErrorMessage(error)
 
-      logger.error(
-        "Ticketmaster search failed",
-        {
-          component: "ticketmaster-api",
-          action: "search_error",
-          metadata: { params, responseTime },
+      // Enhanced error logging with more details
+      logger.error("Ticketmaster search failed", {
+        component: "ticketmaster-api",
+        action: "search_error",
+        metadata: {
+          params,
+          responseTime,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          hasApiKey: !!apiKey,
+          apiKeyLength: apiKey ? apiKey.length : 0,
         },
-        error instanceof Error ? error : new Error(errorMessage),
-      )
+      })
 
       return {
         events: [],
         totalCount: 0,
         page: params.page || 0,
         totalPages: 0,
-        error: errorMessage,
+        error: `Ticketmaster API error: ${errorMessage}`,
         responseTime,
         cached: false,
       }
