@@ -55,7 +55,6 @@
     "framer-motion": "latest",
     "geojson": "latest",
     "gsap": "latest",
-    "https:": "latest",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "mapbox-gl": "latest",
