@@ -7,54 +7,60 @@
 
 ## Supabase Configuration
 
-This application is connected to Supabase for database and authentication services.
+This application connects to Supabase for features like database interactions and authentication.
 
-### Environment Variables
+### Environment Variables for Next.js Application
 
-The following environment variables are configured in `.env.local`:
+For the Next.js application to connect to Supabase, create a `.env.local` file in the root of your project with the following essential variables:
 
-\`\`\`bash
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL="https://ejsllpjzxnbndrrfpjkz.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
-SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
-SUPABASE_JWT_SECRET="your-jwt-secret"
+```bash
+# Essential for Supabase client connection in the Next.js app
+NEXT_PUBLIC_SUPABASE_URL="https://your-supabase-url.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
 
-# Database Configuration
-POSTGRES_URL="your-postgres-connection-string"
-POSTGRES_PRISMA_URL="your-postgres-prisma-connection-string"
-POSTGRES_URL_NON_POOLING="your-postgres-non-pooling-connection-string"
-POSTGRES_USER="postgres"
-POSTGRES_HOST="db.ejsllpjzxnbndrrfpjkz.supabase.co"
-POSTGRES_PASSWORD="your-password"
-POSTGRES_DATABASE="postgres"
-\`\`\`
+# Example values (replace with your actual Supabase project details):
+# NEXT_PUBLIC_SUPABASE_URL="https://ejsllpjzxnbndrrfpjkz.supabase.co"
+# NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqc2xscGp6eG5ibmRycmZwamt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc5MTYxNDYsImV4cCI6MjA2MzQ5MjE0Nn0.uFthMUbM4dkOqlxGWC2tVoTjo_5b9VmvhnYdXWnlLXU"
+```
+
+**Important:**
+- `NEXT_PUBLIC_SUPABASE_URL`: The URL of your Supabase project.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: The public anonymous key for your Supabase project. This key is safe to expose on the client side and is used for operations that adhere to your Row Level Security (RLS) policies.
+
+The application reads these variables via `lib/env.ts`.
+
+### Other Supabase-related Environment Variables
+
+Your Supabase project provides other keys and connection strings for different purposes:
+- **Service Role Key (`SUPABASE_SERVICE_ROLE_KEY`):** Used for server-side operations that require bypassing RLS. Store this securely and do not expose it on the client side. It should be set as an environment variable in your deployment environment for server-side functions or scripts that need admin privileges.
+- **JWT Secret (`SUPABASE_JWT_SECRET`):** Used for signing and verifying JWTs. Store this securely.
+- **Direct Database Connection Strings (e.g., `POSTGRES_URL`, `POSTGRES_PRISMA_URL`):** Used for connecting directly to your PostgreSQL database, often for migrations, server-side scripts, or tools like Prisma. These should also be stored securely and used in server-side contexts.
+
+These additional variables should be set in your deployment environment or in `.env.local` if specifically required by a local script or server-side utility that you are running, but ensure they are not prefixed with `NEXT_PUBLIC_` unless intended to be client-accessible (which is generally not the case for these sensitive keys).
 
 ### Testing the Connection
 
-To test the Supabase connection:
+After setting up your `.env.local` file:
 
-1. Start the development server: `npm run dev`
-2. Visit: `http://localhost:3000/supabase-test`
-3. Click "Test Client Connection" to test client-side connection
-4. Click "Test Server Connection" to test server-side connection
-5. Or visit the API endpoint directly: `http://localhost:3000/api/test-supabase`
+1.  Ensure all dependencies are installed: `pnpm install`
+2.  Start the development server: `pnpm dev` (or `npm run dev`, `yarn dev`)
+3.  Visit the Supabase test page: `http://localhost:3000/supabase-test`
+    - Click "Test Client Connection" to verify the client-side Supabase setup.
+    - Click "Test Server Connection" to verify basic server-side connectivity to Supabase (via `app/api/test-supabase/route.ts`).
+4.  Alternatively, run the command-line test script: `pnpm run test:supabase-connection` (or `npm run test:supabase-connection`, `yarn test:supabase-connection`).
 
-### Database Details
+This script (`scripts/test-supabase-basic-connection.ts`) directly tests the `.env.local` variables and attempts a basic connection.
 
-- **Project ID**: ejsllpjzxnbndrrfpjkz
-- **Region**: us-east-1
-- **Database Host**: db.ejsllpjzxnbndrrfpjkz.supabase.co
-- **Connection Pooler**: aws-0-us-east-1.pooler.supabase.com
+### Files Modified/Checked for this Setup
 
-### Files Modified
-
-- `.env.local` - Environment variables
-- `lib/env.ts` - Updated Supabase configuration
-- `lib/api/supabase-api.ts` - Supabase client setup
-- `components/supabase-connection-test.tsx` - Connection test component
-- `app/supabase-test/page.tsx` - Test page
-- `app/api/test-supabase/route.ts` - Server-side test endpoint
+- `.env.local`: Created to store your local environment variables.
+- `lib/env.ts`: Defines how environment variables are accessed.
+- `lib/api/supabase-api.ts`: Contains Supabase client initialization logic.
+- `components/supabase-connection-test.tsx`: UI component for testing Supabase connection.
+- `app/supabase-test/page.tsx`: Page that hosts the connection test component.
+- `app/api/test-supabase/route.ts`: API route for server-side connection testing.
+- `scripts/test-supabase-basic-connection.ts`: CLI script for testing connection.
+- `package.json`: Added `test:supabase-connection` script.
 
 ## Overview
 
