@@ -4,7 +4,7 @@
 
 **Proposed Document Structure:**
 
-```mermaid
+\`\`\`mermaid
 graph TD
     A[API_Helper/] --> B(README.md);
     A --> C{shared/};
@@ -25,7 +25,7 @@ graph TD
     style D fill:#f9f,stroke:#333,stroke-width:2px
     style E fill:#f9f,stroke:#333,stroke-width:2px
     style F fill:#f9f,stroke:#333,stroke-width:2px
-```
+\`\`\`
 *(New files to be created are highlighted)*
 
 ---

@@ -15,9 +15,9 @@ The Ticketmaster Discovery API uses an **API Key** (referred to as `apikey` or C
 
 **Using the API Key:**
 The `apikey` must be included as a query parameter in all API requests.
-```
+\`\`\`
 https://app.ticketmaster.com/discovery/v2/events.json?apikey=YOUR_API_KEY&keyword=concerts
-```
+\`\`\`
 Replace `YOUR_API_KEY` with your actual key.
 [Source: Ticketmaster Developer Docs][1][2]
 
@@ -57,16 +57,16 @@ This is the primary endpoint for finding events.
 -   `source`: Filter by source system (e.g., `ticketmaster`, `universe`, `frontgate`).
 
 **Example Request:**
-```
+\`\`\`
 https://app.ticketmaster.com/discovery/v2/events.json?apikey=YOUR_API_KEY&keyword=Ed Sheeran&city=London&countryCode=GB&startDateTime=2025-07-01T00:00:00Z&endDateTime=2025-07-31T23:59:59Z&sort=date,asc
-```
+\`\`\`
 
 ### Get Event Details
 **Endpoint:** `GET /events/{id}.json`
 Retrieves detailed information for a specific event by its ID.
-```
+\`\`\`
 https://app.ticketmaster.com/discovery/v2/events/G5v0Z9JKea7A7.json?apikey=YOUR_API_KEY
-```
+\`\`\`
 
 ### Search Attractions
 **Endpoint:** `GET /attractions.json`
@@ -156,7 +156,7 @@ The API uses standard HTTP status codes.
 -   `500 Internal Server Error`: Server-side error at Ticketmaster.
 
 **Example Error Response Snippet:**
-```json
+\`\`\`json
 // For a 400 error
 {
   "fault": {
@@ -175,7 +175,7 @@ The API uses standard HTTP status codes.
     }
   }
 }
-```
+\`\`\`
 Always check the response body for specific error details.
 
 ---

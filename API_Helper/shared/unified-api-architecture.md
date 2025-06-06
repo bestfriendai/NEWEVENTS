@@ -101,7 +101,7 @@ When building a client module for a specific API:
 
 ## Example (Conceptual Flow)
 
-```
+\`\`\`
 Client Application
        |
        v
@@ -125,6 +125,6 @@ NEWEVENTS Backend Service (Returns standardized data to client)
        |
        v
 Client Application (Consumes standardized data)
-```
+\`\`\`
 
 This unified architectural approach aims to make API integrations more robust, manageable, and adaptable for the NEWEVENTS project.

@@ -11,13 +11,13 @@ After reviewing the official Ticketmaster Discovery API v2 documentation, I've i
 **Issue**: Using deprecated `latlong` parameter
 **Fix**: Updated to use `geoPoint` parameter (recommended)
 
-```typescript
+\`\`\`typescript
 // Before (deprecated)
 queryParams.append("latlong", `${lat},${lng}`)
 
 // After (recommended)
 queryParams.append("geoPoint", `${lat},${lng}`)
-```
+\`\`\`
 
 **Files Updated**:
 - `lib/api/ticketmaster-api.ts`
@@ -32,12 +32,12 @@ queryParams.append("geoPoint", `${lat},${lng}`)
 - More descriptive rate limit messages
 - Proper handling of API key validation errors
 
-```typescript
+\`\`\`typescript
 // Enhanced error handling for Ticketmaster-specific responses
 if (errorData.fault?.detail?.errorcode === "oauth.v2.InvalidApiKey") {
   return "Invalid Ticketmaster API key - please check your credentials"
 }
-```
+\`\`\`
 
 ### 3. Additional API Parameters ✅
 
@@ -55,10 +55,10 @@ if (errorData.fault?.detail?.errorcode === "oauth.v2.InvalidApiKey") {
 - Location-based searches: Sort by distance
 - Keyword searches: Sort by relevance
 
-```typescript
+\`\`\`typescript
 const sortOrder = params.coordinates ? "distance,asc" : "relevance,desc"
 queryParams.append("sort", sortOrder)
-```
+\`\`\`
 
 ## Current Implementation Status
 
@@ -105,7 +105,7 @@ queryParams.append("sort", sortOrder)
 4. **Fallback**: Intelligent estimation based on event type/venue
 
 ### Price Range Handling
-```typescript
+\`\`\`typescript
 if (range.min === 0 && range.max === 0) {
   price = "Free"
 } else if (range.min === range.max && range.min > 0) {
@@ -113,7 +113,7 @@ if (range.min === 0 && range.max === 0) {
 } else if (range.min > 0 && range.max > 0) {
   price = `$${range.min.toFixed(2)} - $${range.max.toFixed(2)}`
 }
-```
+\`\`\`
 
 ## Event Classification & Categorization
 
@@ -151,10 +151,10 @@ Events are categorized based on Ticketmaster's classification system and mapped 
 ## Environment Configuration
 
 ### Required Environment Variables
-```bash
+\`\`\`bash
 TICKETMASTER_API_KEY=your_api_key_here
 TICKETMASTER_SECRET=your_secret_here  # Optional for advanced features
-```
+\`\`\`
 
 ### API Key Management
 - Server-side only (never exposed to client)

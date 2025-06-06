@@ -40,7 +40,7 @@ To handle errors consistently within the NEWEVENTS application, we will define a
 
 **Proposed Structure (TypeScript example):**
 
-```typescript
+\`\`\`typescript
 interface InternalApiError {
   statusCode: number; // HTTP status code from the API, or an internal code for network errors
   message: string; // A user-friendly message
@@ -51,7 +51,7 @@ interface InternalApiError {
   path?: string; // The API endpoint that was called
   // Additional fields as needed
 }
-```
+\`\`\`
 
 ## Mapping External API Errors to Internal Errors
 

@@ -14,11 +14,11 @@ OpenRouter uses API keys for authentication. Requests must include an `Authoriza
 3.  Generate a new API key.
 
 **Required Headers for API Requests:**
-```
+\`\`\`
 Authorization: Bearer YOUR_OPENROUTER_API_KEY
 HTTP-Referer: YOUR_SITE_URL_OR_APP_NAME 
 X-Title: YOUR_APP_NAME 
-```
+\`\`\`
 - Replace `YOUR_OPENROUTER_API_KEY` with your actual key.
 - `YOUR_SITE_URL_OR_APP_NAME` should be the URL of your application or a recognizable name if it's a backend service (e.g., `https://newevents.com` or `NEWEVENTS-Backend`).
 - `YOUR_APP_NAME` can be the same as `X-Title` or a more user-friendly name.
@@ -39,7 +39,7 @@ This is the primary endpoint for text generation, summarization, classification,
 **Endpoint:** `POST /chat/completions`
 
 **Request Body (JSON):**
-```json
+\`\`\`json
 {
   "model": "google/gemini-flash-1.5", // Specify the model to use (e.g., "mistralai/mistral-7b-instruct", "openai/gpt-3.5-turbo")
   "messages": [
@@ -51,7 +51,7 @@ This is the primary endpoint for text generation, summarization, classification,
   "top_p": 1.0,       // Optional: Nucleus sampling
   // Other parameters like stream, stop, presence_penalty, frequency_penalty can also be used.
 }
-```
+\`\`\`
 
 **Example Usage for Event Discovery Platform:**
 
@@ -89,7 +89,7 @@ OpenRouter follows the OpenAI API structure for chat completions.
 - `temperature`, `max_tokens`, `top_p`, `stream`, etc. (optional parameters).
 
 **Response (Non-Streaming):**
-```json
+\`\`\`json
 {
   "id": "chatcmpl-xxxxxxxxxxxxxxxxxxxxx",
   "object": "chat.completion",
@@ -111,7 +111,7 @@ OpenRouter follows the OpenAI API structure for chat completions.
     "total_tokens": 87
   }
 }
-```
+\`\`\`
 **Response (Streaming):**
 If `stream: true` is set, the API returns a series of server-sent events. Each event will have a `data` field containing a JSON object with a `choices` array, where each choice has a `delta` object (e.g., `{"delta": {"content": "some text"}}`). The last event will have `{"delta": {}}` and a `finish_reason`.
 
@@ -133,7 +133,7 @@ OpenRouter uses standard HTTP status codes.
 - `503 Service Unavailable`: The service or a specific model is temporarily unavailable.
 
 **Example Error Handling (Python with OpenAI SDK):**
-```python
+\`\`\`python
 import openai
 import os
 
@@ -160,7 +160,7 @@ except openai.error.InvalidRequestError as e:
   print(f"Invalid Request: {e}")
 except Exception as e:
   print(f"An unexpected error occurred: {e}")
-```
+\`\`\`
 
 ---
 

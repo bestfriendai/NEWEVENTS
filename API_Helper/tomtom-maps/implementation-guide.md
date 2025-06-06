@@ -19,14 +19,14 @@ TomTom APIs use an **API Key** for authentication.
 **Using the API Key:**
 The API key is typically passed as a parameter in SDK initialization or as a query parameter (`key=YOUR_API_KEY`) in direct API calls.
 
-```javascript
+\`\`\`javascript
 // For Maps SDK for Web
 const map = tt.map({
   key: 'YOUR_TOMTOM_API_KEY', // Replace with your key
   container: 'map-element-id',
   // ... other map options
 });
-```
+\`\`\`
 
 ---
 
@@ -36,12 +36,12 @@ const map = tt.map({
 This is the primary JavaScript library for embedding interactive maps into web applications.
 -   **Features:** Vector map rendering, customizable map styles, markers, popups, event handling. [Source: TomTom Docs][2][3][5]
 -   **Installation:**
-    ```html
+    \`\`\`html
     <!-- CSS for the SDK -->
     <link rel='stylesheet' type='text/css' href='https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/maps.css'/>
     <!-- SDK JavaScript -->
     <script src='https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/maps-web.min.js'></script>
-    ```
+    \`\`\`
     (Always check the [TomTom CDN page](https://developer.tomtom.com/maps-sdk-web/cdn-details) for the latest version number.)
 
 ### Search API (includes Geocoding & Reverse Geocoding)
@@ -62,7 +62,7 @@ Part of TomTom's Places API suite.
 
 ### Displaying Maps
 Initialize and display an interactive map.
-```javascript
+\`\`\`javascript
 // HTML: <div id='eventMap' style='width: 100%; height: 500px;'></div>
 
 const map = tt.map({
@@ -76,11 +76,11 @@ const map = tt.map({
 // Add map controls
 map.addControl(new tt.NavigationControl(), 'top-left');
 map.addControl(new tt.FullscreenControl(), 'top-left');
-```
+\`\`\`
 
 ### Adding Event Markers & Popups
 Display event locations on the map.
-```javascript
+\`\`\`javascript
 // Example: Adding a single event marker
 const eventLocation = [-0.118092, 51.509865]; // [lng, lat] for an event
 const eventMarker = new tt.Marker()
@@ -94,11 +94,11 @@ eventMarker.setPopup(popup);
 
 // To open popup programmatically: eventMarker.togglePopup();
 // To have popup open on marker click (default behavior if popup is set)
-```
+\`\`\`
 
 ### Geocoding Addresses
 Convert event venue addresses to latitude/longitude.
-```javascript
+\`\`\`javascript
 async function geocodeAddress(address) {
   const apiKey = 'YOUR_TOMTOM_API_KEY';
   const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(address)}.json?key=${apiKey}&limit=1`;
@@ -125,11 +125,11 @@ async function geocodeAddress(address) {
 // geocodeAddress("1600 Amphitheatre Parkway, Mountain View, CA").then(coords => {
 //   if (coords) console.log(coords);
 // });
-```
+\`\`\`
 
 ### Reverse Geocoding Coordinates
 Convert latitude/longitude to a human-readable address.
-```javascript
+\`\`\`javascript
 async function reverseGeocode(latitude, longitude) {
   const apiKey = 'YOUR_TOMTOM_API_KEY';
   const url = `https://api.tomtom.com/search/2/reverseGeocode/${latitude},${longitude}.json?key=${apiKey}&radius=100`;
@@ -155,7 +155,7 @@ async function reverseGeocode(latitude, longitude) {
 // reverseGeocode(37.422, -122.084).then(address => {
 //   if (address) console.log(address);
 // });
-```
+\`\`\`
 
 ---
 
@@ -171,7 +171,7 @@ async function reverseGeocode(latitude, longitude) {
     -   `setHTML(htmlString)` or `setText(textString)`
     -   `setDOMContent(htmlElement)`
 -   **Geocoding API Response (`/geocode`):**
-    ```json
+    \`\`\`json
     {
       "summary": { /* ... */ },
       "results": [
@@ -189,9 +189,9 @@ async function reverseGeocode(latitude, longitude) {
         }
       ]
     }
-    ```
+    \`\`\`
 -   **Reverse Geocoding API Response (`/reverseGeocode`):**
-    ```json
+    \`\`\`json
     {
       "summary": { /* ... */ },
       "addresses": [
@@ -207,19 +207,19 @@ async function reverseGeocode(latitude, longitude) {
         }
       ]
     }
-    ```
+    \`\`\`
 
 ---
 
 ## 5. Error Handling
 
 -   **SDK Errors:** The Maps SDK for Web can emit errors on the map instance.
-    ```javascript
+    \`\`\`javascript
     map.on('error', (errorEvent) => {
       console.error('TomTom Map Error:', errorEvent.error);
       // e.g., { message: "Unauthorized", status: 401 } for invalid API key
     });
-    ```
+    \`\`\`
 -   **API Request Errors (Direct HTTP calls, e.g., to Search API):**
     -   Check HTTP status codes. Common codes:
         -   `200 OK`: Success.
@@ -230,7 +230,7 @@ async function reverseGeocode(latitude, longitude) {
         -   `429 Too Many Requests`: Rate limit exceeded.
         -   `5xx Server Error`: Issues on TomTom's side.
     -   The response body for errors is typically JSON with a `detailedError` or `error` object.
-    ```json
+    \`\`\`json
     // Example 400 error response
     {
       "detailedError": {
@@ -238,7 +238,7 @@ async function reverseGeocode(latitude, longitude) {
         "message": "Parameter 'query' is missing"
       }
     }
-    ```
+    \`\`\`
 
 ---
 

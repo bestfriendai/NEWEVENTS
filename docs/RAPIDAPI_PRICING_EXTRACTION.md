@@ -16,7 +16,7 @@ The RapidAPI Real-Time Events Search API doesn't always include direct pricing i
 ### Key Features
 
 #### 1. Ticket Link URL Analysis
-```typescript
+\`\`\`typescript
 // Extract pricing from ticket platform URLs
 private extractPriceFromTicketUrl(url: string, source: string): number | null {
   // Eventbrite URL patterns
@@ -28,10 +28,10 @@ private extractPriceFromTicketUrl(url: string, source: string): number | null {
   // SeeTickets, VividSeats, and other platforms
   // ... platform-specific extraction logic
 }
-```
+\`\`\`
 
 #### 2. Enhanced Pricing Method
-```typescript
+\`\`\`typescript
 async getEnhancedPricing(event: RapidAPIEvent): Promise<string> {
   // 1. Try standard extraction
   const standardPrice = this.extractPrice(event)
@@ -44,13 +44,13 @@ async getEnhancedPricing(event: RapidAPIEvent): Promise<string> {
   
   return standardPrice
 }
-```
+\`\`\`
 
 ## RapidAPI Response Structure
 
 Based on your example response, RapidAPI events include:
 
-```json
+\`\`\`json
 {
   "event_id": "...",
   "name": "CupcakKe",
@@ -75,7 +75,7 @@ Based on your example response, RapidAPI events include:
     // ... other venue details
   }
 }
-```
+\`\`\`
 
 ## Pricing Extraction Strategies
 
@@ -86,7 +86,7 @@ Based on your example response, RapidAPI events include:
 - **Generic**: Use regex patterns for common price formats
 
 ### 2. Platform-Specific API Integration (Future Enhancement)
-```typescript
+\`\`\`typescript
 // Potential future implementation
 async getEventbritePrice(eventId: string): Promise<number | null> {
   // Make API call to Eventbrite to get actual pricing
@@ -95,7 +95,7 @@ async getEventbritePrice(eventId: string): Promise<number | null> {
 async getSeeTicketsPrice(eventUrl: string): Promise<number | null> {
   // Scrape or use API to get pricing from SeeTickets
 }
-```
+\`\`\`
 
 ### 3. Intelligent Fallbacks
 - **Free Event Detection**: Check for "free" indicators in URLs and descriptions
@@ -129,7 +129,7 @@ The enhanced pricing extraction is now integrated into:
 
 To test the enhanced pricing extraction:
 
-```typescript
+\`\`\`typescript
 import { rapidAPIEventsService } from './lib/api/rapidapi-events'
 
 // Test with your sample event
@@ -145,7 +145,7 @@ const sampleEvent = {
 
 const pricing = await rapidAPIEventsService.getEnhancedPricing(sampleEvent)
 console.log('Extracted pricing:', pricing)
-```
+\`\`\`
 
 ## Conclusion
 

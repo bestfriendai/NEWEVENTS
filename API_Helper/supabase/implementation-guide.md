@@ -17,7 +17,7 @@ These keys are found in your Supabase project dashboard under **Project Settings
 ### User Authentication (JWTs)
 Supabase Auth handles user sign-up, sign-in, and management, issuing JWTs to authenticated users.
 -   **Email/Password:**
-    ```javascript
+    \`\`\`javascript
     // Sign up
     const { data, error } = await supabase.auth.signUp({
       email: 'user@example.com',
@@ -29,21 +29,21 @@ Supabase Auth handles user sign-up, sign-in, and management, issuing JWTs to aut
       email: 'user@example.com',
       password: 'securepassword123'
     });
-    ```
+    \`\`\`
 -   **OAuth Providers (Google, GitHub, etc.):**
-    ```javascript
+    \`\`\`javascript
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google' // or 'github', 'facebook', etc.
     });
-    ```
+    \`\`\`
 -   **Magic Links (Passwordless):**
-    ```javascript
+    \`\`\`javascript
     const { data, error } = await supabase.auth.signInWithOtp({
       email: 'user@example.com'
     });
-    ```
+    \`\`\`
 -   **Session Management:** The Supabase client library automatically manages JWTs and session refresh.
-    ```javascript
+    \`\`\`javascript
     // Get current session
     const { data: { session }, error } = await supabase.auth.getSession();
     if (session) {
@@ -55,7 +55,7 @@ Supabase Auth handles user sign-up, sign-in, and management, issuing JWTs to aut
       console.log(event, session);
       // Handle sign-in, sign-out, token refresh
     });
-    ```
+    \`\`\`
 [Source: Supabase Auth Docs][2][3][5]
 
 ---
@@ -66,19 +66,19 @@ Supabase Auth handles user sign-up, sign-in, and management, issuing JWTs to aut
 Supabase auto-generates a RESTful API from your PostgreSQL schema using PostgREST [1]. You interact with it using the `supabase-js` client library.
 
 **Initializing the Client:**
-```javascript
+\`\`\`javascript
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL; // From your project settings
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // From your project settings
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-```
+\`\`\`
 
 **CRUD Operations for Events, Users, Favorites:**
 
 *   **Example Table Structures (SQL):**
-    ```sql
+    \`\`\`sql
     -- Users table (Supabase Auth manages its own 'auth.users' table, this might be for public profiles)
     CREATE TABLE public.profiles (
       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -119,10 +119,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
       created_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (user_id, event_id)
     );
-    ```
+    \`\`\`
 
 *   **Creating Records:**
-    ```javascript
+    \`\`\`javascript
     // Add a new event
     const { data: newEvent, error: insertError } = await supabase
       .from('events')
@@ -137,10 +137,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
       })
       .select() // To get the inserted record back
       .single(); // If inserting one record
-    ```
+    \`\`\`
 
 *   **Reading Records:**
-    ```javascript
+    \`\`\`javascript
     // Get all upcoming events
     const { data: upcomingEvents, error: selectError } = await supabase
       .from('events')
@@ -154,30 +154,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
       .from('user_favorites')
       .select('event_id, events (*)') // Fetch event details along with favorite
       .eq('user_id', userId);
-    ```
+    \`\`\`
 
 *   **Updating Records:**
-    ```javascript
+    \`\`\`javascript
     const { data: updatedEvent, error: updateError } = await supabase
       .from('events')
       .update({ description: 'Updated description for the tech conference.' })
       .eq('id', 'event_uuid_to_update')
       .select()
       .single();
-    ```
+    \`\`\`
 
 *   **Deleting Records:**
-    ```javascript
+    \`\`\`javascript
     // Remove an event from favorites
     const { error: deleteError } = await supabase
       .from('user_favorites')
       .delete()
       .match({ user_id: 'user_uuid', event_id: 'event_uuid_to_unfavorite' });
-    ```
+    \`\`\`
 
 ### Realtime Subscriptions
 Listen to database changes in real time (e.g., new events added, favorites updated).
-```javascript
+\`\`\`javascript
 const eventsChannel = supabase
   .channel('public-events-changes')
   .on(
@@ -202,7 +202,7 @@ const eventsChannel = supabase
 
 // Don't forget to unsubscribe when the component unmounts or is no longer needed
 // eventsChannel.unsubscribe();
-```
+\`\`\`
 [Source: Supabase Database Docs, Realtime Docs][1][3][5]
 
 ---
@@ -214,7 +214,7 @@ RLS is crucial for securing your data by defining policies on who can access or 
 **Example RLS Policies:**
 
 *   **Profiles Table:**
-    ```sql
+    \`\`\`sql
     -- Enable RLS on profiles table
     ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
@@ -225,10 +225,10 @@ RLS is crucial for securing your data by defining policies on who can access or 
     -- Users can update their own profile
     CREATE POLICY "Users can update their own profile."
       ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-    ```
+    \`\`\`
 
 *   **Events Table:**
-    ```sql
+    \`\`\`sql
     ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
     -- Anyone can read events
@@ -240,10 +240,10 @@ RLS is crucial for securing your data by defining policies on who can access or 
     --   ON public.events FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
     -- Or, only specific roles/admin can insert/update/delete events (manage this via service_role key on backend)
-    ```
+    \`\`\`
 
 *   **User Favorites Table:**
-    ```sql
+    \`\`\`sql
     ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
 
     -- Users can view their own favorites
@@ -253,7 +253,7 @@ RLS is crucial for securing your data by defining policies on who can access or 
     -- Users can insert/delete their own favorites
     CREATE POLICY "Users can manage their own favorites."
       ON public.user_favorites FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-    ```
+    \`\`\`
 Policies are managed via SQL in the Supabase dashboard (Database > Policies).
 [Source: Supabase RLS Docs][1][3]
 
@@ -262,7 +262,7 @@ Policies are managed via SQL in the Supabase dashboard (Database > Policies).
 ## 4. Error Handling
 
 The `supabase-js` client returns an `error` object alongside `data`. Always check for errors.
-```javascript
+\`\`\`javascript
 const { data, error } = await supabase.from('events').select('*');
 
 if (error) {
@@ -280,7 +280,7 @@ if (error) {
 }
 // Process data if no error
 console.log(data);
-```
+\`\`\`
 
 ---
 
