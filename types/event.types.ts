@@ -55,16 +55,54 @@ export interface ApiResponse<T> {
 }
 
 export interface EventSearchParams {
+  // Text search
   query?: string
+  keyword?: string
+
+  // Location
   location?: string
+  lat?: number
+  lng?: number
+  radius?: number
+
+  // Categories and filtering
   category?: string
+  categories?: string[]
+
+  // Date filtering
   startDate?: string
   endDate?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+
+  // Price filtering
   minPrice?: number
   maxPrice?: number
-  radius?: number
+  priceMin?: number
+  priceMax?: number
+  priceRange?: {
+    min: number
+    max: number
+  }
+
+  // Sorting and pagination
+  sortBy?: 'date' | 'distance' | 'popularity' | 'price' | 'relevance'
+  sortOrder?: 'asc' | 'desc'
   page?: number
   limit?: number
+  offset?: number
+
+  // Advanced filters
+  tags?: string[]
+  source?: 'rapidapi' | 'ticketmaster' | 'eventbrite' | 'all'
+  hasImages?: boolean
+  hasDescription?: boolean
+
+  // Search behavior
+  includeCache?: boolean
+  forceRefresh?: boolean
 }
 
 export interface EventCategory {

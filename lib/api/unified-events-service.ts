@@ -5,15 +5,51 @@ import { searchTicketmasterEvents, type TicketmasterSearchParams } from "./ticke
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 export interface UnifiedEventSearchParams {
+  // Location-based search
   lat?: number
   lng?: number
   radius?: number // in kilometers
+
+  // Text search
+  query?: string
+  keyword?: string // Alias for query for compatibility
+
+  // Category and filtering
   category?: string
+  categories?: string[] // Support multiple categories
+
+  // Date filtering
   startDate?: string
   endDate?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+
+  // Price filtering
+  priceMin?: number
+  priceMax?: number
+  priceRange?: {
+    min: number
+    max: number
+  }
+
+  // Sorting and pagination
+  sortBy?: 'date' | 'distance' | 'popularity' | 'price' | 'relevance'
+  sortOrder?: 'asc' | 'desc'
   limit?: number
   offset?: number
-  query?: string
+  page?: number
+
+  // Advanced filters
+  tags?: string[]
+  source?: 'rapidapi' | 'ticketmaster' | 'eventbrite' | 'all'
+  hasImages?: boolean
+  hasDescription?: boolean
+
+  // Search behavior
+  includeCache?: boolean
+  forceRefresh?: boolean
 }
 
 export interface UnifiedEventsResponse {
@@ -163,14 +199,15 @@ class UnifiedEventsService {
         }
       }
 
-      // Remove duplicates and apply final filtering
+      // Remove duplicates and apply advanced filtering
       const uniqueEvents = this.removeDuplicates(allEvents)
-      const filteredEvents = this.applyFilters(uniqueEvents, params)
+      const filteredEvents = this.applyAdvancedFilters(uniqueEvents, params)
+
+      // Apply sorting
+      const sortedEvents = this.applySorting(filteredEvents, params)
 
       // Apply pagination
-      const offset = params.offset || 0
-      const limit = params.limit || 50 // Back to 50 default
-      const paginatedEvents = filteredEvents.slice(offset, offset + limit)
+      const { paginatedEvents, totalCount, hasMore } = this.applyPagination(sortedEvents, params)
 
       logger.info("Unified events search completed", {
         component: "UnifiedEventsService",
@@ -185,8 +222,8 @@ class UnifiedEventsService {
       const responseTime = Date.now() - startTime
       return {
         events: paginatedEvents,
-        totalCount: filteredEvents.length,
-        hasMore: filteredEvents.length > offset + limit,
+        totalCount,
+        hasMore,
         sources,
         responseTime,
       }
@@ -736,9 +773,9 @@ class UnifiedEventsService {
   }
 
   /**
-   * Apply additional filters to events
+   * Apply advanced filters to events
    */
-  private applyFilters(events: EventDetailProps[], params: UnifiedEventSearchParams): EventDetailProps[] {
+  private applyAdvancedFilters(events: EventDetailProps[], params: UnifiedEventSearchParams): EventDetailProps[] {
     let filtered = events
 
     // Filter by location radius if coordinates provided
@@ -750,14 +787,198 @@ class UnifiedEventsService {
       })
     }
 
-    // Sort by date and time (soonest first)
-    filtered.sort((a, b) => {
-      const dateTimeA = this.parseEventDateTime(a.date, a.time)
-      const dateTimeB = this.parseEventDateTime(b.date, b.time)
-      return new Date(dateTimeA).getTime() - new Date(dateTimeB).getTime()
-    })
+    // Filter by multiple categories
+    if (params.categories && params.categories.length > 0) {
+      filtered = filtered.filter((event) =>
+        params.categories!.some(cat =>
+          event.category.toLowerCase().includes(cat.toLowerCase())
+        )
+      )
+    }
+
+    // Filter by price range
+    if (params.priceRange || (params.priceMin !== undefined || params.priceMax !== undefined)) {
+      const minPrice = params.priceRange?.min ?? params.priceMin
+      const maxPrice = params.priceRange?.max ?? params.priceMax
+
+      filtered = filtered.filter((event) => {
+        if (!event.price || event.price.toLowerCase().includes('free')) {
+          return minPrice === undefined || minPrice === 0
+        }
+
+        const eventPrice = this.extractMinPrice(event.price)
+        if (eventPrice === undefined) return true
+
+        if (minPrice !== undefined && eventPrice < minPrice) return false
+        if (maxPrice !== undefined && eventPrice > maxPrice) return false
+
+        return true
+      })
+    }
+
+    // Filter by date range
+    if (params.dateRange || params.startDate || params.endDate) {
+      const startDate = params.dateRange?.start ?? params.startDate
+      const endDate = params.dateRange?.end ?? params.endDate
+
+      filtered = filtered.filter((event) => {
+        const eventDateTime = this.parseEventDateTime(event.date, event.time)
+        const eventDate = new Date(eventDateTime)
+
+        if (startDate && eventDate < new Date(startDate)) return false
+        if (endDate && eventDate > new Date(endDate)) return false
+
+        return true
+      })
+    }
+
+    // Filter by tags
+    if (params.tags && params.tags.length > 0) {
+      filtered = filtered.filter((event) => {
+        const eventText = `${event.title} ${event.description} ${event.category}`.toLowerCase()
+        return params.tags!.some(tag => eventText.includes(tag.toLowerCase()))
+      })
+    }
+
+    // Filter by content quality
+    if (params.hasImages) {
+      filtered = filtered.filter((event) => event.image && event.image !== '')
+    }
+
+    if (params.hasDescription) {
+      filtered = filtered.filter((event) => event.description && event.description.length > 10)
+    }
 
     return filtered
+  }
+
+  /**
+   * Apply sorting to events
+   */
+  private applySorting(events: EventDetailProps[], params: UnifiedEventSearchParams): EventDetailProps[] {
+    const sortBy = params.sortBy || 'date'
+    const sortOrder = params.sortOrder || 'asc'
+
+    const sorted = [...events].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortBy) {
+        case 'date':
+          const dateTimeA = this.parseEventDateTime(a.date, a.time)
+          const dateTimeB = this.parseEventDateTime(b.date, b.time)
+          comparison = new Date(dateTimeA).getTime() - new Date(dateTimeB).getTime()
+          break
+
+        case 'distance':
+          if (params.lat && params.lng) {
+            const distanceA = a.coordinates ?
+              this.calculateDistance(params.lat, params.lng, a.coordinates.lat, a.coordinates.lng) :
+              Infinity
+            const distanceB = b.coordinates ?
+              this.calculateDistance(params.lat, params.lng, b.coordinates.lat, b.coordinates.lng) :
+              Infinity
+            comparison = distanceA - distanceB
+          }
+          break
+
+        case 'price':
+          const priceA = this.extractMinPrice(a.price || '') || 0
+          const priceB = this.extractMinPrice(b.price || '') || 0
+          comparison = priceA - priceB
+          break
+
+        case 'popularity':
+          // Use attendee count or fallback to title length as popularity metric
+          const popularityA = a.attendeeCount || a.title.length
+          const popularityB = b.attendeeCount || b.title.length
+          comparison = popularityB - popularityA // Higher is better for popularity
+          break
+
+        case 'relevance':
+          // Simple relevance based on query match
+          if (params.query || params.keyword) {
+            const query = (params.query || params.keyword || '').toLowerCase()
+            const relevanceA = this.calculateRelevanceScore(a, query)
+            const relevanceB = this.calculateRelevanceScore(b, query)
+            comparison = relevanceB - relevanceA // Higher is better for relevance
+          }
+          break
+
+        default:
+          comparison = 0
+      }
+
+      return sortOrder === 'desc' ? -comparison : comparison
+    })
+
+    return sorted
+  }
+
+  /**
+   * Apply pagination to events
+   */
+  private applyPagination(events: EventDetailProps[], params: UnifiedEventSearchParams): {
+    paginatedEvents: EventDetailProps[]
+    totalCount: number
+    hasMore: boolean
+  } {
+    const totalCount = events.length
+
+    // Handle both offset/limit and page-based pagination
+    let offset = params.offset || 0
+    const limit = params.limit || 50
+
+    if (params.page !== undefined) {
+      offset = params.page * limit
+    }
+
+    const paginatedEvents = events.slice(offset, offset + limit)
+    const hasMore = totalCount > offset + limit
+
+    return {
+      paginatedEvents,
+      totalCount,
+      hasMore
+    }
+  }
+
+  /**
+   * Calculate relevance score for search query
+   */
+  private calculateRelevanceScore(event: EventDetailProps, query: string): number {
+    if (!query) return 0
+
+    let score = 0
+    const queryLower = query.toLowerCase()
+
+    // Title match (highest weight)
+    if (event.title.toLowerCase().includes(queryLower)) {
+      score += 10
+    }
+
+    // Category match
+    if (event.category.toLowerCase().includes(queryLower)) {
+      score += 5
+    }
+
+    // Description match
+    if (event.description.toLowerCase().includes(queryLower)) {
+      score += 3
+    }
+
+    // Location match
+    if (event.location.toLowerCase().includes(queryLower)) {
+      score += 2
+    }
+
+    return score
+  }
+
+  /**
+   * Apply additional filters to events (legacy method for compatibility)
+   */
+  private applyFilters(events: EventDetailProps[], params: UnifiedEventSearchParams): EventDetailProps[] {
+    return this.applyAdvancedFilters(events, params)
   }
 
   // Helper methods
