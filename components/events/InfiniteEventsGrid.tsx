@@ -42,21 +42,24 @@ export function InfiniteEventsGrid({
   const [hasMore, setHasMore] = useState(true)
   const loader = useRef<HTMLDivElement>(null)
 
-  // Function to load events - stabilized with useRef to prevent infinite re-renders
-  const loadEventsRef = useRef<(pageToLoad: number, isNewSearch?: boolean) => Promise<void>>()
+  // Stable reference to search params to prevent infinite re-renders
+  const searchParamsRef = useRef(searchParams)
+  searchParamsRef.current = searchParams
 
-  loadEventsRef.current = async (pageToLoad: number, isNewSearch: boolean = false) => {
-    if (!searchParams.lat || !searchParams.lng) return
+  // Function to load events - completely stable reference
+  const loadEvents = useCallback(async (pageToLoad: number, isNewSearch: boolean = false) => {
+    const currentParams = searchParamsRef.current
+    if (!currentParams.lat || !currentParams.lng) return
 
     setIsLoading(true)
     setError(null)
 
     try {
       const result = await fetchEvents({
-        coordinates: { lat: searchParams.lat, lng: searchParams.lng, name: "Current Location" },
-        radius: searchParams.radius || 25,
-        categories: searchParams.category ? [searchParams.category] : undefined,
-        keyword: searchParams.query,
+        coordinates: { lat: currentParams.lat, lng: currentParams.lng, name: "Current Location" },
+        radius: currentParams.radius || 25,
+        categories: currentParams.category ? [currentParams.category] : undefined,
+        keyword: currentParams.query,
         page: pageToLoad,
         size: 12,
       })
@@ -89,8 +92,8 @@ export function InfiniteEventsGrid({
           .map((event) => ({
             ...event,
             coordinates: event.coordinates || {
-              lat: searchParams.lat! + (Math.random() - 0.5) * 0.1,
-              lng: searchParams.lng! + (Math.random() - 0.5) * 0.1,
+              lat: currentParams.lat! + (Math.random() - 0.5) * 0.1,
+              lng: currentParams.lng! + (Math.random() - 0.5) * 0.1,
             },
           }))
 
@@ -108,22 +111,31 @@ export function InfiniteEventsGrid({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, []) // Empty dependency array - function is completely stable
 
-  const loadEvents = useCallback((pageToLoad: number, isNewSearch: boolean = false) => {
-    return loadEventsRef.current?.(pageToLoad, isNewSearch) || Promise.resolve()
-  }, [])
+  // Track search params changes to trigger reloads
+  const prevSearchParamsRef = useRef<string>()
 
-  // Initial load - only reset when search params change, not on every render
+  // Initial load - only reset when search params actually change
   useEffect(() => {
-    if (searchParams.lat && searchParams.lng) {
+    const currentParamsString = JSON.stringify({
+      lat: searchParams.lat,
+      lng: searchParams.lng,
+      radius: searchParams.radius,
+      category: searchParams.category,
+      query: searchParams.query
+    })
+
+    // Only reload if params actually changed
+    if (prevSearchParamsRef.current !== currentParamsString && searchParams.lat && searchParams.lng) {
+      prevSearchParamsRef.current = currentParamsString
       setEvents([])
       setPage(0)
       setHasMore(true)
       // Load first page immediately
       loadEvents(0, true)
     }
-  }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query])
+  }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query, loadEvents])
 
   // Intersection observer for infinite scroll
   useEffect(() => {

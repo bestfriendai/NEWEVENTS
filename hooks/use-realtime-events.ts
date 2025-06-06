@@ -106,29 +106,24 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
             )
 
             if (distance <= radius) {
-              // Add to live events\
-              setLiveEvents(prev => [newEvent, ...prev].slice(0, 49)
-              ]) // Keep last 50
-            
-            // Add notification
-            addNotification(
-              type: "nearby_event", message
-              : `New event "${record.title}" added near you ($
-              distance.toFixed(1)
-              miles
-              away
-              )`,
-              event: newEvent
-              )
-            
-            // Invalidate location-based queries
-            queryClient.invalidateQueries(
-              queryKey: eventsQueryKeys.list({
-                lat: userLocation.lat,
-                lng: userLocation.lng,
-                radius,
+              // Add to live events
+              setLiveEvents(prev => [newEvent, ...prev].slice(0, 49)) // Keep last 50
+
+              // Add notification
+              addNotification({
+                type: "nearby_event",
+                message: `New event "${record.title}" added near you (${distance.toFixed(1)} miles away)`,
+                event: newEvent
               })
-              )
+
+              // Invalidate location-based queries
+              queryClient.invalidateQueries({
+                queryKey: eventsQueryKeys.list({
+                  lat: userLocation.lat,
+                  lng: userLocation.lng,
+                  radius,
+                })
+              })
             }
           }
 

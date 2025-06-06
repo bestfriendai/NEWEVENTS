@@ -77,7 +77,7 @@ class RealAPIEventsService {
     try {
       const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json")
       url.searchParams.set("apikey", this.ticketmasterApiKey)
-      url.searchParams.set("latlong", `${params.lat},${params.lng}`)
+      url.searchParams.set("geoPoint", `${params.lat},${params.lng}`) // Updated from latlong to geoPoint
       url.searchParams.set("radius", params.radius.toString())
       url.searchParams.set("unit", "miles")
       url.searchParams.set("size", "50")

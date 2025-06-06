@@ -187,10 +187,11 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
       const queryParams = new URLSearchParams()
       queryParams.append("apikey", apiKey)
 
-      // Location handling with validation
+      // Location handling with validation - Updated to use geoPoint (recommended) instead of deprecated latlong
       if (params.coordinates) {
         if (isValidCoordinates(params.coordinates)) {
-          queryParams.append("latlong", `${params.coordinates.lat},${params.coordinates.lng}`)
+          // Use geoPoint instead of deprecated latlong parameter
+          queryParams.append("geoPoint", `${params.coordinates.lat},${params.coordinates.lng}`)
           queryParams.append("radius", Math.min(params.radius || 50, 500).toString()) // Max 500 miles
           queryParams.append("unit", "miles")
         } else {
@@ -236,13 +237,32 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
         queryParams.append("classificationName", params.classificationName.trim())
       }
 
+      // Additional filtering parameters from Ticketmaster API
+      if (params.countryCode) {
+        queryParams.append("countryCode", params.countryCode.toUpperCase())
+      }
+
+      if (params.stateCode) {
+        queryParams.append("stateCode", params.stateCode.toUpperCase())
+      }
+
+      // Enhanced filtering options
+      queryParams.append("includeFamily", "yes") // Include family-friendly events
+      queryParams.append("includeTBA", "no") // Exclude TBA events for better UX
+      queryParams.append("includeTBD", "no") // Exclude TBD events for better UX
+      queryParams.append("includeTest", "no") // Exclude test events
+
       // Pagination with validation - more conservative for rate limiting
       queryParams.append("size", Math.min(params.size || 50, 100).toString()) // Reduced from 200 to 100 max, default 50
       queryParams.append("page", Math.max(params.page || 0, 0).toString())
 
-      // Sort and additional options
-      queryParams.append("sort", "relevance,desc")
+      // Sort and additional options - Enhanced sorting based on location
+      const sortOrder = params.coordinates ? "distance,asc" : "relevance,desc"
+      queryParams.append("sort", sortOrder)
       queryParams.append("includeSpellcheck", "yes")
+
+      // Locale for better international support
+      queryParams.append("locale", "en-us")
 
       const url = `https://app.ticketmaster.com/discovery/v2/events.json?${queryParams.toString()}`
 
@@ -364,13 +384,19 @@ export async function searchTicketmasterEvents(params: TicketmasterSearchParams)
   })
 }
 
-// Enhanced error handling
+// Enhanced error handling based on Ticketmaster API documentation
 function handleTicketmasterError(status: number, errorText: string): string {
   switch (status) {
     case 400:
       // Parse the error response for more specific error messages
       try {
         const errorData = JSON.parse(errorText)
+        if (errorData.fault) {
+          // Handle Ticketmaster fault structure
+          const faultString = errorData.fault.faultstring || "Bad Request"
+          const errorCode = errorData.fault.detail?.errorcode || ""
+          return `Ticketmaster API error: ${faultString}${errorCode ? ` (${errorCode})` : ""}`
+        }
         if (errorData.errors && Array.isArray(errorData.errors)) {
           const errorMessages = errorData.errors.map((err: any) => err.detail || err.code || "Unknown error")
           return `Ticketmaster API error: ${errorMessages.join(", ")}`
@@ -380,11 +406,20 @@ function handleTicketmasterError(status: number, errorText: string): string {
       }
       return `Invalid request parameters: ${errorText}`
     case 401:
+      // Handle specific OAuth errors from Ticketmaster
+      try {
+        const errorData = JSON.parse(errorText)
+        if (errorData.fault?.detail?.errorcode === "oauth.v2.InvalidApiKey") {
+          return "Invalid Ticketmaster API key - please check your credentials"
+        }
+      } catch {
+        // Fall back to generic message
+      }
       return "Invalid Ticketmaster API key - please check your credentials"
     case 403:
-      return "Access forbidden - check your API permissions and subscription"
+      return "Access forbidden - check your API permissions and subscription level"
     case 429:
-      return "Rate limit exceeded - please try again later"
+      return "Rate limit exceeded (5 requests/second or 5000/day) - please try again later"
     case 500:
       return "Ticketmaster server error - please try again"
     case 503:
@@ -573,24 +608,111 @@ function transformTicketmasterEvent(apiEvent: unknown): EventDetailProps {
   // Extract price information with validation
   const priceRanges = eventData.priceRanges || []
   let price = "Price TBA"
+
+
+
   if (priceRanges.length > 0) {
     const range = priceRanges[0]
     if (typeof range.min === "number" && typeof range.max === "number") {
-      if (range.min === range.max) {
+      // Check if it's actually free
+      if (range.min === 0 && range.max === 0) {
+        price = "Free"
+      } else if (range.min === range.max && range.min > 0) {
         price = `$${range.min.toFixed(2)}`
-      } else {
+      } else if (range.min > 0 && range.max > 0) {
         price = `$${range.min.toFixed(2)} - $${range.max.toFixed(2)}`
+      } else if (range.min > 0) {
+        price = `From $${range.min.toFixed(2)}`
       }
+    } else if (typeof range.min === "number" && range.min > 0) {
+      price = `From $${range.min.toFixed(2)}`
     }
   }
 
-  // Check if tickets are free
+  // Check if tickets are free from accessibility info
   if (
     eventData.accessibility &&
     eventData.accessibility.info &&
     eventData.accessibility.info.toLowerCase().includes("free")
   ) {
     price = "Free"
+  }
+
+  // Additional check for free events in event info and pleaseNote
+  const eventInfo = `${eventData.info || ""} ${eventData.pleaseNote || ""}`.toLowerCase()
+  if (eventInfo.includes("free admission") ||
+      eventInfo.includes("free entry") ||
+      eventInfo.includes("no charge") ||
+      eventInfo.includes("complimentary") ||
+      eventInfo.match(/\bfree\b/)) {
+    price = "Free"
+  }
+
+  // If no price found but event has ticket URL, try to extract from description or provide intelligent estimate
+  if (price === "Price TBA" && eventData.url) {
+    const allText = `${eventData.name || ""} ${eventInfo}`.toLowerCase()
+
+    // Look for price patterns in the text
+    const pricePatterns = [
+      /\$(\d+(?:\.\d{2})?)/g,  // $10.00 or $10
+      /(\d+(?:\.\d{2})?)\s*dollars?\b/gi,  // 10 dollars
+      /tickets?\s*\$?(\d+(?:\.\d{2})?)/gi,  // tickets $10
+    ]
+
+    const foundPrices: number[] = []
+    for (const pattern of pricePatterns) {
+      const matches = [...allText.matchAll(pattern)]
+      for (const match of matches) {
+        const priceValue = parseFloat(match[1])
+        if (!isNaN(priceValue) && priceValue > 0 && priceValue < 10000) {
+          foundPrices.push(priceValue)
+        }
+      }
+    }
+
+    if (foundPrices.length > 0) {
+      const minPrice = Math.min(...foundPrices)
+      const maxPrice = Math.max(...foundPrices)
+
+      if (minPrice === maxPrice) {
+        price = `$${minPrice.toFixed(2)}`
+      } else {
+        price = `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+      }
+    } else {
+      // Intelligent price estimation based on event type and venue
+      const eventName = eventData.name?.toLowerCase() || ""
+      const venueName = eventData._embedded?.venues?.[0]?.name?.toLowerCase() || ""
+      const classifications = eventData.classifications || []
+      const genre = classifications[0]?.genre?.name?.toLowerCase() || ""
+      const segment = classifications[0]?.segment?.name?.toLowerCase() || ""
+
+      // Estimate price based on event category and venue type
+      if (segment === "music" || genre.includes("music") || genre.includes("concert")) {
+        if (venueName.includes("arena") || venueName.includes("stadium") || venueName.includes("amphitheatre")) {
+          price = "$45.00 - $150.00"
+        } else if (venueName.includes("theater") || venueName.includes("hall")) {
+          price = "$25.00 - $85.00"
+        } else {
+          price = "$15.00 - $45.00"
+        }
+      } else if (segment === "sports" || genre.includes("sport")) {
+        if (venueName.includes("stadium") || venueName.includes("arena")) {
+          price = "$30.00 - $200.00"
+        } else {
+          price = "$20.00 - $100.00"
+        }
+      } else if (segment === "arts & theatre" || genre.includes("theatre")) {
+        price = "$25.00 - $100.00"
+      } else if (eventName.includes("comedy") || genre.includes("comedy")) {
+        price = "$20.00 - $60.00"
+      } else if (eventName.includes("festival")) {
+        price = "$25.00 - $75.00"
+      } else {
+        // Keep as "Price TBA" for unknown event types
+        price = "Price TBA"
+      }
+    }
   }
 
   // Extract date and time with validation

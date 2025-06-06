@@ -282,62 +282,55 @@ export const performanceUtils = {
   now: (): number => {
     return Date.now()
   },
-\
-  measure: async <T>(name: string, fn: () => Promise<T> | T): Promise<
-{
-  result: T
-  duration: number
-}
-> =>
-{
-  const start = Date.now()
-  const result = await fn()
-  const duration = performance.now() - start
 
-  logger.info(`Performance measurement: ${name}`, {
-    component: "performance",
-    action: "measure",
-    metadata: { name, duration },
-  })
+  measure: async <T>(name: string, fn: () => Promise<T> | T): Promise<{
+    result: T
+    duration: number
+  }> => {
+    const start = Date.now()
+    const result = await fn()
+    const duration = performance.now() - start
 
-  return { result, duration }
-}
-,
+    logger.info(`Performance measurement: ${name}`, {
+      component: "performance",
+      action: "measure",
+      metadata: { name, duration },
+    })
+
+    return { result, duration }
+  },
 
   benchmark: async <T>(
     name: string,
     fn: () => Promise<T> | T,
     iterations: number = 10
-  ): Promise<
-{
-  averageDuration: number
-  minDuration: number
-  maxDuration: number
-  results: T[]
-}
-> =>
-{
-  const durations: number[] = []
-  const results: T[] = []
+  ): Promise<{
+    averageDuration: number
+    minDuration: number
+    maxDuration: number
+    results: T[]
+  }> => {
+    const durations: number[] = []
+    const results: T[] = []
 
-  for (let i = 0; i < iterations; i++) {
-    const { result, duration } = await performanceUtils.measure(`${name} iteration ${i + 1}`, fn)
-    durations.push(duration)
-    results.push(result)
+    for (let i = 0; i < iterations; i++) {
+      const { result, duration } = await performanceUtils.measure(`${name} iteration ${i + 1}`, fn)
+      durations.push(duration)
+      results.push(result)
+    }
+
+    const averageDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length
+    const minDuration = Math.min(...durations)
+    const maxDuration = Math.max(...durations)
+
+    logger.info(`Benchmark completed: ${name}`, {
+      component: "performance",
+      action: "benchmark",
+      metadata: { name, iterations, averageDuration, minDuration, maxDuration },
+    })
+
+    return { averageDuration, minDuration, maxDuration, results }
   }
-
-  const averageDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length
-  const minDuration = Math.min(...durations)
-  const maxDuration = Math.max(...durations)
-
-  logger.info(`Benchmark completed: ${name}`, {
-    component: "performance",
-    action: "benchmark",
-    metadata: { name, iterations, averageDuration, minDuration, maxDuration },
-  })
-
-  return { averageDuration, minDuration, maxDuration, results }
-}
 }
 
 /**

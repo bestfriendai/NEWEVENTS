@@ -58,13 +58,13 @@ class RealTimeEventsAPI {
     try {
       const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json")
 
-      // Required parameters
+      // Required parameters - Updated to use geoPoint instead of deprecated latlong
       url.searchParams.set("apikey", API_CONFIG.ticketmaster.apiKey)
-      url.searchParams.set("latlong", `${params.lat},${params.lng}`)
+      url.searchParams.set("geoPoint", `${params.lat},${params.lng}`)
       url.searchParams.set("radius", params.radius.toString())
       url.searchParams.set("unit", "miles")
       url.searchParams.set("size", (params.limit || 50).toString())
-      url.searchParams.set("sort", "date,asc")
+      url.searchParams.set("sort", "distance,asc") // Sort by distance for location-based search
 
       // Optional parameters
       if (params.keyword) {
@@ -327,49 +327,80 @@ class RealTimeEventsAPI {
         return []
       }
 
-      const events: RealTimeEvent[] = data.data.map((event: any, index: number) => {
-        const eventLat = event.latitude ? Number.parseFloat(event.latitude) : 0
-        const eventLng = event.longitude ? Number.parseFloat(event.longitude) : 0
-        const distance = calculateDistance(params.lat, params.lng, eventLat, eventLng)
+      const events: RealTimeEvent[] = await Promise.all(
+        data.data.map(async (event: any, index: number) => {
+          const eventLat = event.latitude ? Number.parseFloat(event.latitude) : 0
+          const eventLng = event.longitude ? Number.parseFloat(event.longitude) : 0
+          const distance = calculateDistance(params.lat, params.lng, eventLat, eventLng)
 
-        return {
-          id: `ra_${event.event_id || index}`,
-          title: event.title || event.name || "Untitled Event",
-          description: event.description || "",
-          category: event.category || "Event",
-          startDate: event.start_time?.split("T")[0] || event.date || "",
-          endDate: event.end_time?.split("T")[0],
-          startTime: event.start_time?.split("T")[1]?.substring(0, 5) || "TBD",
-          endTime: event.end_time?.split("T")[1]?.substring(0, 5),
-          venue: {
-            name: event.venue_name || event.venue || "TBD",
-            address: event.venue_address || event.location || "",
-            city: event.city || "",
-            state: event.state || "",
-            country: event.country || "US",
-            lat: eventLat,
-            lng: eventLng,
-          },
-          pricing: {
-            min: event.min_price ? Number.parseFloat(event.min_price) : 0,
-            max: event.max_price ? Number.parseFloat(event.max_price) : 0,
+          // Get enhanced pricing information
+          let pricing = {
+            min: 0,
+            max: 0,
             currency: "USD",
             isFree: event.is_free || false,
-          },
-          organizer: {
-            name: event.organizer || "Event Organizer",
-            verified: false,
-          },
-          images: event.thumbnail ? [event.thumbnail] : [],
-          ticketUrl: event.link,
-          website: event.link,
-          rating: 3.0 + Math.random() * 2.0, // Simulated rating
-          tags: [event.category, event.type].filter(Boolean),
-          source: "RapidAPI",
-          distance,
-          popularity: Math.floor(Math.random() * 300) + 25,
-        }
-      })
+          }
+
+          try {
+            const { rapidAPIEventsService } = await import("./rapidapi-events")
+            const priceString = await rapidAPIEventsService.getEnhancedPricing(event)
+
+            // Parse the price string to extract min/max values
+            if (priceString === "Free") {
+              pricing.isFree = true
+            } else if (priceString.includes("$")) {
+              const priceMatch = priceString.match(/\$(\d+(?:\.\d{2})?)\s*-\s*\$(\d+(?:\.\d{2})?)/)
+              if (priceMatch) {
+                pricing.min = parseFloat(priceMatch[1])
+                pricing.max = parseFloat(priceMatch[2])
+              } else {
+                const singlePriceMatch = priceString.match(/\$(\d+(?:\.\d{2})?)/)
+                if (singlePriceMatch) {
+                  pricing.min = parseFloat(singlePriceMatch[1])
+                  pricing.max = pricing.min
+                }
+              }
+            }
+          } catch (error) {
+            // Fallback to original pricing logic
+            pricing.min = event.min_price ? Number.parseFloat(event.min_price) : 0
+            pricing.max = event.max_price ? Number.parseFloat(event.max_price) : 0
+          }
+
+          return {
+            id: `ra_${event.event_id || index}`,
+            title: event.title || event.name || "Untitled Event",
+            description: event.description || "",
+            category: event.category || "Event",
+            startDate: event.start_time?.split("T")[0] || event.date || "",
+            endDate: event.end_time?.split("T")[0],
+            startTime: event.start_time?.split("T")[1]?.substring(0, 5) || "TBD",
+            endTime: event.end_time?.split("T")[1]?.substring(0, 5),
+            venue: {
+              name: event.venue_name || event.venue || "TBD",
+              address: event.venue_address || event.location || "",
+              city: event.city || "",
+              state: event.state || "",
+              country: event.country || "US",
+              lat: eventLat,
+              lng: eventLng,
+            },
+            pricing,
+            organizer: {
+              name: event.organizer || "Event Organizer",
+              verified: false,
+            },
+            images: event.thumbnail ? [event.thumbnail] : [],
+            ticketUrl: event.link,
+            website: event.link,
+            rating: 3.0 + Math.random() * 2.0, // Simulated rating
+            tags: [event.category, event.type].filter(Boolean),
+            source: "RapidAPI",
+            distance,
+            popularity: Math.floor(Math.random() * 300) + 25,
+          }
+        })
+      )
 
       logger.info(`Successfully fetched ${events.length} events from RapidAPI`, {
         component: "RealTimeEventsAPI",

@@ -665,11 +665,12 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
     formattedTime = formatted.formattedTime
   }
 
-  // Extract price using enhanced extraction
+  // Extract price using enhanced extraction with ticket links
   let price = "Price TBA"
   try {
     const { rapidAPIEventsService } = await import("./rapidapi-events")
-    price = rapidAPIEventsService.extractPrice(event)
+    // Use the enhanced pricing method that includes ticket link analysis
+    price = await rapidAPIEventsService.getEnhancedPricing(event)
 
     // Log pricing extraction for debugging
     logger.debug("Price extraction result", {
@@ -678,6 +679,12 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
       metadata: {
         eventTitle: event.name || event.title,
         extractedPrice: price,
+        eventStructure: {
+          allFields: Object.keys(event),
+          hasTicketLinks: !!event.ticket_links,
+          hasLink: !!event.link,
+          linkValue: event.link,
+        },
         originalPriceData: {
           is_free: event.is_free,
           min_price: event.min_price,
@@ -685,6 +692,9 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
           price: event.price,
           ticket_price: event.ticket_price,
           cost: event.cost,
+          admission: event.admission,
+          fee: event.fee,
+          pricing: event.pricing,
         },
       },
     })
