@@ -2,9 +2,23 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
-import { MapPin, Search, ArrowRight, Users } from "lucide-react"
+import { MapPin, Search, ArrowRight, Users, Loader2 } from "lucide-react"
+
+// Dynamic import for globe component with fallback
+const GlobeWithFallback = dynamic(() => import("@/components/globe-with-fallback"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[600px] h-[600px] max-w-full aspect-square rounded-full bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
+        <p className="text-gray-400 text-sm">Loading Interactive Globe...</p>
+      </div>
+    </div>
+  ),
+})
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
@@ -62,23 +76,27 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Globe Container - Simplified */}
+            {/* Interactive Globe Container */}
             <div className="relative mx-auto max-w-4xl">
               <div className="relative z-10 flex justify-center">
                 <div className="relative">
-                  <div className="w-[600px] h-[600px] max-w-full aspect-square rounded-full bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <p className="text-gray-400 text-sm">Interactive Globe</p>
-                    </div>
-                  </div>
-                  {/* Glow effect around globe */}
-                  <div className="absolute inset-0 bg-gradient-radial from-purple-500/20 via-transparent to-transparent rounded-full blur-xl pointer-events-none"></div>
+                  {/* Interactive Globe Component with Fallback */}
+                  <GlobeWithFallback
+                    size={600}
+                    className="drop-shadow-2xl"
+                  />
+                  {/* Enhanced Glow effect around globe */}
+                  <div className="absolute inset-0 bg-gradient-radial from-purple-500/30 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-gradient-radial from-blue-500/20 via-transparent to-transparent rounded-full blur-3xl pointer-events-none"></div>
                 </div>
+              </div>
+
+              {/* Floating particles effect */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-purple-400 rounded-full opacity-60 animate-pulse"></div>
+                <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-blue-400 rounded-full opacity-40 animate-pulse delay-1000"></div>
+                <div className="absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-pink-400 rounded-full opacity-50 animate-pulse delay-2000"></div>
+                <div className="absolute top-1/2 right-1/3 w-1 h-1 bg-indigo-400 rounded-full opacity-30 animate-pulse delay-3000"></div>
               </div>
             </div>
           </div>
