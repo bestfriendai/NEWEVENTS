@@ -19,16 +19,16 @@ This document compares the Ticketmaster API implementation before and after the 
 ### 1. Location Parameter
 
 #### Before (Deprecated)
-```typescript
+\`\`\`typescript
 // Using deprecated latlong parameter
 queryParams.append("latlong", `${lat},${lng}`)
-```
+\`\`\`
 
 #### After (Recommended)
-```typescript
+\`\`\`typescript
 // Using recommended geoPoint parameter
 queryParams.append("geoPoint", `${lat},${lng}`)
-```
+\`\`\`
 
 **Benefits**:
 - Future-proof implementation
@@ -38,7 +38,7 @@ queryParams.append("geoPoint", `${lat},${lng}`)
 ### 2. Error Handling
 
 #### Before (Basic)
-```typescript
+\`\`\`typescript
 function handleTicketmasterError(status: number, errorText: string): string {
   switch (status) {
     case 401:
@@ -49,10 +49,10 @@ function handleTicketmasterError(status: number, errorText: string): string {
       return `API error ${status}`
   }
 }
-```
+\`\`\`
 
 #### After (Enhanced)
-```typescript
+\`\`\`typescript
 function handleTicketmasterError(status: number, errorText: string): string {
   switch (status) {
     case 401:
@@ -70,7 +70,7 @@ function handleTicketmasterError(status: number, errorText: string): string {
     // ... more specific error handling
   }
 }
-```
+\`\`\`
 
 **Benefits**:
 - Specific error messages based on Ticketmaster fault structure
@@ -80,16 +80,16 @@ function handleTicketmasterError(status: number, errorText: string): string {
 ### 3. API Parameters
 
 #### Before (Limited)
-```typescript
+\`\`\`typescript
 // Basic parameters only
 queryParams.append("keyword", params.keyword)
 queryParams.append("size", params.size.toString())
 queryParams.append("page", params.page.toString())
 queryParams.append("sort", "relevance,desc")
-```
+\`\`\`
 
 #### After (Enhanced)
-```typescript
+\`\`\`typescript
 // Enhanced parameters for better filtering
 queryParams.append("keyword", params.keyword.trim())
 queryParams.append("size", Math.min(params.size || 50, 100).toString())
@@ -105,7 +105,7 @@ queryParams.append("locale", "en-us")
 // Dynamic sorting
 const sortOrder = params.coordinates ? "distance,asc" : "relevance,desc"
 queryParams.append("sort", sortOrder)
-```
+\`\`\`
 
 **Benefits**:
 - Better event quality (exclude TBA/TBD/test events)
@@ -116,17 +116,17 @@ queryParams.append("sort", sortOrder)
 ### 4. Sorting Logic
 
 #### Before (Static)
-```typescript
+\`\`\`typescript
 // Always sort by relevance
 queryParams.append("sort", "relevance,desc")
-```
+\`\`\`
 
 #### After (Dynamic)
-```typescript
+\`\`\`typescript
 // Dynamic sorting based on search type
 const sortOrder = params.coordinates ? "distance,asc" : "relevance,desc"
 queryParams.append("sort", sortOrder)
-```
+\`\`\`
 
 **Benefits**:
 - Location-based searches show nearest events first
@@ -136,13 +136,13 @@ queryParams.append("sort", sortOrder)
 ### 5. Rate Limiting
 
 #### Before (Basic)
-```typescript
+\`\`\`typescript
 // Simple rate limiting
 await rateLimiter.waitIfNeeded()
-```
+\`\`\`
 
 #### After (API-Compliant)
-```typescript
+\`\`\`typescript
 // Ticketmaster-specific rate limiting
 // 5 requests per second, 5000 per day
 await rateLimiter.waitIfNeeded()
@@ -155,7 +155,7 @@ const response = await withRetry(() => fetch(url), {
   maxAttempts: 3, 
   baseDelay: 1000 
 })
-```
+\`\`\`
 
 **Benefits**:
 - Respects API limits (5 req/sec, 5000/day)
@@ -165,7 +165,7 @@ const response = await withRetry(() => fetch(url), {
 ### 6. Price Extraction
 
 #### Before (Basic)
-```typescript
+\`\`\`typescript
 // Simple price range handling
 if (priceRanges.length > 0) {
   const range = priceRanges[0]
@@ -175,10 +175,10 @@ if (priceRanges.length > 0) {
     price = `$${range.min.toFixed(2)} - $${range.max.toFixed(2)}`
   }
 }
-```
+\`\`\`
 
 #### After (Comprehensive)
-```typescript
+\`\`\`typescript
 // Enhanced price extraction with multiple fallbacks
 if (priceRanges.length > 0) {
   const range = priceRanges[0]
@@ -203,7 +203,7 @@ if (eventData.accessibility?.info?.toLowerCase().includes("free")) {
 
 // Text pattern matching for prices
 // Intelligent estimation based on event type
-```
+\`\`\`
 
 **Benefits**:
 - Better free event detection

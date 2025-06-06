@@ -25,7 +25,7 @@ Authentication for APIs on RapidAPI is standardized. You typically need to inclu
 -   `X-RapidAPI-Host`: The specific host for the Events API you subscribed to (e.g., `specific-events-api.p.rapidapi.com`).
 
 **Example (JavaScript `fetch`):**
-```javascript
+\`\`\`javascript
 const apiKey = 'YOUR_RAPIDAPI_KEY'; // Replace with your key
 const apiHost = 'chosen-events-api.p.rapidapi.com'; // Replace with the API's host
 
@@ -58,7 +58,7 @@ async function fetchEvents(params) {
 // fetchEvents({ location: 'New York', date: '2025-07-04', keyword: 'festival' })
 //   .then(data => console.log(data))
 //   .catch(err => console.error(err));
-```
+\`\`\`
 RapidAPI's interface usually provides code snippets in various languages with these headers pre-filled for each endpoint of a subscribed API [1][4].
 
 ---
@@ -85,7 +85,7 @@ The specific endpoints will **vary greatly** depending on the Events API provide
     *   Sometimes `GET /venues/{venue_id}` or venue details might be nested within event details.
 
 **Example Structure (Conceptual - check specific API for actuals):**
-```
+\`\`\`
 // Hypothetical search endpoint
 GET https://chosen-events-api.p.rapidapi.com/v1/events/search
     ?query=music festival
@@ -93,7 +93,7 @@ GET https://chosen-events-api.p.rapidapi.com/v1/events/search
     &start_date=2025-08-01
     &end_date=2025-08-03
     &radius=20km
-```
+\`\`\`
 
 ---
 
@@ -131,7 +131,7 @@ RapidAPI standardizes some error responses, but the specific error messages and 
 -   `5xx Server Error`: An issue with the API provider's servers or RapidAPI's infrastructure.
 
 **Example Error Handling (JavaScript `fetch`):**
-```javascript
+\`\`\`javascript
 // ... inside your fetchEvents function
 if (!response.ok) {
   let errorPayload = { message: `HTTP error! status: ${response.status}` };
@@ -145,7 +145,7 @@ if (!response.ok) {
   // You might want to throw a custom error object
   throw new Error(`API Error (${response.status}): ${errorPayload.message || errorPayload.error || 'Unknown API error'}`);
 }
-```
+\`\`\`
 
 ---
 

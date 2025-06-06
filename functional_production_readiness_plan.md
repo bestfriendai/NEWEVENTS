@@ -98,7 +98,7 @@ The review will be conducted in several phases:
 
 ## 5. Diagram: Review Flow
 
-```mermaid
+\`\`\`mermaid
 graph TD
     A[Start: Analyze Codebase for Functional Production-Readiness] --> B{Phase 1: High-Level Structure};
     B --> C{Phase 2: API Endpoint Review};
@@ -114,6 +114,6 @@ graph TD
 
     style A fill:#f9f,stroke:#333,stroke-width:2px
     style H fill:#f9f,stroke:#333,stroke-width:2px
-```
+\`\`\`
 
 This plan will guide the systematic review of the codebase to identify functional improvements for production readiness.

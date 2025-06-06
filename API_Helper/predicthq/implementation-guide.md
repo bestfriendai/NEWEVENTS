@@ -13,21 +13,21 @@ PredictHQ uses **OAuth 2.0 Bearer Tokens** for authentication.
 2.  Create an application in the PredictHQ Control Center (developer dashboard).
 3.  Your `client_id` and `client_secret` will be provided.
 4.  Use these credentials to request an access token from the PredictHQ OAuth token endpoint: `https://auth.predicthq.com/oauth2/token`
-    ```bash
+    \`\`\`bash
     curl -X POST "https://auth.predicthq.com/oauth2/token" \
          -H "Content-Type: application/x-www-form-urlencoded" \
          -d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&scope=events"
-    ```
+    \`\`\`
     (Replace `YOUR_CLIENT_ID` and `YOUR_CLIENT_SECRET`). The `scope` parameter might vary based on your subscription (e.g., `events`, `features`).
 
 **Using the Access Token:**
 Include the access token in the `Authorization` header for all API requests:
-```python
+\`\`\`python
 headers = {
     "Authorization": "Bearer YOUR_ACCESS_TOKEN", # Replace with your obtained token
     "Accept": "application/json"
 }
-```
+\`\`\`
 [Source: PredictHQ Authentication Docs, General OAuth 2.0 Practices][2][5]
 
 ---
@@ -60,7 +60,7 @@ Used to search and retrieve detailed information about events.
 -   `offset`: For pagination.
 
 **Example Request (Python):**
-```python
+\`\`\`python
 import requests
 
 ACCESS_TOKEN = "YOUR_ACCESS_TOKEN"
@@ -85,7 +85,7 @@ if response.status_code == 200:
         print(f"Event: {event['title']}, Rank: {event.get('rank')}, Start: {event['start']}")
 else:
     print(f"Error: {response.status_code} - {response.text}")
-```
+\`\`\`
 
 ### Features API
 Provides pre-aggregated event data, useful for understanding overall event impact in a location over time.
@@ -141,7 +141,7 @@ PredictHQ uses standard HTTP status codes:
 -   `502 Bad Gateway`, `503 Service Unavailable`, `504 Gateway Timeout`: Temporary issues, potentially with upstream services or PredictHQ itself. Retry with backoff.
 
 **Example Error Handling (Python):**
-```python
+\`\`\`python
 try:
     response = requests.get(url, headers=headers, params=params)
     response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
@@ -157,7 +157,7 @@ except requests.exceptions.RequestException as req_err:
     print(f"Request exception occurred: {req_err}")
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
-```
+\`\`\`
 
 ---
 

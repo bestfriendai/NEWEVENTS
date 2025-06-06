@@ -41,7 +41,7 @@
 
 **Overall Workflow Diagram:**
 
-```mermaid
+\`\`\`mermaid
 graph TD
     A[Start: User Request & Initial Info] --> B[Clarify Project Purpose & RapidAPI Scope];
     B -- User Input --> C[Verify Existing Guides Status];

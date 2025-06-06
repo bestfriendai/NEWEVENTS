@@ -15,12 +15,12 @@ All Mapbox APIs and SDKs require an **access token**.
 
 **Setup for Mapbox GL JS (Web):**
 Include the Mapbox GL JS library and CSS in your HTML:
-```html
+\`\`\`html
 <script src='https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js'></script>
 <link href='https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css' rel='stylesheet' />
-```
+\`\`\`
 Initialize the map in your JavaScript:
-```javascript
+\`\`\`javascript
 mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN'; // Replace with your actual token
 const map = new mapboxgl.Map({
   container: 'map', // ID of the div where the map will render
@@ -28,7 +28,7 @@ const map = new mapboxgl.Map({
   center: [-74.5, 40], // Initial map center [longitude, latitude]
   zoom: 9 // Initial zoom level
 });
-```
+\`\`\`
 [Source: Mapbox GL JS Docs][5]
 
 ---
@@ -38,7 +38,7 @@ const map = new mapboxgl.Map({
 ### Displaying Maps
 The core functionality is rendering an interactive map. Mapbox GL JS provides extensive customization options for map styles, controls, and interactivity.
 
-```javascript
+\`\`\`javascript
 // Basic map initialization (as shown in setup)
 const map = new mapboxgl.Map({ /* ... configuration ... */ });
 
@@ -56,12 +56,12 @@ map.addControl(new mapboxgl.GeolocateControl({
   trackUserLocation: true,
   showUserHeading: true
 }));
-```
+\`\`\`
 
 ### Adding Event Markers
 Display event locations using markers. Markers can be customized and can include popups with event information.
 
-```javascript
+\`\`\`javascript
 // Example: Adding a single event marker
 const eventMarker = new mapboxgl.Marker({ color: 'red' }) // Customize marker color, element, etc.
   .setLngLat([-73.985130, 40.758896]) // Event coordinates [longitude, latitude]
@@ -69,13 +69,13 @@ const eventMarker = new mapboxgl.Marker({ color: 'red' }) // Customize marker co
   .addTo(map);
 
 // For many events, consider clustering or data-driven styling (see Best Practices).
-```
+\`\`\`
 [Source: Mapbox GL JS Markers][5]
 
 ### Geocoding (Address to Coordinates)
 Convert addresses (e.g., event venue addresses) into geographic coordinates (latitude, longitude) using the Mapbox Geocoding API.
 
-```javascript
+\`\`\`javascript
 async function getCoordinates(address) {
   const accessToken = mapboxgl.accessToken;
   const response = await fetch(
@@ -103,13 +103,13 @@ try {
 } catch (error) {
   console.error(error.message);
 }
-```
+\`\`\`
 [Source: Mapbox Geocoding API][3]
 
 ### Reverse Geocoding (Coordinates to Address)
 Convert geographic coordinates into a human-readable address. Useful if you have coordinates and need to display an address.
 
-```javascript
+\`\`\`javascript
 async function getAddress(longitude, latitude) {
   const accessToken = mapboxgl.accessToken;
   const response = await fetch(
@@ -135,7 +135,7 @@ try {
 } catch (error) {
   console.error(error.message);
 }
-```
+\`\`\`
 [Source: Mapbox Geocoding API][3]
 
 ---
@@ -155,7 +155,7 @@ When working with Mapbox GL JS, markers and popups are typically created program
 
 **GeoJSON for Data Layers:**
 For displaying multiple events or complex shapes, GeoJSON is the standard format.
-```json
+\`\`\`json
 {
   "type": "FeatureCollection",
   "features": [
@@ -175,7 +175,7 @@ For displaying multiple events or complex shapes, GeoJSON is the standard format
     // ... more event features
   ]
 }
-```
+\`\`\`
 You can add a GeoJSON source to the map and style its features (points, lines, polygons) using layers.
 
 ---
@@ -184,7 +184,7 @@ You can add a GeoJSON source to the map and style its features (points, lines, p
 
 ### Error Handling
 - **Mapbox GL JS Events:** The `map` object emits an `error` event for issues like invalid tokens, style loading failures, or tile errors.
-  ```javascript
+  \`\`\`javascript
   map.on('error', (e) => {
     console.error('Mapbox GL JS Error:', e.error);
     // Example: Handle specific errors
@@ -195,7 +195,7 @@ You can add a GeoJSON source to the map and style its features (points, lines, p
       console.warn('Mapbox rate limit hit. Consider optimizing or upgrading your plan.');
     }
   });
-  ```
+  \`\`\`
 - **API Requests (Geocoding, etc.):** Check HTTP status codes.
     - `200 OK`: Success.
     - `400 Bad Request`: Invalid parameters.
@@ -223,7 +223,7 @@ You can add a GeoJSON source to the map and style its features (points, lines, p
 1.  **Token Security**: Store access tokens securely. For client-side web apps, public tokens are used, but be mindful of their scopes. For server-side API calls, use secret tokens and protect them.
 2.  **Performance with Many Markers**:
     *   **Clustering**: For a large number of event markers, use Mapbox's built-in GeoJSON clustering capabilities or libraries like `supercluster`.
-      ```javascript
+      \`\`\`javascript
       // Example: Adding a clustered GeoJSON source
       map.addSource('events', {
         type: 'geojson',
@@ -233,7 +233,7 @@ You can add a GeoJSON source to the map and style its features (points, lines, p
         clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
       });
       // Then add layers to style clusters and individual points.
-      ```
+      \`\`\`
     *   **Data-Driven Styling**: Efficiently style many features.
     *   **Vector Tiles**: For very large datasets, consider creating and using vector tiles.
 3.  **Efficient Data Loading**: Load event data dynamically based on the map's viewport (bounding box and zoom level) to avoid fetching and rendering unnecessary data.

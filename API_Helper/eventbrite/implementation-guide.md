@@ -13,12 +13,12 @@ Eventbrite uses **OAuth 2.0** for authentication, requiring either server-side (
 3. After approval, use the `client_id` (API key) and `client_secret` for authentication.
 
 Example authentication header for API requests:
-```javascript
+\`\`\`javascript
 headers: {
   'Authorization': `Bearer ${ACCESS_TOKEN}`,
   'Content-Type': 'application/json'
 }
-```
+\`\`\`
 
 ---
 
@@ -26,7 +26,7 @@ headers: {
 
 ### 1. **Search Events**
 Relevant for finding events based on keywords, location, and date.
-```javascript
+\`\`\`javascript
 // Example: Search events in NYC with keyword "music" for October 2025
 const response = await fetch(
   'https://www.eventbriteapi.com/v3/events/search/?q=music&location.address=New+York&start_date.range_end=2025-10-31',
@@ -39,7 +39,7 @@ const response = await fetch(
 );
 const data = await response.json();
 console.log(data.events); // Array of event objects
-```
+\`\`\`
 **Key Parameters for Event Search:**
 - `q`: Keyword to search for (e.g., "concert", "workshop").
 - `location.address`: Human-readable location (e.g., "San Francisco, CA", "London").
@@ -54,7 +54,7 @@ console.log(data.events); // Array of event objects
 
 ### 2. **Fetch Event Details**
 Retrieve detailed information for a specific event using its ID.
-```javascript
+\`\`\`javascript
 // Example: Get details for event ID 123456789
 const eventId = '123456789'; // Replace with an actual event ID
 const response = await fetch(
@@ -68,12 +68,12 @@ const response = await fetch(
 );
 const eventDetails = await response.json();
 console.log(eventDetails);
-```
+\`\`\`
 This endpoint returns comprehensive details including description, start/end times, capacity, ticket information, venue, and organizer.
 
 ### 3. **Venue Information**
 Retrieve details for a specific venue using its ID. Venue IDs are often included in event details.
-```javascript
+\`\`\`javascript
 // Example: Retrieve venue details by ID 987654321
 const venueId = '987654321'; // Replace with an actual venue ID
 const response = await fetch(
@@ -87,7 +87,7 @@ const response = await fetch(
 );
 const venueDetails = await response.json();
 console.log(venueDetails);
-```
+\`\`\`
 This provides information like venue name, address, capacity, and location coordinates.
 
 ---
@@ -122,7 +122,7 @@ The API uses standard HTTP status codes. Common ones include:
 - `503 Service Unavailable`: The service is temporarily unavailable.
 
 **Example Error Handling in JavaScript:**
-```javascript
+\`\`\`javascript
 try {
   const response = await fetch(apiUrl, { headers });
   const data = await response.json();
@@ -141,7 +141,7 @@ try {
   console.error(`Network or parsing error: ${error.message}`);
   return null; // Or re-throw
 }
-```
+\`\`\`
 
 ### Rate Limiting
 - Eventbrite's API has rate limits to ensure fair usage. Specific limits are not detailed in the provided search results but are common for public APIs.
@@ -160,7 +160,7 @@ try {
 1.  **Securely Store Credentials**: Never expose your `client_secret` or access tokens in client-side code or public repositories[5]. Use environment variables or secure server-side storage.
 2.  **Use HTTPS**: Always make API calls over HTTPS to protect data in transit.
 3.  **Handle Pagination**: For endpoints that return lists of items (e.g., event search), properly handle pagination using parameters like `page` or `continuation` tokens provided in the API response to fetch all results.
-    ```javascript
+    \`\`\`javascript
     // Pseudocode for handling pagination
     let allEvents = [];
     let page = 1;
@@ -173,7 +173,7 @@ try {
       page++;
       if (hasMore) await new Promise(resolve => setTimeout(resolve, 200)); // Be respectful of rate limits
     }
-    ```
+    \`\`\`
 4.  **Cache Responses**: Cache frequently accessed, non-volatile data (like venue details or past event information) to improve performance and reduce API calls.
 5.  **Use Webhooks**: For real-time updates on event changes (e.g., event updated, order placed), consider using Eventbrite's webhook system instead of polling[2]. This is more efficient.
 6.  **Specific `expand` Usage**: Only use the `expand` parameter to request additional nested data when necessary, as it can increase response size and processing time.
