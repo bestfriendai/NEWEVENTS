@@ -12,11 +12,36 @@ interface DateRangePickerProps {
   className?: string
   dateRange?: DateRange
   onDateRangeChange?: (dateRange: DateRange | undefined) => void
+  // Additional props for compatibility
+  value?: { start: Date; end: Date } | null
+  onChange?: (value: { start: Date; end: Date } | null) => void
+  placeholder?: string
 }
 
-export function DateRangePicker({ className, dateRange, onDateRangeChange }: DateRangePickerProps) {
-  // Provide default values for props to prevent errors
-  const handleDateChange = onDateRangeChange || (() => {})
+export function DateRangePicker({
+  className,
+  dateRange,
+  onDateRangeChange,
+  value,
+  onChange,
+  placeholder = "Pick a date range"
+}: DateRangePickerProps) {
+  // Handle both prop patterns for compatibility
+  const currentRange = dateRange || (value ? { from: value.start, to: value.end } : undefined)
+
+  const handleDateChange = (range: DateRange | undefined) => {
+    // Call the original handler if provided
+    onDateRangeChange?.(range)
+
+    // Call the new handler if provided
+    if (onChange) {
+      if (range?.from && range?.to) {
+        onChange({ start: range.from, end: range.to })
+      } else {
+        onChange(null)
+      }
+    }
+  }
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -31,16 +56,16 @@ export function DateRangePicker({ className, dateRange, onDateRangeChange }: Dat
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4 text-purple-400" />
-            {dateRange?.from ? (
-              dateRange.to ? (
+            {currentRange?.from ? (
+              currentRange.to ? (
                 <>
-                  {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                  {format(currentRange.from, "LLL dd, y")} - {format(currentRange.to, "LLL dd, y")}
                 </>
               ) : (
-                format(dateRange.from, "LLL dd, y")
+                format(currentRange.from, "LLL dd, y")
               )
             ) : (
-              <span>Pick a date range</span>
+              <span>{placeholder}</span>
             )}
           </Button>
         </PopoverTrigger>
@@ -48,8 +73,8 @@ export function DateRangePicker({ className, dateRange, onDateRangeChange }: Dat
           <Calendar
             initialFocus
             mode="range"
-            {...(dateRange?.from && { defaultMonth: dateRange.from })}
-            selected={dateRange}
+            {...(currentRange?.from && { defaultMonth: currentRange.from })}
+            selected={currentRange}
             onSelect={handleDateChange}
             numberOfMonths={2}
             className="bg-[#1A1D25] text-gray-300"

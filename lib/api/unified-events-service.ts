@@ -109,24 +109,27 @@ class UnifiedEventsService {
   async searchEvents(params: UnifiedEventSearchParams): Promise<UnifiedEventsResponse> {
     const startTime = Date.now()
 
+    // Normalize and validate parameters
+    const normalizedParams = this.normalizeSearchParams(params)
+
     try {
       logger.info("Starting unified events search", {
         component: "UnifiedEventsService",
         action: "searchEvents",
-        metadata: params,
+        metadata: { original: params, normalized: normalizedParams },
       })
 
       // Input validation
-      if (params.lat && (params.lat < -90 || params.lat > 90)) {
+      if (normalizedParams.lat && (normalizedParams.lat < -90 || normalizedParams.lat > 90)) {
         throw new Error("Invalid latitude: must be between -90 and 90")
       }
-      if (params.lng && (params.lng < -180 || params.lng > 180)) {
+      if (normalizedParams.lng && (normalizedParams.lng < -180 || normalizedParams.lng > 180)) {
         throw new Error("Invalid longitude: must be between -180 and 180")
       }
-      if (params.radius && (params.radius < 1 || params.radius > 500)) {
+      if (normalizedParams.radius && (normalizedParams.radius < 1 || normalizedParams.radius > 500)) {
         throw new Error("Invalid radius: must be between 1 and 500 km")
       }
-      if (params.limit && (params.limit < 1 || params.limit > 200)) {
+      if (normalizedParams.limit && (normalizedParams.limit < 1 || normalizedParams.limit > 200)) {
         throw new Error("Invalid limit: must be between 1 and 200")
       }
 
@@ -134,7 +137,7 @@ class UnifiedEventsService {
       const allEvents: EventDetailProps[] = []
 
       // First, check for cached events in Supabase (quick check)
-      const cachedEvents = await this.getCachedEvents(params)
+      const cachedEvents = await this.getCachedEvents(normalizedParams)
       if (cachedEvents.length > 0) {
         allEvents.push(...cachedEvents)
         sources.cached = cachedEvents.length
@@ -142,7 +145,7 @@ class UnifiedEventsService {
       }
 
       // If we don't have enough cached events, fetch from APIs in parallel
-      const remainingLimit = (params.limit || 50) - allEvents.length // Reduced back to 50 default
+      const remainingLimit = (normalizedParams.limit || 50) - allEvents.length
       if (remainingLimit > 0) {
         const apiLimit = Math.max(remainingLimit, 50) // Reduced back to 50
 
@@ -152,7 +155,7 @@ class UnifiedEventsService {
         // RapidAPI promise with better error handling
         if (serverEnv.RAPIDAPI_KEY) {
           apiPromises.push(
-            this.fetchFromRapidAPI(params, apiLimit)
+            this.fetchFromRapidAPI(normalizedParams, apiLimit)
               .then((events) => ({ source: "rapidapi", events }))
               .catch((error) => {
                 logger.error("RapidAPI fetch failed", {
@@ -170,7 +173,7 @@ class UnifiedEventsService {
           await new Promise((resolve) => setTimeout(resolve, 100))
 
           apiPromises.push(
-            this.fetchFromTicketmaster(params, Math.min(apiLimit, 50)) // Limit Ticketmaster to 50 events max
+            this.fetchFromTicketmaster(normalizedParams, Math.min(apiLimit, 50)) // Limit Ticketmaster to 50 events max
               .then((events) => ({ source: "ticketmaster", events }))
               .catch((error) => {
                 logger.error("Ticketmaster fetch failed", {
@@ -201,13 +204,13 @@ class UnifiedEventsService {
 
       // Remove duplicates and apply advanced filtering
       const uniqueEvents = this.removeDuplicates(allEvents)
-      const filteredEvents = this.applyAdvancedFilters(uniqueEvents, params)
+      const filteredEvents = this.applyAdvancedFilters(uniqueEvents, normalizedParams)
 
       // Apply sorting
-      const sortedEvents = this.applySorting(filteredEvents, params)
+      const sortedEvents = this.applySorting(filteredEvents, normalizedParams)
 
       // Apply pagination
-      const { paginatedEvents, totalCount, hasMore } = this.applyPagination(sortedEvents, params)
+      const { paginatedEvents, totalCount, hasMore } = this.applyPagination(sortedEvents, normalizedParams)
 
       logger.info("Unified events search completed", {
         component: "UnifiedEventsService",
@@ -888,9 +891,9 @@ class UnifiedEventsService {
           break
 
         case 'popularity':
-          // Use attendee count or fallback to title length as popularity metric
-          const popularityA = a.attendeeCount || a.title.length
-          const popularityB = b.attendeeCount || b.title.length
+          // Use title length as popularity metric (since attendeeCount is not available)
+          const popularityA = a.title.length
+          const popularityB = b.title.length
           comparison = popularityB - popularityA // Higher is better for popularity
           break
 
@@ -974,23 +977,40 @@ class UnifiedEventsService {
     return score
   }
 
+  // Helper methods
+
   /**
-   * Apply additional filters to events (legacy method for compatibility)
+   * Normalize search parameters
    */
-  private applyFilters(events: EventDetailProps[], params: UnifiedEventSearchParams): EventDetailProps[] {
-    return this.applyAdvancedFilters(events, params)
+  private normalizeSearchParams(params: UnifiedEventSearchParams): UnifiedEventSearchParams {
+    return {
+      ...params,
+      query: params.query || params.keyword,
+      limit: params.limit || 50,
+      offset: params.offset || 0,
+      radius: params.radius || 25,
+      sortBy: params.sortBy || 'date',
+      sortOrder: params.sortOrder || 'asc',
+      includeCache: params.includeCache !== false,
+      forceRefresh: params.forceRefresh || false,
+    }
   }
 
-  // Helper methods
-  private generateNumericId(externalId: string): number {
-    // Create a numeric ID from string ID
-    let hash = 0
-    for (let i = 0; i < externalId.length; i++) {
-      const char = externalId.charCodeAt(i)
-      hash = (hash << 5) - hash + char
-      hash = hash & hash // Convert to 32-bit integer
-    }
-    return Math.abs(hash)
+  /**
+   * Extract minimum price from price string
+   */
+  private extractMinPrice(priceString: string): number | undefined {
+    if (!priceString || typeof priceString !== 'string') return undefined
+
+    // Handle free events
+    if (priceString.toLowerCase().includes('free')) return 0
+
+    // Extract numbers from price string
+    const numbers = priceString.match(/\d+(?:\.\d{2})?/g)
+    if (!numbers || numbers.length === 0) return undefined
+
+    // Return the minimum price found
+    return Math.min(...numbers.map(n => parseFloat(n)))
   }
 
   private formatDate(dateString: string): string {
@@ -1036,10 +1056,7 @@ class UnifiedEventsService {
     }
   }
 
-  private extractMinPrice(priceString: string): number | undefined {
-    const match = priceString.match(/\$(\d+(?:\.\d{2})?)/)
-    return match ? Number.parseFloat(match[1]) : undefined
-  }
+
 
   private extractMaxPrice(priceString: string): number | undefined {
     const matches = priceString.match(/\$(\d+(?:\.\d{2})?)/g)
@@ -1107,144 +1124,7 @@ class UnifiedEventsService {
     return images[randomIndex]
   }
 
-  /**
-   * Enhanced image URL validation
-   */
-  private isValidImageUrl(url: string): boolean {
-    if (!url || typeof url !== "string") return false
 
-    try {
-      const urlObj = new URL(url)
-      if (!["http:", "https:"].includes(urlObj.protocol)) return false
-
-      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".avif"]
-      const imageServices = [
-        "images.unsplash.com",
-        "img.evbuc.com",
-        "s1.ticketm.net",
-        "media.ticketmaster.com",
-        "tmol-prd.s3.amazonaws.com",
-        "livenationinternational.com",
-        "cdn.evbuc.com",
-        "eventbrite.com",
-        "rapidapi.com",
-        "pexels.com",
-        "pixabay.com",
-        "cloudinary.com",
-        "amazonaws.com",
-        "googleusercontent.com",
-        "fbcdn.net",
-        "cdninstagram.com",
-      ]
-
-      const hasImageExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
-      const isFromImageService = imageServices.some((service) => url.toLowerCase().includes(service.toLowerCase()))
-
-      return hasImageExtension || isFromImageService
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * Enhanced date/time parsing
-   */
-  private parseEventDateTimeEnhanced(date: string, time?: string): string {
-    try {
-      if (!date) return new Date().toISOString()
-
-      let dateTime: Date
-
-      // Try parsing the date
-      if (date.includes("T") || date.includes("Z")) {
-        dateTime = new Date(date)
-      } else {
-        // Combine date and time if available
-        const dateStr = time ? `${date} ${time}` : date
-        dateTime = new Date(dateStr)
-      }
-
-      // Validate the parsed date
-      if (isNaN(dateTime.getTime())) {
-        return new Date().toISOString()
-      }
-
-      return dateTime.toISOString()
-    } catch {
-      return new Date().toISOString()
-    }
-  }
-
-  /**
-   * Extract tags from event data
-   */
-  private extractEventTags(event: EventDetailProps, source: string): string[] {
-    const tags: string[] = []
-
-    // Add source as a tag
-    tags.push(source)
-
-    // Add category as a tag
-    if (event.category) {
-      tags.push(event.category.toLowerCase())
-    }
-
-    // Extract tags from title and description
-    const text = `${event.title} ${event.description}`.toLowerCase()
-    const commonTags = [
-      "music",
-      "concert",
-      "festival",
-      "comedy",
-      "theater",
-      "sports",
-      "art",
-      "food",
-      "business",
-      "conference",
-      "workshop",
-      "nightlife",
-      "community",
-      "dance",
-    ]
-
-    commonTags.forEach((tag) => {
-      if (text.includes(tag)) {
-        tags.push(tag)
-      }
-    })
-
-    // Remove duplicates and limit to 10 tags
-    return [...new Set(tags)].slice(0, 10)
-  }
-
-  /**
-   * Validate coordinate values
-   */
-  private validateCoordinate(coord: number | undefined, type: "lat" | "lng"): number | null {
-    if (typeof coord !== "number" || isNaN(coord)) return null
-
-    if (type === "lat") {
-      return coord >= -90 && coord <= 90 ? coord : null
-    } else {
-      return coord >= -180 && coord <= 180 ? coord : null
-    }
-  }
-
-  /**
-   * Validate and clean ticket links
-   */
-  private validateTicketLinks(links: any[]): any[] {
-    if (!Array.isArray(links)) return []
-
-    return links
-      .filter((link) => link && typeof link === "object" && link.link)
-      .map((link) => ({
-        source: link.source || "Tickets",
-        link: link.link,
-      }))
-      .slice(0, 5) // Limit to 5 ticket links
-  }
 
   /**
    * Generate enhanced fallback events with better variety

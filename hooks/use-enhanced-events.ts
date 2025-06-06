@@ -191,13 +191,25 @@ export function useEnhancedEvents(options: UseEnhancedEventsOptions = {}): UseEn
         const startTime = window.performance.now()
         lastFetchRef.current = startTime
 
+        // Build query string from parameters
+        const queryParams = new URLSearchParams()
+
+        Object.entries(fetchParams).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            if (Array.isArray(value)) {
+              queryParams.set(key, value.join(','))
+            } else {
+              queryParams.set(key, String(value))
+            }
+          }
+        })
+
         // Make API request
-        const response = await fetch("/api/events", {
-          method: "POST",
+        const response = await fetch(`/api/events?${queryParams.toString()}`, {
+          method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(fetchParams),
           signal: abortControllerRef.current.signal,
         })
 
