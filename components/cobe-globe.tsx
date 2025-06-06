@@ -24,42 +24,36 @@ export default function CobeGlobe({
   ]
 }: CobeGlobeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const globeRef = useRef<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoaded, setIsLoaded] = useState(false)
   const pointerInteracting = useRef<number | null>(null)
   const pointerInteractionMovement = useRef(0)
 
   useEffect(() => {
     let phi = 0
-    let width = 0
-
-    const onResize = () => {
-      if (canvasRef.current) {
-        width = canvasRef.current.offsetWidth
-      }
-    }
-
-    window.addEventListener("resize", onResize)
-    onResize()
+    let globe: any = null
 
     if (!canvasRef.current) return
 
-    const globe = createGlobe(canvasRef.current, {
+    // Initialize the globe based on official COBE documentation
+    globe = createGlobe(canvasRef.current, {
       devicePixelRatio: 2,
       width: size * 2,
       height: size * 2,
       phi: 0,
-      theta: 0.3,
-      dark: 1,
+      theta: 0,
+      dark: 1, // Dark theme
       diffuse: 1.2,
+      scale: 1,
       mapSamples: 16000,
       mapBrightness: 6,
       baseColor: [0.3, 0.3, 0.3],
-      markerColor: [0.8, 0.4, 1.0],
-      glowColor: [0.8, 0.4, 1.0],
+      markerColor: [1, 0.5, 1], // Purple markers
+      glowColor: [1, 1, 1],
+      offset: [0, 0],
       markers: markers,
       onRender: (state) => {
-        // Auto-rotation
+        // Called on every animation frame
+        // Auto-rotation when not interacting
         if (!pointerInteracting.current) {
           phi += 0.005
         }
@@ -67,10 +61,9 @@ export default function CobeGlobe({
       },
     })
 
-    globeRef.current = globe
-    setIsLoading(false)
+    setIsLoaded(true)
 
-    // Mouse interaction handlers
+    // Mouse interaction handlers for dragging
     const onPointerDown = (e: PointerEvent) => {
       pointerInteracting.current = e.clientX - pointerInteractionMovement.current
       if (canvasRef.current) {
@@ -99,6 +92,7 @@ export default function CobeGlobe({
       }
     }
 
+    // Add event listeners for interaction
     if (canvasRef.current) {
       canvasRef.current.style.cursor = "grab"
       canvasRef.current.addEventListener("pointerdown", onPointerDown)
@@ -107,10 +101,10 @@ export default function CobeGlobe({
       canvasRef.current.addEventListener("mousemove", onMouseMove)
     }
 
+    // Cleanup function
     return () => {
-      window.removeEventListener("resize", onResize)
-      if (globeRef.current) {
-        globeRef.current.destroy()
+      if (globe) {
+        globe.destroy()
       }
       if (canvasRef.current) {
         canvasRef.current.removeEventListener("pointerdown", onPointerDown)
@@ -123,23 +117,21 @@ export default function CobeGlobe({
 
   return (
     <div className={`relative ${className}`} style={{ width: size, height: size, maxWidth: "100%" }}>
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
       <canvas
         ref={canvasRef}
-        className={`w-full h-full transition-opacity duration-1000 ${isLoading ? "opacity-0" : "opacity-100"}`}
+        className={`transition-opacity duration-500 ${isLoaded ? "opacity-100" : "opacity-0"}`}
         style={{
           width: size,
           height: size,
           maxWidth: "100%",
           aspectRatio: "1",
-          contain: "layout paint size",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 pointer-events-none rounded-full"></div>
     </div>
   )
 }

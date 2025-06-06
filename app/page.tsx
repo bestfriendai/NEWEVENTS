@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
 import { MapPin, Search, ArrowRight, Users, Loader2 } from "lucide-react"
 
-// Dynamic import for globe component with fallback
-const GlobeWithFallback = dynamic(() => import("@/components/globe-with-fallback"), {
+// Dynamic import for COBE globe (properly implemented)
+const CobeGlobe = dynamic(() => import("@/components/cobe-globe"), {
   ssr: false,
   loading: () => (
     <div className="w-[600px] h-[600px] max-w-full aspect-square rounded-full bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 flex items-center justify-center">
@@ -80,10 +80,24 @@ export default function Home() {
             <div className="relative mx-auto max-w-4xl">
               <div className="relative z-10 flex justify-center">
                 <div className="relative">
-                  {/* Interactive Globe Component with Fallback */}
-                  <GlobeWithFallback
+                  {/* Interactive COBE Globe */}
+                  <CobeGlobe
                     size={600}
                     className="drop-shadow-2xl"
+                    markers={[
+                      { location: [37.7595, -122.4367], size: 0.04 }, // San Francisco
+                      { location: [40.7128, -74.0060], size: 0.04 },  // New York
+                      { location: [51.5074, -0.1278], size: 0.04 },   // London
+                      { location: [35.6762, 139.6503], size: 0.04 },  // Tokyo
+                      { location: [48.8566, 2.3522], size: 0.04 },    // Paris
+                      { location: [-33.8688, 151.2093], size: 0.04 }, // Sydney
+                      { location: [19.4326, -99.1332], size: 0.04 },  // Mexico City
+                      { location: [-22.9068, -43.1729], size: 0.04 }, // Rio de Janeiro
+                      { location: [55.7558, 37.6173], size: 0.04 },   // Moscow
+                      { location: [39.9042, 116.4074], size: 0.04 },  // Beijing
+                      { location: [34.0522, -118.2437], size: 0.04 }, // Los Angeles
+                      { location: [19.076, 72.8777], size: 0.04 },    // Mumbai
+                    ]}
                   />
                   {/* Enhanced Glow effect around globe */}
                   <div className="absolute inset-0 bg-gradient-radial from-purple-500/30 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none"></div>
