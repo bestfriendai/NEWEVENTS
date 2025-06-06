@@ -23,6 +23,9 @@ import {
   Sparkles,
   Zap,
   Sun,
+  MapPin,
+  Navigation,
+  Target,
 } from "lucide-react"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { unifiedEventsService } from "@/lib/api/unified-events-service"
@@ -32,8 +35,48 @@ import { EventCard } from "@/components/event-card"
 import { PartyHero } from "@/components/party/party-hero"
 import { FeaturedArtists } from "@/components/party/featured-artists"
 import { PartyFooter } from "@/components/party/party-footer"
+import { useLocationContext } from "@/contexts/LocationContext"
+import { locationService } from "@/lib/services/location-service"
 
-// Party-specific categories
+// Distance calculation utility
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 3959 // Earth's radius in miles
+  const dLat = (lat2 - lat1) * (Math.PI / 180)
+  const dLng = (lng2 - lng1) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+// Function to filter out sports events
+const filterOutSportsEvents = (events: any[]): any[] => {
+  const sportsKeywords = [
+    "football", "basketball", "baseball", "soccer", "hockey", "tennis",
+    "golf", "volleyball", "swimming", "track", "field", "marathon",
+    "game", "match", "tournament", "championship", "league", "playoffs",
+    "stadium", "arena", "court", "field", "track", "pool", "gym",
+    "sport", "sports", "athletic", "athletics", "team", "vs", "versus",
+    "nfl", "nba", "mlb", "nhl", "mls", "fifa", "olympics", "ncaa"
+  ]
+
+  return events.filter(event => {
+    const eventText = `${event.title || ""} ${event.description || ""} ${event.category || ""} ${event.location || ""}`.toLowerCase()
+
+    // Check if any sports keywords are present
+    const hasSportsKeywords = sportsKeywords.some(keyword => eventText.includes(keyword))
+
+    // Also check venue type for sports venues
+    const venueText = `${event.venue?.name || ""} ${event.venue?.address || ""}`.toLowerCase()
+    const isSportsVenue = ["stadium", "arena", "field", "court", "gym", "track"].some(venue => venueText.includes(venue))
+
+    // Filter out if it contains sports keywords or is at a sports venue
+    return !hasSportsKeywords && !isSportsVenue
+  })
+}
+
+// Party-specific categories with enhanced keywords
 const partyCategories = [
   { id: "all", name: "All Parties", icon: PartyPopper, color: "bg-purple-500", keywords: [] },
   {
@@ -41,35 +84,59 @@ const partyCategories = [
     name: "Day Parties",
     icon: Sun,
     color: "bg-yellow-500",
-    keywords: ["day party", "pool party", "brunch", "daytime", "outdoor", "rooftop"],
+    keywords: [
+      "day party", "pool party", "brunch", "daytime", "afternoon", "outdoor", "rooftop",
+      "beach party", "garden party", "patio", "terrace", "lawn", "picnic", "bbq",
+      "pool", "swimming", "sun", "summer", "spring", "weekend", "saturday", "sunday"
+    ],
   },
   {
     id: "festivals",
     name: "Festivals",
     icon: Sparkles,
     color: "bg-pink-500",
-    keywords: ["festival", "fest", "music festival", "outdoor festival", "concert"],
+    keywords: [
+      "festival", "fest", "music festival", "outdoor festival", "concert", "live music",
+      "art festival", "food festival", "street festival", "summer festival", "winter festival",
+      "cultural festival", "community festival", "local festival", "annual festival",
+      "multi-day", "weekend festival", "camping", "fairgrounds", "amphitheater"
+    ],
   },
   {
     id: "nightlife",
     name: "Nightlife",
     icon: Zap,
     color: "bg-blue-500",
-    keywords: ["nightclub", "club", "nightlife", "night party", "dance", "dj"],
+    keywords: [
+      "nightclub", "club", "nightlife", "night party", "dance", "dj", "disc jockey",
+      "late night", "after party", "bar", "lounge", "cocktail", "drinks", "dancing",
+      "electronic", "house", "techno", "edm", "rave", "underground", "warehouse",
+      "friday night", "saturday night", "weekend", "vip", "bottle service"
+    ],
   },
   {
     id: "brunches",
     name: "Brunches",
     icon: Users,
     color: "bg-green-500",
-    keywords: ["brunch", "bottomless brunch", "weekend brunch", "mimosa", "breakfast"],
+    keywords: [
+      "brunch", "bottomless brunch", "weekend brunch", "mimosa", "breakfast", "lunch",
+      "sunday brunch", "saturday brunch", "morning", "eggs", "pancakes", "waffles",
+      "bloody mary", "champagne", "prosecco", "coffee", "cafe", "restaurant",
+      "buffet", "all you can eat", "unlimited", "social dining"
+    ],
   },
   {
     id: "public-events",
     name: "Public Events",
     icon: Music,
     color: "bg-indigo-500",
-    keywords: ["public", "community", "free", "outdoor", "street", "park"],
+    keywords: [
+      "public", "community", "free", "outdoor", "street", "park", "plaza", "square",
+      "city event", "municipal", "government", "local", "neighborhood", "family friendly",
+      "all ages", "cultural", "educational", "charity", "fundraiser", "volunteer",
+      "civic", "town hall", "library", "museum", "gallery", "market", "fair"
+    ],
   },
 ]
 
@@ -118,6 +185,9 @@ const featuredArtists = [
 ]
 
 export default function PartyPage() {
+  // Location context
+  const { userLocation, getCurrentLocation, searchLocation, isLoading: locationLoading, error: locationError } = useLocationContext()
+
   // State management
   const [isLoading, setIsLoading] = useState(true)
   const [events, setEvents] = useState<EventDetailProps[]>([])
@@ -128,17 +198,23 @@ export default function PartyPage() {
   const [apiStatus, setApiStatus] = useState<"loading" | "success" | "error" | "partial">("loading")
   const [searchStats, setSearchStats] = useState({ successful: 0, total: 0, events: 0 })
 
+  // Location states
+  const [showLocationPrompt, setShowLocationPrompt] = useState(true)
+  const [locationQuery, setLocationQuery] = useState("")
+  const [currentLocationName, setCurrentLocationName] = useState("")
+  const [searchRadius, setSearchRadius] = useState(50) // miles - increased for better coverage
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [priceRange, setPriceRange] = useState([0, 200])
   const [dateFilter, setDateFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("relevance")
+  const [sortBy, setSortBy] = useState("date") // Default to date (soonest first)
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [eventsPerPage] = useState(24)
 
-  // Load party events with enhanced filtering
+  // Load party events with enhanced filtering and location-based search
   const loadPartyEvents = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -150,48 +226,193 @@ export default function PartyPage() {
         action: "loadPartyEvents",
         searchQuery: searchQuery || "none",
         category: selectedCategory,
+        location: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : "none",
+        radius: searchRadius,
       })
 
-      // Build party-specific search terms
+      // Build comprehensive party-specific search terms for Ticketmaster/RapidAPI (NO SPORTS)
       const partyKeywords = [
-        "party",
-        "festival",
-        "brunch",
-        "nightlife",
-        "club",
-        "dance",
-        "music",
-        "concert",
-        "entertainment",
-        "celebration",
-        "event",
-        "day party",
-        "pool party",
-        "rooftop",
-        "outdoor",
-        "live music",
-        "dj",
-        "electronic",
-        "house music",
-        "techno",
+        // Core party terms
+        "party", "parties", "celebration", "bash", "gathering", "social",
+
+        // Festival & outdoor events
+        "festival", "fest", "music festival", "outdoor festival", "street festival",
+        "food festival", "art festival", "summer festival", "winter festival",
+
+        // Nightlife & clubs
+        "nightlife", "club", "nightclub", "night club", "dance club", "lounge",
+        "bar", "pub", "cocktail", "happy hour", "after party", "late night",
+
+        // Music & entertainment
+        "concert", "live music", "band", "dj", "disc jockey", "performance",
+        "show", "entertainment", "music", "acoustic", "live band",
+
+        // Electronic & dance music
+        "electronic", "edm", "house", "techno", "trance", "dubstep", "rave",
+        "dance", "dancing", "dance party", "dance music", "beats",
+
+        // Day events
+        "brunch", "day party", "daytime", "afternoon", "morning", "lunch",
+        "bottomless brunch", "weekend brunch", "sunday brunch",
+
+        // Outdoor & venue types
+        "outdoor", "rooftop", "pool party", "beach party", "garden party",
+        "patio", "terrace", "park", "plaza", "courtyard", "lawn",
+
+        // Special events
+        "birthday", "anniversary", "graduation", "holiday", "new year",
+        "halloween", "christmas", "valentine", "st patrick", "cinco de mayo",
+
+        // Activity types
+        "karaoke", "trivia", "game night", "comedy", "stand up", "open mic",
+        "networking", "mixer", "meetup", "social hour", "wine tasting",
+
+        // Venue descriptors
+        "venue", "space", "hall", "center", "ballroom", "warehouse", "loft",
+        "studio", "gallery", "theater", "amphitheater", "pavilion",
+
+        // Event styles
+        "themed", "costume", "dress up", "formal", "casual", "upscale",
+        "underground", "exclusive", "vip", "premium", "luxury",
+
+        // Food & drink
+        "food truck", "beer garden", "wine bar", "brewery", "distillery",
+        "tasting", "culinary", "chef", "gourmet", "buffet", "catering"
       ]
 
-      let searchTerm = searchQuery || partyKeywords.slice(0, 8).join(" ")
+      // Sports exclusion keywords to filter out
+      const sportsExclusionKeywords = [
+        "football", "basketball", "baseball", "soccer", "hockey", "tennis",
+        "golf", "volleyball", "swimming", "track", "field", "marathon",
+        "game", "match", "tournament", "championship", "league", "playoffs",
+        "stadium", "arena", "court", "field", "track", "pool", "gym",
+        "sport", "sports", "athletic", "athletics", "team", "vs", "versus"
+      ]
+
+      // Build more comprehensive search terms
+      let searchTerm = searchQuery || partyKeywords.slice(0, 15).join(" ") // Use more keywords
 
       // Add category-specific keywords
       if (selectedCategory !== "all") {
         const category = partyCategories.find((c) => c.id === selectedCategory)
         if (category && category.keywords.length > 0) {
-          searchTerm = `${searchQuery || ""} ${category.keywords.join(" ")}`.trim()
+          const categoryKeywords = category.keywords.join(" ")
+          searchTerm = searchQuery
+            ? `${searchQuery} ${categoryKeywords}`
+            : `${categoryKeywords} ${partyKeywords.slice(0, 10).join(" ")}`
         }
       }
 
-      // Use unified events service for better integration
-      const searchResult = await unifiedEventsService.searchEvents({
+      // Add date filtering for upcoming events (next 3 months)
+      const now = new Date()
+      const threeMonthsFromNow = new Date()
+      threeMonthsFromNow.setMonth(now.getMonth() + 3)
+
+      // Use unified events service with location-based search and date filtering
+      const searchParams: any = {
         query: searchTerm,
         category: selectedCategory !== "all" ? selectedCategory : undefined,
-        limit: 100,
+        startDate: now.toISOString(), // Only future events
+        endDate: threeMonthsFromNow.toISOString(), // Within next 3 months
+        limit: 200, // Increased limit for better results
+      }
+
+      // ALWAYS add location parameters if available (fix for location filtering issue)
+      if (userLocation) {
+        searchParams.lat = userLocation.lat
+        searchParams.lng = userLocation.lng
+        searchParams.radius = searchRadius
+
+        logger.info("Using location-based search for party events", {
+          component: "PartyPage",
+          location: { lat: userLocation.lat, lng: userLocation.lng },
+          radius: searchRadius,
+          category: selectedCategory,
+        })
+      }
+
+      // Execute multiple parallel searches for better party coverage
+      const parallelSearches = [
+        // Main search with comprehensive terms
+        unifiedEventsService.searchEvents(searchParams),
+
+        // Additional targeted searches for more party events
+        unifiedEventsService.searchEvents({
+          ...searchParams,
+          query: "nightlife club bar lounge dance party",
+          limit: 75,
+        }),
+
+        unifiedEventsService.searchEvents({
+          ...searchParams,
+          query: "festival music concert live entertainment",
+          limit: 75,
+        }),
+
+        unifiedEventsService.searchEvents({
+          ...searchParams,
+          query: "brunch social gathering celebration event",
+          limit: 75,
+        }),
+
+        unifiedEventsService.searchEvents({
+          ...searchParams,
+          query: "dj electronic house techno dance music",
+          limit: 75,
+        }),
+      ]
+
+      logger.info("Executing parallel party searches", {
+        component: "PartyPage",
+        searchCount: parallelSearches.length,
+        location: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null,
       })
+
+      const searchResults = await Promise.allSettled(parallelSearches)
+
+      // Combine all successful results
+      let allEvents: any[] = []
+      let successfulSources = 0
+      let totalSources = 0
+
+      searchResults.forEach((result, index) => {
+        totalSources++
+        if (result.status === 'fulfilled' && result.value.events) {
+          allEvents = [...allEvents, ...result.value.events]
+          successfulSources++
+          logger.info(`Parallel search ${index + 1} successful`, {
+            component: "PartyPage",
+            eventCount: result.value.events.length,
+          })
+        } else {
+          logger.warn(`Parallel search ${index + 1} failed`, {
+            component: "PartyPage",
+            error: result.status === 'rejected' ? result.reason : 'No events',
+          })
+        }
+      })
+
+      // Remove duplicates based on event ID or title+date
+      const uniqueEvents = allEvents.filter((event, index, self) =>
+        index === self.findIndex(e =>
+          e.id === event.id ||
+          (e.title === event.title && e.date === event.date && e.location === event.location)
+        )
+      )
+
+      logger.info("Combined parallel search results", {
+        component: "PartyPage",
+        totalEvents: allEvents.length,
+        uniqueEvents: uniqueEvents.length,
+        successfulSources,
+        totalSources,
+      })
+
+      const searchResult = {
+        events: uniqueEvents,
+        sources: successfulSources,
+        total: totalSources,
+      }
 
       logger.info(`Search completed: ${searchResult.events.length} events found`, {
         sources: searchResult.sources,
@@ -201,18 +422,70 @@ export default function PartyPage() {
 
       if (searchResult.events.length === 0) {
         setApiStatus("partial")
-        setError("No party events found from APIs. Trying fallback...")
+        setError("No party events found from APIs. Trying broader search...")
 
-        // Try a broader search with just "party" and "music"
-        const fallbackResult = await unifiedEventsService.searchEvents({
-          query: "party music",
-          limit: 50,
-        })
+        // Try multiple comprehensive fallback searches with different keyword combinations (NO SPORTS)
+        const fallbackSearches = [
+          "party music dance club nightlife entertainment",
+          "festival concert live music performance show",
+          "brunch bar restaurant social event gathering",
+          "celebration birthday anniversary party event",
+          "nightclub lounge cocktail party drinks",
+          "dj electronic house techno dance music",
+          "outdoor festival park plaza event",
+          "rooftop pool party summer event",
+          "comedy karaoke trivia social night",
+          "wine beer tasting social gathering",
+          "art gallery opening cultural event",
+          "food truck festival street fair"
+        ]
+
+        let fallbackResult = null
+        for (const fallbackQuery of fallbackSearches) {
+          const fallbackParams: any = {
+            query: fallbackQuery,
+            startDate: now.toISOString(),
+            endDate: threeMonthsFromNow.toISOString(),
+            limit: 75,
+          }
+
+          // ALWAYS include location if available (fix for location filtering)
+          if (userLocation) {
+            fallbackParams.lat = userLocation.lat
+            fallbackParams.lng = userLocation.lng
+            fallbackParams.radius = searchRadius * 2 // Expand radius for fallback
+
+            logger.info("Using location-based fallback search", {
+              component: "PartyPage",
+              query: fallbackQuery,
+              location: { lat: userLocation.lat, lng: userLocation.lng },
+              radius: searchRadius * 2,
+            })
+          }
+
+          fallbackResult = await unifiedEventsService.searchEvents(fallbackParams)
+          if (fallbackResult.events.length > 0) {
+            logger.info(`Fallback search successful with query: ${fallbackQuery}`, {
+              component: "PartyPage",
+              eventCount: fallbackResult.events.length,
+            })
+            break
+          }
+        }
 
         if (fallbackResult.events.length > 0) {
-          const partyEvents = filterPartyEvents(fallbackResult.events)
+          const nonSportsEvents = filterOutSportsEvents(fallbackResult.events)
+          const partyEvents = filterPartyEvents(nonSportsEvents)
           const enhancedEvents = enhanceEventsForParty(partyEvents)
-          setEvents(enhancedEvents)
+
+          // Filter for quality events with images and descriptions
+          const qualityEvents = enhancedEvents.filter(event => {
+            const hasImage = event.image || event.thumbnail || (event.images && event.images.length > 0)
+            const hasDescription = event.description && event.description.trim().length > 20
+            return hasImage && hasDescription
+          })
+
+          setEvents(qualityEvents)
           setApiStatus("success")
           setError(null)
           setSearchStats({
@@ -226,20 +499,48 @@ export default function PartyPage() {
           setSearchStats({ successful: 0, total: 1, events: fallbackEvents.length })
         }
       } else {
-        // Filter and enhance events for party relevance
-        const partyEvents = filterPartyEvents(searchResult.events)
+        // Filter out sports events first, then filter and enhance for party relevance
+        const nonSportsEvents = filterOutSportsEvents(searchResult.events)
+        const partyEvents = filterPartyEvents(nonSportsEvents)
         const enhancedEvents = enhanceEventsForParty(partyEvents)
 
-        // Sort by party relevance first, then by date
-        const sortedEvents = enhancedEvents.sort((a, b) => {
-          const aRelevance = getPartyRelevanceScore(a)
-          const bRelevance = getPartyRelevanceScore(b)
+        // Filter out events without images or descriptions (as per user preference)
+        const qualityEvents = enhancedEvents.filter(event => {
+          const hasImage = event.image || event.thumbnail || (event.images && event.images.length > 0)
+          const hasDescription = event.description && event.description.trim().length > 20
+          return hasImage && hasDescription
+        })
 
-          if (aRelevance !== bRelevance) {
-            return bRelevance - aRelevance
+        logger.info("Applied comprehensive event filtering", {
+          component: "PartyPage",
+          originalCount: searchResult.events.length,
+          afterSportsFilter: nonSportsEvents.length,
+          afterPartyFilter: partyEvents.length,
+          afterQualityFilter: qualityEvents.length,
+        })
+
+        // Sort by date first (soonest events), then by party relevance
+        const sortedEvents = qualityEvents.sort((a, b) => {
+          const aDate = new Date(a.date).getTime()
+          const bDate = new Date(b.date).getTime()
+          const now = Date.now()
+
+          // Prioritize events happening soon (within next 7 days)
+          const aIsUpcoming = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+          const bIsUpcoming = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+          if (aIsUpcoming && !bIsUpcoming) return -1
+          if (!aIsUpcoming && bIsUpcoming) return 1
+
+          // If both are upcoming or both are not, sort by date (soonest first)
+          if (aDate !== bDate) {
+            return aDate - bDate
           }
 
-          return new Date(a.date).getTime() - new Date(b.date).getTime()
+          // If dates are the same, sort by party relevance
+          const aRelevance = getPartyRelevanceScore(a)
+          const bRelevance = getPartyRelevanceScore(b)
+          return bRelevance - aRelevance
         })
 
         setEvents(sortedEvents)
@@ -254,10 +555,14 @@ export default function PartyPage() {
           setError(`Some API sources had issues: ${searchResult.error}`)
         }
 
-        logger.info(`Successfully loaded ${sortedEvents.length} party events`, {
+        logger.info(`Successfully loaded ${sortedEvents.length} party events (sorted by date - soonest first)`, {
           sources: searchResult.sources,
           originalCount: searchResult.events.length,
           finalCount: sortedEvents.length,
+          upcomingEvents: sortedEvents.filter(e => {
+            const eventDate = new Date(e.date).getTime()
+            return eventDate - now <= 7 * 24 * 60 * 60 * 1000 && eventDate > now
+          }).length,
         })
       }
     } catch (error) {
@@ -272,7 +577,58 @@ export default function PartyPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery, selectedCategory])
+  }, [searchQuery, selectedCategory, userLocation, searchRadius])
+
+  // Location handling functions
+  const handleGetCurrentLocation = useCallback(async () => {
+    try {
+      setShowLocationPrompt(false)
+      await getCurrentLocation()
+      setCurrentLocationName("Your Current Location")
+      logger.info("Current location obtained for party search", {
+        component: "PartyPage",
+        action: "getCurrentLocation",
+      })
+    } catch (error) {
+      logger.error("Failed to get current location", {
+        component: "PartyPage",
+        action: "getCurrentLocation",
+        error: error instanceof Error ? error.message : String(error),
+      })
+      setError("Unable to get your current location. Please try searching for a location manually.")
+    }
+  }, [getCurrentLocation])
+
+  const handleLocationSearch = useCallback(async () => {
+    if (!locationQuery.trim()) return
+
+    try {
+      setShowLocationPrompt(false)
+      await searchLocation(locationQuery)
+      setCurrentLocationName(locationQuery)
+      logger.info("Location search completed for party search", {
+        component: "PartyPage",
+        action: "searchLocation",
+        query: locationQuery,
+      })
+    } catch (error) {
+      logger.error("Failed to search location", {
+        component: "PartyPage",
+        action: "searchLocation",
+        error: error instanceof Error ? error.message : String(error),
+      })
+      setError("Unable to find that location. Please try a different search term.")
+    }
+  }, [locationQuery, searchLocation])
+
+  const handleSkipLocation = useCallback(() => {
+    setShowLocationPrompt(false)
+    setCurrentLocationName("All Locations")
+    logger.info("User skipped location for party search", {
+      component: "PartyPage",
+      action: "skipLocation",
+    })
+  }, [])
 
   // Enhanced event filtering
   const filterEvents = useMemo(() => {
@@ -342,33 +698,85 @@ export default function PartyPage() {
       })
     }
 
-    // Sort events
+    // Sort events with enhanced date prioritization
     filtered.sort((a, b) => {
+      const now = Date.now()
+      const aDate = new Date(a.date).getTime()
+      const bDate = new Date(b.date).getTime()
+
       switch (sortBy) {
         case "date":
-          return new Date(a.date).getTime() - new Date(b.date).getTime()
+          // Enhanced date sorting: prioritize upcoming events (next 7 days), then chronological
+          const aIsUpcoming = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+          const bIsUpcoming = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+          if (aIsUpcoming && !bIsUpcoming) return -1
+          if (!aIsUpcoming && bIsUpcoming) return 1
+
+          // Both upcoming or both not upcoming - sort chronologically
+          return aDate - bDate
+
         case "popularity":
-          // Sort by relevance score instead of attendees
+          // Sort by relevance score, but prioritize upcoming events
+          const aIsUpcomingPop = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+          const bIsUpcomingPop = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+          if (aIsUpcomingPop && !bIsUpcomingPop) return -1
+          if (!aIsUpcomingPop && bIsUpcomingPop) return 1
+
           const aRelevance = getPartyRelevanceScore(a)
           const bRelevance = getPartyRelevanceScore(b)
           return bRelevance - aRelevance
+
         case "price":
           const priceA = extractPrice(a.price)
           const priceB = extractPrice(b.price)
           return priceA - priceB
+
         case "alphabetical":
           return a.title.localeCompare(b.title)
+
+        case "distance":
+          // Sort by distance if user location is available, but prioritize upcoming events
+          if (userLocation && a.coordinates && b.coordinates) {
+            const aIsUpcomingDist = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+            const bIsUpcomingDist = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+            if (aIsUpcomingDist && !bIsUpcomingDist) return -1
+            if (!aIsUpcomingDist && bIsUpcomingDist) return 1
+
+            const distanceA = calculateDistance(userLocation.lat, userLocation.lng, a.coordinates.lat, a.coordinates.lng)
+            const distanceB = calculateDistance(userLocation.lat, userLocation.lng, b.coordinates.lat, b.coordinates.lng)
+            return distanceA - distanceB
+          }
+          return 0
+
         case "relevance":
+          // Sort by relevance, but prioritize upcoming events
+          const aIsUpcomingRel = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+          const bIsUpcomingRel = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+          if (aIsUpcomingRel && !bIsUpcomingRel) return -1
+          if (!aIsUpcomingRel && bIsUpcomingRel) return 1
+
           const aRel = getPartyRelevanceScore(a)
           const bRel = getPartyRelevanceScore(b)
           return bRel - aRel
+
         default:
-          return 0
+          // Default: prioritize upcoming events, then by date
+          const aIsUpcomingDefault = aDate - now <= 7 * 24 * 60 * 60 * 1000 && aDate > now
+          const bIsUpcomingDefault = bDate - now <= 7 * 24 * 60 * 60 * 1000 && bDate > now
+
+          if (aIsUpcomingDefault && !bIsUpcomingDefault) return -1
+          if (!aIsUpcomingDefault && bIsUpcomingDefault) return 1
+
+          return aDate - bDate
       }
     })
 
     return filtered
-  }, [events, selectedCategory, searchQuery, priceRange, dateFilter, sortBy])
+  }, [events, selectedCategory, searchQuery, priceRange, dateFilter, sortBy, userLocation])
 
   // Update filtered events and reset pagination when filters change
   useEffect(() => {
@@ -376,10 +784,32 @@ export default function PartyPage() {
     setCurrentPage(1)
   }, [filterEvents])
 
-  // Load events on mount
+  // Load events when location changes or on mount (but only if location prompt is dismissed)
   useEffect(() => {
-    loadPartyEvents()
-  }, [loadPartyEvents])
+    if (!showLocationPrompt) {
+      loadPartyEvents()
+    }
+  }, [loadPartyEvents, showLocationPrompt])
+
+  // Auto-load events when user location is obtained
+  useEffect(() => {
+    if (userLocation && !showLocationPrompt) {
+      loadPartyEvents()
+    }
+  }, [userLocation, loadPartyEvents, showLocationPrompt])
+
+  // Reload events when category or radius changes to ensure location filtering is applied
+  useEffect(() => {
+    if (!showLocationPrompt && userLocation) {
+      logger.info("Category or radius changed, reloading events with location", {
+        component: "PartyPage",
+        category: selectedCategory,
+        radius: searchRadius,
+        location: { lat: userLocation.lat, lng: userLocation.lng },
+      })
+      loadPartyEvents()
+    }
+  }, [selectedCategory, searchRadius, userLocation, showLocationPrompt, loadPartyEvents])
 
   // Pagination
   const totalPages = Math.ceil(filteredEvents.length / eventsPerPage)
@@ -408,7 +838,7 @@ export default function PartyPage() {
     setSelectedCategory("all")
     setPriceRange([0, 200])
     setDateFilter("all")
-    setSortBy("relevance")
+    setSortBy("date") // Default to soonest first
     setCurrentPage(1)
   }
 
@@ -422,24 +852,158 @@ export default function PartyPage() {
         {/* Hero Section */}
         <PartyHero />
 
+        {/* Location Prompt */}
+        {showLocationPrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="max-w-4xl mx-auto px-4 py-6"
+          >
+            <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
+              <CardContent className="p-8 text-center">
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  className="flex flex-col items-center space-y-6"
+                >
+                  <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
+                    <MapPin className="w-8 h-8 text-purple-400" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-white">Find Parties Near You</h2>
+                    <p className="text-gray-300 max-w-md">
+                      Discover the hottest parties, festivals, and events happening around your location.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                    <Button
+                      onClick={handleGetCurrentLocation}
+                      disabled={locationLoading}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Navigation className="w-4 h-4 mr-2" />
+                      {locationLoading ? "Getting Location..." : "Use My Location"}
+                    </Button>
+
+                    <div className="flex gap-2 flex-1">
+                      <Input
+                        placeholder="Enter city or address"
+                        value={locationQuery}
+                        onChange={(e) => setLocationQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && handleLocationSearch()}
+                        className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      />
+                      <Button
+                        onClick={handleLocationSearch}
+                        disabled={!locationQuery.trim() || locationLoading}
+                        variant="outline"
+                        className="border-purple-500 text-purple-400 hover:bg-purple-500/10"
+                      >
+                        <Search className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSkipLocation}
+                    variant="ghost"
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Skip - Show All Parties
+                  </Button>
+
+                  {locationError && (
+                    <div className="text-red-400 text-sm mt-2">
+                      {locationError}
+                    </div>
+                  )}
+                </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Current Location Display */}
+        {!showLocationPrompt && currentLocationName && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="max-w-7xl mx-auto px-4 py-2"
+          >
+            <div className="flex items-center justify-between bg-gray-800/50 rounded-lg px-4 py-2 border border-gray-700">
+              <div className="flex items-center space-x-2">
+                <Target className="w-4 h-4 text-purple-400" />
+                <span className="text-sm text-gray-300">
+                  Showing parties near: <span className="text-white font-medium">{currentLocationName}</span>
+                </span>
+                {userLocation && (
+                  <span className="text-xs text-gray-500">
+                    (within {searchRadius} miles)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Select value={searchRadius.toString()} onValueChange={(value) => setSearchRadius(Number(value))}>
+                  <SelectTrigger className="w-24 h-8 bg-gray-700 border-gray-600 text-white text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25 mi</SelectItem>
+                    <SelectItem value="50">50 mi</SelectItem>
+                    <SelectItem value="75">75 mi</SelectItem>
+                    <SelectItem value="100">100 mi</SelectItem>
+                    <SelectItem value="150">150 mi</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  onClick={() => setShowLocationPrompt(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-400 hover:text-purple-300 text-xs"
+                >
+                  Change Location
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Main content */}
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-[60vh]">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
-                <p className="text-gray-400">Finding the best party events...</p>
+                <p className="text-gray-400">
+                  {userLocation
+                    ? `Finding parties near ${currentLocationName}...`
+                    : "Finding the best party events..."
+                  }
+                </p>
                 <p className="text-sm text-gray-500 mt-2">
                   {apiStatus === "loading" ? "Searching live APIs..." : "Processing results..."}
                 </p>
+                {userLocation && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Searching within {searchRadius} miles of your location
+                  </p>
+                )}
                 <div className="mt-4 text-xs text-gray-600">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 mb-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
                     <span>Ticketmaster</span>
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-100"></div>
                     <span>RapidAPI</span>
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse delay-200"></div>
-                    <span>Cached Events</span>
+                    <span>Multiple Sources</span>
+                  </div>
+                  <div className="text-xs text-gray-700">
+                    Enhanced search: 5 parallel queries • 60+ party keywords • Quality filtering
                   </div>
                 </div>
               </motion.div>
@@ -472,11 +1036,21 @@ export default function PartyPage() {
                             : "text-red-400"
                       }`}
                     >
-                      {apiStatus === "success"
-                        ? `Live Party Events • ${searchStats.successful} sources • ${events.length} events found`
-                        : apiStatus === "partial"
-                          ? `Partial Results • ${searchStats.successful}/${searchStats.total} sources • ${events.length} events`
-                          : `API Error • Using sample party events`}
+                      {(() => {
+                        const upcomingCount = events.filter(e => {
+                          const eventDate = new Date(e.date).getTime()
+                          const now = Date.now()
+                          return eventDate - now <= 7 * 24 * 60 * 60 * 1000 && eventDate > now
+                        }).length
+
+                        if (apiStatus === "success") {
+                          return `Live Party Events • ${searchStats.successful} sources • ${events.length} events found${userLocation ? ` near ${currentLocationName}` : ""} • ${upcomingCount} happening soon`
+                        } else if (apiStatus === "partial") {
+                          return `Partial Results • ${searchStats.successful}/${searchStats.total} sources • ${events.length} events${userLocation ? ` near ${currentLocationName}` : ""} • ${upcomingCount} happening soon`
+                        } else {
+                          return `API Error • Using sample party events`
+                        }
+                      })()}
                     </span>
                   </div>
                   <Button
@@ -555,6 +1129,11 @@ export default function PartyPage() {
 
                   <div className="flex items-center gap-4 text-sm text-gray-400">
                     <span>{filteredEvents.length} events found</span>
+                    {userLocation && (
+                      <span className="text-xs bg-purple-600/20 text-purple-400 px-2 py-1 rounded-full">
+                        📍 Location Active ({searchRadius}mi)
+                      </span>
+                    )}
                     {filteredEvents.length > 0 && (
                       <span>
                         Page {currentPage} of {totalPages}
@@ -618,10 +1197,11 @@ export default function PartyPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
+                                  <SelectItem value="date">Soonest First</SelectItem>
                                   <SelectItem value="relevance">Party Relevance</SelectItem>
-                                  <SelectItem value="date">Date</SelectItem>
-                                  <SelectItem value="popularity">Popularity</SelectItem>
-                                  <SelectItem value="price">Price</SelectItem>
+                                  {userLocation && <SelectItem value="distance">Nearest First</SelectItem>}
+                                  <SelectItem value="popularity">Most Popular</SelectItem>
+                                  <SelectItem value="price">Price (Low to High)</SelectItem>
                                   <SelectItem value="alphabetical">A-Z</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -669,22 +1249,69 @@ export default function PartyPage() {
                   ) : (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {paginatedEvents.map((event, i) => (
-                          <motion.div
-                            key={event.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.05 * i, duration: 0.4 }}
-                            whileHover={{ y: -5 }}
-                          >
-                            <EventCard
-                              event={event}
-                              onViewDetails={() => handleViewEventDetails(event)}
-                              onToggleFavorite={() => handleToggleFavorite(event.id)}
-                              index={i}
-                            />
-                          </motion.div>
-                        ))}
+                        {paginatedEvents.map((event, i) => {
+                          // Calculate distance if user location is available
+                          let distance: number | null = null
+                          if (userLocation && event.coordinates) {
+                            distance = calculateDistance(
+                              userLocation.lat,
+                              userLocation.lng,
+                              event.coordinates.lat,
+                              event.coordinates.lng
+                            )
+                          }
+
+                          // Check if event is happening soon (within next 7 days)
+                          const eventDate = new Date(event.date).getTime()
+                          const now = Date.now()
+                          const isUpcoming = eventDate - now <= 7 * 24 * 60 * 60 * 1000 && eventDate > now
+                          const isToday = new Date(event.date).toDateString() === new Date().toDateString()
+                          const isTomorrow = new Date(event.date).toDateString() === new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()
+
+                          return (
+                            <motion.div
+                              key={event.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.05 * i, duration: 0.4 }}
+                              whileHover={{ y: -5 }}
+                            >
+                              <div className="relative">
+                                <EventCard
+                                  event={event}
+                                  onViewDetails={() => handleViewEventDetails(event)}
+                                  onToggleFavorite={() => handleToggleFavorite(event.id)}
+                                  index={i}
+                                />
+
+                                {/* Upcoming event badge */}
+                                {isToday && (
+                                  <div className="absolute top-2 left-2 bg-red-600/90 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm border border-red-400/30 animate-pulse">
+                                    <span className="font-semibold">TODAY</span>
+                                  </div>
+                                )}
+                                {isTomorrow && !isToday && (
+                                  <div className="absolute top-2 left-2 bg-orange-600/90 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm border border-orange-400/30">
+                                    <span className="font-semibold">TOMORROW</span>
+                                  </div>
+                                )}
+                                {isUpcoming && !isToday && !isTomorrow && (
+                                  <div className="absolute top-2 left-2 bg-green-600/90 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm border border-green-400/30">
+                                    <span className="font-semibold">SOON</span>
+                                  </div>
+                                )}
+
+                                {/* Distance badge */}
+                                {distance !== null && (
+                                  <div className={`absolute top-2 right-2 bg-purple-600/90 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm border border-purple-400/30 ${isUpcoming ? 'top-12' : ''}`}>
+                                    <MapPin className="w-3 h-3 inline mr-1" />
+                                    {distance < 1 ? "< 1 mi" : `${distance.toFixed(1)} mi`}
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )
+                        })}
                       </div>
 
                       {/* Pagination */}
@@ -793,11 +1420,48 @@ function filterPartyEvents(events: EventDetailProps[]): EventDetailProps[] {
 }
 
 function enhanceEventsForParty(events: EventDetailProps[]): EventDetailProps[] {
-  return events.map((event) => ({
-    ...event,
-    category: mapToPartyCategory(event.category, event.title, event.description),
-    image: event.image || getPartyImage(event.category),
-  }))
+  return events.map((event) => {
+    const enhancedCategory = mapToPartyCategory(event.category, event.title, event.description)
+
+    // Enhanced image handling - ensure events have good images
+    let enhancedImages = event.images || []
+    let primaryImage = event.image || event.thumbnail
+
+    // If no primary image, try to get from different sources
+    if (!primaryImage) {
+      const possibleImages = [
+        event.poster,
+        event.banner,
+        event.photo,
+        event.picture,
+      ].filter(Boolean)
+
+      primaryImage = possibleImages[0] || getPartyImage(enhancedCategory)
+    }
+
+    // If no images array, create one from available sources
+    if (enhancedImages.length === 0) {
+      const allImages = [
+        primaryImage,
+        event.poster,
+        event.banner,
+        event.photo,
+        event.picture,
+      ].filter(Boolean)
+
+      enhancedImages = [...new Set(allImages)].slice(0, 3) // Remove duplicates and limit to 3
+    }
+
+    return {
+      ...event,
+      category: enhancedCategory,
+      image: primaryImage,
+      images: enhancedImages,
+      thumbnail: primaryImage,
+      // Enhance party-specific attributes
+      tags: [...(event.tags || []), "party", "social", "entertainment"],
+    }
+  })
 }
 
 function mapToPartyCategory(category: string, title: string, description: string): string {

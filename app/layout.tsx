@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 // Import the AuthProvider
 import { AuthProvider } from "@/lib/auth/auth-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { LocationProvider } from "@/contexts/LocationContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -63,12 +64,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <AuthProvider>
-            <QueryProvider>
-              <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                <div className="min-h-screen bg-background">{children}</div>
-                <Toaster />
-              </ThemeProvider>
-            </QueryProvider>
+            <LocationProvider>
+              <QueryProvider>
+                <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                  <div className="min-h-screen bg-background">{children}</div>
+                  <Toaster />
+                </ThemeProvider>
+              </QueryProvider>
+            </LocationProvider>
           </AuthProvider>
         </ErrorBoundary>
       </body>
