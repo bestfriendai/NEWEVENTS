@@ -153,7 +153,7 @@ export function EnhancedEventCard({
         <div className="relative aspect-video overflow-hidden rounded-t-lg">
           {!imageError ? (
             <img
-              src={event.image || "/placeholder.svg"}
+              src={event.image}
               alt={event.title}
               className={`h-full w-full object-cover transition-opacity duration-200 ${
                 isImageLoading ? "opacity-0" : "opacity-100"

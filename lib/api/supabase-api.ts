@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient, AuthError, PostgrestError } from "@supabase/supabase-js"
 import { env } from "@/lib/env"
 import { cookies } from "next/headers"
+import { logger } from "@/lib/utils/logger"
 
 // Function to create a Supabase client for server-side operations
 export async function createServerSupabaseClient(): Promise<SupabaseClient> {
@@ -44,7 +45,11 @@ function _handleSupabaseClientError(
 ): { error: string } | null {
   if (error) {
     const errorMessage = error.message
-    console.error(`Supabase client error during ${operationContext}: ${errorMessage}`)
+    logger.error(`Supabase client error during ${operationContext}`, {
+      component: 'SupabaseAPI',
+      action: 'handleClientError',
+      metadata: { operationContext, errorMessage }
+    }, error)
     return { error: errorMessage }
   }
   return null

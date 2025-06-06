@@ -72,7 +72,7 @@ export function EventCard({ event, onSelect, className }: EventCardProps) {
     >
       <div className="aspect-video relative overflow-hidden">
         <Image
-          src={event.image || "/placeholder.svg?height=200&width=300&text=" + encodeURIComponent(event.title)}
+          src={event.image}
           alt={event.title}
           fill
           style={{ objectFit: 'cover' }}

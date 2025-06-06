@@ -25,7 +25,7 @@ import {
   Sun,
 } from "lucide-react"
 import type { EventDetailProps } from "@/components/event-detail-modal"
-import { searchEvents } from "@/lib/api/events-api"
+import { unifiedEventsService } from "@/lib/api/unified-events-service"
 import { logger } from "@/lib/utils/logger"
 import { AppLayout } from "@/components/app-layout"
 import { EventCard } from "@/components/event-card"
@@ -186,11 +186,11 @@ export default function PartyPage() {
         }
       }
 
-      // Use the standard searchEvents function with party-focused terms
-      const searchResult = await searchEvents({
-        keyword: searchTerm,
-        size: 100,
-        sort: "date",
+      // Use unified events service for better integration
+      const searchResult = await unifiedEventsService.searchEvents({
+        query: searchTerm,
+        category: selectedCategory !== "all" ? selectedCategory : undefined,
+        limit: 100,
       })
 
       logger.info(`Search completed: ${searchResult.events.length} events found`, {
@@ -201,10 +201,30 @@ export default function PartyPage() {
 
       if (searchResult.events.length === 0) {
         setApiStatus("partial")
-        setError("No party events found from APIs. Using sample events instead.")
-        const fallbackEvents = generateFallbackPartyEvents()
-        setEvents(fallbackEvents)
-        setSearchStats({ successful: 0, total: 1, events: fallbackEvents.length })
+        setError("No party events found from APIs. Trying fallback...")
+
+        // Try a broader search with just "party" and "music"
+        const fallbackResult = await unifiedEventsService.searchEvents({
+          query: "party music",
+          limit: 50,
+        })
+
+        if (fallbackResult.events.length > 0) {
+          const partyEvents = filterPartyEvents(fallbackResult.events)
+          const enhancedEvents = enhanceEventsForParty(partyEvents)
+          setEvents(enhancedEvents)
+          setApiStatus("success")
+          setError(null)
+          setSearchStats({
+            successful: 1,
+            total: 1,
+            events: enhancedEvents.length
+          })
+        } else {
+          const fallbackEvents = generateFallbackPartyEvents()
+          setEvents(fallbackEvents)
+          setSearchStats({ successful: 0, total: 1, events: fallbackEvents.length })
+        }
       } else {
         // Filter and enhance events for party relevance
         const partyEvents = filterPartyEvents(searchResult.events)
@@ -328,7 +348,10 @@ export default function PartyPage() {
         case "date":
           return new Date(a.date).getTime() - new Date(b.date).getTime()
         case "popularity":
-          return b.attendees - a.attendees
+          // Sort by relevance score instead of attendees
+          const aRelevance = getPartyRelevanceScore(a)
+          const bRelevance = getPartyRelevanceScore(b)
+          return bRelevance - aRelevance
         case "price":
           const priceA = extractPrice(a.price)
           const priceB = extractPrice(b.price)
@@ -336,9 +359,9 @@ export default function PartyPage() {
         case "alphabetical":
           return a.title.localeCompare(b.title)
         case "relevance":
-          const aRelevance = getPartyRelevanceScore(a)
-          const bRelevance = getPartyRelevanceScore(b)
-          return bRelevance - aRelevance
+          const aRel = getPartyRelevanceScore(a)
+          const bRel = getPartyRelevanceScore(b)
+          return bRel - aRel
         default:
           return 0
       }
@@ -375,9 +398,9 @@ export default function PartyPage() {
   }
 
   const handleToggleFavorite = (id: number) => {
-    setEvents((prevEvents) =>
-      prevEvents.map((event) => (event.id === id ? { ...event, isFavorite: !event.isFavorite } : event)),
-    )
+    // Favorite functionality can be implemented with user authentication
+    logger.info("Favorite toggled", { eventId: id })
+    // For now, just log the action - can be connected to user preferences later
   }
 
   const handleClearFilters = () => {
@@ -406,7 +429,19 @@ export default function PartyPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
                 <p className="text-gray-400">Finding the best party events...</p>
-                <p className="text-sm text-gray-500 mt-2">This may take a moment</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {apiStatus === "loading" ? "Searching live APIs..." : "Processing results..."}
+                </p>
+                <div className="mt-4 text-xs text-gray-600">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <span>Ticketmaster</span>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-100"></div>
+                    <span>RapidAPI</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse delay-200"></div>
+                    <span>Cached Events</span>
+                  </div>
+                </div>
               </motion.div>
             </div>
           ) : (
@@ -841,7 +876,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$45",
       image: "/event-7.png",
       organizer: { name: "Pool Party Productions", avatar: "/avatar-1.png" },
-      attendees: 250,
       isFavorite: false,
     },
     {
@@ -857,7 +891,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$120",
       image: "/event-6.png",
       organizer: { name: "Electric Dreams", avatar: "/avatar-2.png" },
-      attendees: 5000,
       isFavorite: false,
     },
     {
@@ -872,7 +905,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$65",
       image: "/event-8.png",
       organizer: { name: "Brunch Society", avatar: "/avatar-3.png" },
-      attendees: 150,
       isFavorite: false,
     },
     {
@@ -887,7 +919,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$80",
       image: "/event-4.png",
       organizer: { name: "Night Owl Events", avatar: "/avatar-4.png" },
-      attendees: 400,
       isFavorite: false,
     },
     {
@@ -902,7 +933,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "Free",
       image: "/community-event.png",
       organizer: { name: "City Events", avatar: "/avatar-5.png" },
-      attendees: 2000,
       isFavorite: false,
     },
     {
@@ -917,7 +947,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$35",
       image: "/event-1.png",
       organizer: { name: "Glow Events", avatar: "/avatar-6.png" },
-      attendees: 300,
       isFavorite: false,
     },
     {
@@ -932,7 +961,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$30",
       image: "/event-9.png",
       organizer: { name: "Beach Vibes", avatar: "/avatar-4.png" },
-      attendees: 180,
       isFavorite: false,
     },
     {
@@ -947,7 +975,6 @@ function generateFallbackPartyEvents(): EventDetailProps[] {
       price: "$85",
       image: "/event-10.png",
       organizer: { name: "Jazz & Dine", avatar: "/avatar-5.png" },
-      attendees: 120,
       isFavorite: false,
     },
   ]

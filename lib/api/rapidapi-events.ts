@@ -214,26 +214,56 @@ class RapidAPIEventsService {
       return `From $${event.min_price}`
     }
 
+    // Check additional price fields that might exist
+    if (event.ticket_price !== undefined) {
+      return `$${event.ticket_price}`
+    }
+
+    if (event.cost !== undefined) {
+      return `$${event.cost}`
+    }
+
     // Try to extract price from description or name
-    const text = `${event.name} ${event.description}`.toLowerCase()
+    const text = `${event.name || ''} ${event.description || ''}`.toLowerCase()
 
     // Look for free indicators
-    if (text.includes("free") || text.includes("no charge") || text.includes("complimentary")) {
+    if (text.includes("free") || text.includes("no charge") || text.includes("complimentary") || text.includes("no cost")) {
       return "Free"
     }
 
-    // Look for price patterns in text
-    const priceMatch = text.match(/\$(\d+(?:\.\d{2})?)/g)
-    if (priceMatch && priceMatch.length > 0) {
-      const prices = priceMatch.map(p => parseFloat(p.replace('$', '')))
-      const minPrice = Math.min(...prices)
-      const maxPrice = Math.max(...prices)
+    // Look for price patterns in text - enhanced regex
+    const pricePatterns = [
+      /\$(\d+(?:\.\d{2})?)/g,  // $10.00 or $10
+      /(\d+(?:\.\d{2})?)\s*dollars?/gi,  // 10 dollars
+      /(\d+(?:\.\d{2})?)\s*usd/gi,  // 10 USD
+      /price[:\s]*\$?(\d+(?:\.\d{2})?)/gi,  // price: $10
+      /cost[:\s]*\$?(\d+(?:\.\d{2})?)/gi,   // cost: $10
+    ]
 
-      if (minPrice === maxPrice) {
-        return `$${minPrice}`
-      } else {
-        return `$${minPrice} - $${maxPrice}`
+    for (const pattern of pricePatterns) {
+      const matches = text.match(pattern)
+      if (matches && matches.length > 0) {
+        const prices = matches.map(match => {
+          const numMatch = match.match(/(\d+(?:\.\d{2})?)/)
+          return numMatch ? parseFloat(numMatch[1]) : 0
+        }).filter(price => price > 0)
+
+        if (prices.length > 0) {
+          const minPrice = Math.min(...prices)
+          const maxPrice = Math.max(...prices)
+
+          if (minPrice === maxPrice) {
+            return `$${minPrice}`
+          } else {
+            return `$${minPrice} - $${maxPrice}`
+          }
+        }
       }
+    }
+
+    // Check if event has tickets available (might indicate paid event)
+    if (text.includes("ticket") && !text.includes("free")) {
+      return "Tickets Available"
     }
 
     // Default fallback

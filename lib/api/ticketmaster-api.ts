@@ -445,20 +445,55 @@ function getBestImage(images: TicketmasterImage[]): string {
 function isValidImageUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url)
-    // Allow HTTPS URLs from trusted domains and common image hosting services
-    return (
-      parsedUrl.protocol === "https:" &&
-      (parsedUrl.hostname.includes("ticketmaster") ||
-        parsedUrl.hostname.includes("livenation") ||
-        parsedUrl.hostname.includes("tmol-prd") ||
-        parsedUrl.hostname.includes("cloudinary") ||
-        parsedUrl.hostname.includes("amazonaws") ||
-        parsedUrl.hostname.includes("imgix") ||
-        parsedUrl.hostname.includes("fastly") ||
-        parsedUrl.hostname.includes("akamai") ||
-        // Allow common image file extensions
-        /\.(jpg|jpeg|png|gif|webp)$/i.test(parsedUrl.pathname))
+
+    // Allow both HTTP and HTTPS for broader compatibility
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return false
+    }
+
+    // Check for image file extensions
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|avif)$/i
+    if (imageExtensions.test(parsedUrl.pathname)) {
+      return true
+    }
+
+    // Trusted image hosting domains (more comprehensive list)
+    const trustedDomains = [
+      "ticketmaster",
+      "livenation",
+      "tmol-prd",
+      "s1.ticketm.net",
+      "media.ticketmaster.com",
+      "cloudinary",
+      "amazonaws",
+      "cloudfront",
+      "imgix",
+      "fastly",
+      "akamai",
+      "googleusercontent",
+      "gstatic",
+      "fbcdn",
+      "cdninstagram",
+      "imgur",
+      "pexels",
+      "pixabay",
+      "unsplash",
+      "placeholder",
+      "giphy"
+    ]
+
+    // Check if hostname contains any trusted domain
+    const isTrustedDomain = trustedDomains.some(domain =>
+      parsedUrl.hostname.toLowerCase().includes(domain.toLowerCase())
     )
+
+    // Additional check for image-related query parameters or paths
+    const hasImageIndicators = url.toLowerCase().includes('image') ||
+                              url.toLowerCase().includes('photo') ||
+                              url.toLowerCase().includes('picture') ||
+                              url.toLowerCase().includes('img')
+
+    return isTrustedDomain || hasImageIndicators
   } catch {
     return false
   }

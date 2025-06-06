@@ -53,7 +53,7 @@ export function ModernEventCard({ event, onSelect, className, index = 0 }: Event
       <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden hover:bg-white/15 transition-all duration-300 group">
         <div className="relative h-48 overflow-hidden">
           <Image
-            src={event.image || "/placeholder.svg?height=192&width=400&text=" + encodeURIComponent(event.title)}
+            src={event.image}
             alt={event.title}
             fill
             style={{ objectFit: "cover" }}

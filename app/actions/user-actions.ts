@@ -1,74 +1,180 @@
 "use server"
 
 import { z } from "zod"
+import { createClient } from "@supabase/supabase-js"
+import { env } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 
-// Mock user repository for development
-class MockUserRepository {
+// Production user repository using Supabase
+class UserRepository {
+  private supabase
+
+  constructor() {
+    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  }
+
   async findById(id: string) {
-    return {
-      data: {
-        id,
-        email: "user@example.com",
-        name: "Test User",
-        avatar_url: "/avatar-1.png",
-        is_active: true,
-        location_lat: 40.7128,
-        location_lng: -74.006,
-        location_name: "New York, NY",
-        preferences: {
-          favoriteCategories: ["Concerts", "Sports"],
-          pricePreference: "medium" as const,
-          timePreference: "evening" as const,
-          radiusPreference: 25,
-          notificationSettings: {
-            email: true,
-            push: true,
-            sms: false,
-          },
-        },
-      },
-      error: null,
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        logger.error('Failed to find user by ID', {
+          component: 'UserRepository',
+          action: 'findById',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error finding user', {
+        component: 'UserRepository',
+        action: 'findById',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to find user' }
     }
   }
 
   async create(userData: any) {
-    return {
-      data: userData,
-      error: null,
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .insert(userData)
+        .select()
+        .single()
+
+      if (error) {
+        logger.error('Failed to create user', {
+          component: 'UserRepository',
+          action: 'create'
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error creating user', {
+        component: 'UserRepository',
+        action: 'create'
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to create user' }
     }
   }
 
   async update(id: string, updates: any) {
-    return {
-      data: { id, ...updates },
-      error: null,
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        logger.error('Failed to update user', {
+          component: 'UserRepository',
+          action: 'update',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating user', {
+        component: 'UserRepository',
+        action: 'update',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to update user' }
     }
   }
 
   async updateLastLogin(id: string) {
-    return { error: null }
+    try {
+      const { error } = await this.supabase
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) {
+        logger.error('Failed to update last login', {
+          component: 'UserRepository',
+          action: 'updateLastLogin',
+          metadata: { userId: id }
+        }, error)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating last login', {
+        component: 'UserRepository',
+        action: 'updateLastLogin',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { error: 'Failed to update last login' }
+    }
   }
 
   async getUserPreferences(id: string) {
-    return {
-      data: {
-        favoriteCategories: ["Concerts", "Sports"],
-        pricePreference: "medium" as const,
-        timePreference: "evening" as const,
-        radiusPreference: 25,
-        notificationSettings: {
-          email: true,
-          push: true,
-          sms: false,
-        },
-      },
-      error: null,
+    try {
+      const { data, error } = await this.supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', id)
+        .single()
+
+      if (error) {
+        logger.error('Failed to get user preferences', {
+          component: 'UserRepository',
+          action: 'getUserPreferences',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error getting user preferences', {
+        component: 'UserRepository',
+        action: 'getUserPreferences',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to get user preferences' }
     }
   }
 
   async updateUserPreferences(id: string, preferences: any) {
-    return { error: null }
+    try {
+      const { error } = await this.supabase
+        .from('user_preferences')
+        .upsert({ user_id: id, ...preferences })
+
+      if (error) {
+        logger.error('Failed to update user preferences', {
+          component: 'UserRepository',
+          action: 'updateUserPreferences',
+          metadata: { userId: id }
+        }, error)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating user preferences', {
+        component: 'UserRepository',
+        action: 'updateUserPreferences',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { error: 'Failed to update user preferences' }
+    }
   }
 }
 

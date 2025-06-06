@@ -1,3 +1,5 @@
+import { logger } from "@/lib/utils/logger"
+
 // Client-side environment variables (prefixed with NEXT_PUBLIC_)
 export const clientEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -130,7 +132,11 @@ export function validateEnv() {
   const missing = [...missingClient, ...missingServer]
 
   if (missing.length > 0) {
-    console.warn(`Missing environment variables: ${missing.join(", ")}`)
+    logger.warn(`Missing environment variables: ${missing.join(", ")}`, {
+      component: 'Environment',
+      action: 'validateEnv',
+      metadata: { missing, missingClient, missingServer }
+    })
   }
 
   return {
@@ -150,13 +156,21 @@ export function getValidatedEnv() {
 
     // In development, just warn instead of throwing
     if (typeof window === "undefined" && serverEnv.NODE_ENV === "development") {
-      console.warn(errorMessage)
+      logger.warn(errorMessage, {
+        component: 'Environment',
+        action: 'getValidatedEnv',
+        metadata: { context: 'development_server' }
+      })
       return API_CONFIG
     }
 
     // Don't throw on client side
     if (typeof window !== "undefined") {
-      console.warn(errorMessage)
+      logger.warn(errorMessage, {
+        component: 'Environment',
+        action: 'getValidatedEnv',
+        metadata: { context: 'client_side' }
+      })
       return API_CONFIG
     }
 

@@ -42,8 +42,10 @@ export function InfiniteEventsGrid({
   const [hasMore, setHasMore] = useState(true)
   const loader = useRef<HTMLDivElement>(null)
 
-  // Function to load events
-  const loadEvents = useCallback(async () => {
+  // Function to load events - stabilized with useRef to prevent infinite re-renders
+  const loadEventsRef = useRef<(pageToLoad: number, isNewSearch?: boolean) => Promise<void>>()
+
+  loadEventsRef.current = async (pageToLoad: number, isNewSearch: boolean = false) => {
     if (!searchParams.lat || !searchParams.lng) return
 
     setIsLoading(true)
@@ -55,31 +57,62 @@ export function InfiniteEventsGrid({
         radius: searchParams.radius || 25,
         categories: searchParams.category ? [searchParams.category] : undefined,
         keyword: searchParams.query,
-        page,
+        page: pageToLoad,
         size: 12,
       })
 
       if (result.error) {
         setError(result.error.message)
       } else {
-        // Add coordinates to events for map display
-        const eventsWithCoords = result.events.map((event) => ({
-          ...event,
-          coordinates: event.coordinates || {
-            lat: searchParams.lat! + (Math.random() - 0.5) * 0.1,
-            lng: searchParams.lng! + (Math.random() - 0.5) * 0.1,
-          },
-        }))
+        // Add coordinates to events for map display and apply client-side content filtering
+        const eventsWithCoords = result.events
+          .filter((event) => {
+            // Client-side content quality check as additional safety
+            const hasValidImage = event.image &&
+                                 event.image !== "/community-event.png" &&
+                                 event.image !== "/placeholder.svg" &&
+                                 !event.image.includes("placeholder") &&
+                                 !event.image.includes("?height=") &&
+                                 !event.image.includes("?text=") &&
+                                 event.image.startsWith("http") &&
+                                 event.image.length > 20
 
-        setEvents((prev) => [...prev, ...eventsWithCoords])
-        setHasMore(page < result.totalPages - 1)
+            const hasValidDescription = event.description &&
+                                       event.description.length > 50 &&
+                                       event.description !== "No description available" &&
+                                       event.description !== "This is a sample event. Please try again later." &&
+                                       !event.description.includes("TBA") &&
+                                       !event.description.includes("To be announced")
+
+            return hasValidImage && hasValidDescription
+          })
+          .map((event) => ({
+            ...event,
+            coordinates: event.coordinates || {
+              lat: searchParams.lat! + (Math.random() - 0.5) * 0.1,
+              lng: searchParams.lng! + (Math.random() - 0.5) * 0.1,
+            },
+          }))
+
+        // For new searches, replace events; for pagination, append
+        if (isNewSearch || pageToLoad === 0) {
+          setEvents(eventsWithCoords)
+        } else {
+          setEvents((prev) => [...prev, ...eventsWithCoords])
+        }
+
+        setHasMore(pageToLoad < result.totalPages - 1)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events")
     } finally {
       setIsLoading(false)
     }
-  }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query, page])
+  }
+
+  const loadEvents = useCallback((pageToLoad: number, isNewSearch: boolean = false) => {
+    return loadEventsRef.current?.(pageToLoad, isNewSearch) || Promise.resolve()
+  }, [])
 
   // Initial load - only reset when search params change, not on every render
   useEffect(() => {
@@ -87,11 +120,14 @@ export function InfiniteEventsGrid({
       setEvents([])
       setPage(0)
       setHasMore(true)
+      // Load first page immediately
+      loadEvents(0, true)
     }
   }, [searchParams.lat, searchParams.lng, searchParams.radius, searchParams.category, searchParams.query])
 
   // Intersection observer for infinite scroll
   useEffect(() => {
+    const currentLoader = loader.current
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoading) {
@@ -101,23 +137,23 @@ export function InfiniteEventsGrid({
       { threshold: 1.0 },
     )
 
-    if (loader.current) {
-      observer.observe(loader.current)
+    if (currentLoader) {
+      observer.observe(currentLoader)
     }
 
     return () => {
-      if (loader.current) {
-        observer.unobserve(loader.current)
+      if (currentLoader) {
+        observer.unobserve(currentLoader)
       }
     }
   }, [hasMore, isLoading])
 
-  // Load events when page changes or initial load
+  // Load events when page changes (for pagination only, not initial load)
   useEffect(() => {
-    if (searchParams.lat && searchParams.lng && (page === 0 || page > 0)) {
-      loadEvents()
+    if (searchParams.lat && searchParams.lng && page > 0) {
+      loadEvents(page, false)
     }
-  }, [loadEvents, page])
+  }, [page, loadEvents])
 
   // Import the EventCard component from the events page
   const EventCard = ({ event, index }: { event: EventDetailProps; index: number }) => {
@@ -135,7 +171,7 @@ export function InfiniteEventsGrid({
         <div className="bg-[#1A1D25]/80 backdrop-blur-md border border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 overflow-hidden rounded-lg group-hover:shadow-2xl group-hover:shadow-purple-500/20">
           <div className="relative h-48 overflow-hidden">
             <img
-              src={event.image || "/placeholder.svg?height=200&width=300&text=Event"}
+              src={event.image}
               alt={event.title}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
@@ -259,7 +295,8 @@ export function InfiniteEventsGrid({
             onClick={() => {
               setPage(0)
               setEvents([])
-              loadEvents()
+              setHasMore(true)
+              loadEvents(0, true)
             }}
           >
             Retry

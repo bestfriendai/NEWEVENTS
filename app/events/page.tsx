@@ -535,6 +535,7 @@ function EventsPageContent() {
   const [events, setEvents] = useState<EventDetailProps[]>([])
   const [featuredEvents, setFeaturedEvents] = useState<EventDetailProps[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isFeaturedLoading, setIsFeaturedLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -570,7 +571,7 @@ function EventsPageContent() {
     }
   }, []) // Empty dependency array - only run once
 
-  // SIMPLIFIED: Load events function
+  // PROGRESSIVE: Load events function with date-based prioritization
   const loadEvents = useCallback(async () => {
     if (!userLocation) return
 
@@ -578,35 +579,87 @@ function EventsPageContent() {
     setError(null)
 
     try {
-      const result = await fetchEvents({
+      // First, load events for the next week (priority)
+      const now = new Date()
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+      const weekResult = await fetchEvents({
         keyword: debouncedSearch || undefined,
         coordinates: userLocation,
         radius: filters.distance || 25,
         categories: selectedCategory !== "all" ? [selectedCategory] : undefined,
-        page,
-        size: 24,
+        page: 0, // Always start from first page for week events
+        size: 12, // Smaller initial load
         sort: sortBy,
+        startDate: now.toISOString(),
+        endDate: nextWeek.toISOString(),
       })
 
-      if (result.error) {
-        setError(result.error.message)
+      if (weekResult.error) {
+        setError(weekResult.error.message)
         setEvents([])
-      } else {
-        const eventsWithCoords = result.events.map((event) => ({
-          ...event,
-          coordinates: event.coordinates || {
-            lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
-            lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
-          },
-        }))
-        setEvents(eventsWithCoords)
-        setTotalCount(result.totalCount)
-        setTotalPages(result.totalPages)
+        return
       }
+
+      // Show week events immediately
+      const weekEventsWithCoords = weekResult.events.map((event) => ({
+        ...event,
+        coordinates: event.coordinates || {
+          lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
+          lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
+        },
+      }))
+
+      setEvents(weekEventsWithCoords)
+      setTotalCount(weekResult.totalCount)
+      setTotalPages(weekResult.totalPages)
+      setIsLoading(false) // Show initial results
+
+      // Then load additional events for the next month (background)
+      setTimeout(async () => {
+        try {
+          setIsLoadingMore(true)
+          const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+          const monthResult = await fetchEvents({
+            keyword: debouncedSearch || undefined,
+            coordinates: userLocation,
+            radius: filters.distance || 25,
+            categories: selectedCategory !== "all" ? [selectedCategory] : undefined,
+            page,
+            size: 24,
+            sort: sortBy,
+            startDate: nextWeek.toISOString(), // Start after the week we already loaded
+            endDate: nextMonth.toISOString(),
+          })
+
+          if (!monthResult.error && monthResult.events.length > 0) {
+            const monthEventsWithCoords = monthResult.events.map((event) => ({
+              ...event,
+              coordinates: event.coordinates || {
+                lat: userLocation.lat + (Math.random() - 0.5) * 0.1,
+                lng: userLocation.lng + (Math.random() - 0.5) * 0.1,
+              },
+            }))
+
+            // Merge with existing events, avoiding duplicates
+            setEvents(prev => {
+              const existingIds = new Set(prev.map(e => e.id))
+              const newEvents = monthEventsWithCoords.filter(e => !existingIds.has(e.id))
+              return [...prev, ...newEvents]
+            })
+            setTotalCount(prev => prev + monthResult.totalCount)
+          }
+        } catch (err) {
+          console.warn("Failed to load additional events:", err)
+        } finally {
+          setIsLoadingMore(false)
+        }
+      }, 500) // Small delay to show initial results first
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events")
       setEvents([])
-    } finally {
       setIsLoading(false)
     }
   }, [userLocation, debouncedSearch, filters.distance, selectedCategory, page, sortBy])
@@ -635,19 +688,19 @@ function EventsPageContent() {
     }
   }, [userLocation])
 
-  // SIMPLIFIED: Only load events when specific dependencies change
+  // OPTIMIZED: Only load events when essential dependencies change
   useEffect(() => {
     if (userLocation) {
       loadEvents()
     }
-  }, [userLocation, debouncedSearch, selectedCategory, sortBy, page, filters.distance])
+  }, [loadEvents]) // loadEvents already has the right dependencies
 
-  // SIMPLIFIED: Only load featured events when location changes
+  // OPTIMIZED: Only load featured events when location changes
   useEffect(() => {
     if (userLocation) {
       loadFeaturedEvents()
     }
-  }, [userLocation])
+  }, [loadFeaturedEvents]) // loadFeaturedEvents already has the right dependencies
 
   const handleLocationSet = useCallback((location: { lat: number; lng: number; name: string }) => {
     setUserLocation(location)
@@ -730,7 +783,7 @@ function EventsPageContent() {
             {!isLoading && !error && (
               <Badge className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-purple-400 border border-purple-500/30">
                 <Sparkles className="h-3 w-3 mr-1" />
-                {totalCount} events found
+                {totalCount} events found{isLoadingMore && " (loading more...)"}
               </Badge>
             )}
           </div>
@@ -885,6 +938,16 @@ function EventsPageContent() {
                       />
                     ))}
               </div>
+
+              {/* Loading More Indicator */}
+              {isLoadingMore && (
+                <div className="flex justify-center items-center py-8">
+                  <div className="flex items-center space-x-3 text-purple-400">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Loading more events...</span>
+                  </div>
+                </div>
+              )}
 
               {/* Pagination Controls */}
               {!isLoading && !error && totalPages > 1 && (

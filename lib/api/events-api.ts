@@ -558,10 +558,52 @@ async function executeRapidApiSearch(params: EventSearchParams): Promise<EventDe
         }),
       )
 
-      // Filter out past events
+      // Filter out past events and events without sufficient content
       const futureEvents = transformedEvents.filter((event) => {
         const eventDate = new Date(event.date)
-        return eventDate >= now
+        const isFutureEvent = eventDate >= now
+
+        // Check content quality - stricter validation
+        const hasValidImage = event.image &&
+                             event.image !== "/community-event.png" &&
+                             event.image !== "/placeholder.svg" &&
+                             !event.image.includes("placeholder") &&
+                             !event.image.includes("event-") &&
+                             !event.image.includes("?height=") &&
+                             !event.image.includes("?text=") &&
+                             event.image.startsWith("http") &&
+                             event.image.length > 20
+
+        const hasValidDescription = event.description &&
+                                   event.description.length > 50 && // Increased from 20 to 50
+                                   event.description !== "No description available" &&
+                                   event.description !== "No description available." &&
+                                   event.description !== "This is a sample event. Please try again later." &&
+                                   !event.description.includes("TBA") &&
+                                   !event.description.includes("To be announced") &&
+                                   !event.description.includes("No description") &&
+                                   !event.description.toLowerCase().includes("coming soon") &&
+                                   !event.description.toLowerCase().includes("more details")
+
+        // Event must have BOTH a valid image AND a valid description
+        const hasValidContent = hasValidImage && hasValidDescription
+
+        if (isFutureEvent && !hasValidContent) {
+          logger.debug("RapidAPI event filtered out due to insufficient content", {
+            component: "events-api",
+            action: "rapidapi_content_filter",
+            metadata: {
+              eventTitle: event.title,
+              hasValidImage,
+              hasValidDescription,
+              imageUrl: event.image,
+              descriptionLength: event.description?.length || 0,
+              reason: !hasValidImage ? "invalid_image" : "invalid_description"
+            },
+          })
+        }
+
+        return isFutureEvent && hasValidContent
       })
 
       logger.info(`Filtered to ${futureEvents.length} future events`)
@@ -628,8 +670,32 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
   try {
     const { rapidAPIEventsService } = await import("./rapidapi-events")
     price = rapidAPIEventsService.extractPrice(event)
+
+    // Log pricing extraction for debugging
+    logger.debug("Price extraction result", {
+      component: "events-api",
+      action: "price_extraction",
+      metadata: {
+        eventTitle: event.name || event.title,
+        extractedPrice: price,
+        originalPriceData: {
+          is_free: event.is_free,
+          min_price: event.min_price,
+          max_price: event.max_price,
+          price: event.price,
+          ticket_price: event.ticket_price,
+          cost: event.cost,
+        },
+      },
+    })
   } catch (error) {
     // Fallback to basic price extraction
+    logger.warn("RapidAPI price extraction failed, using fallback", {
+      component: "events-api",
+      error: formatErrorMessage(error),
+      eventTitle: event.name || event.title,
+    })
+
     if (event.is_free) {
       price = "Free"
     } else if (event.min_price && event.max_price) {
@@ -640,6 +706,10 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
       }
     } else if (event.min_price) {
       price = `From $${event.min_price}`
+    } else if (event.ticket_price) {
+      price = `$${event.ticket_price}`
+    } else if (event.cost) {
+      price = `$${event.cost}`
     }
   }
 
@@ -660,6 +730,18 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
   // Enhanced image extraction with validation
   const rawImageUrl = extractRapidApiImage(event)
 
+  // Debug logging for image extraction
+  logger.debug("RapidAPI image extraction", {
+    component: "events-api",
+    action: "image_extraction",
+    metadata: {
+      eventTitle: event.name || event.title,
+      rawImageUrl,
+      hasImage: !!rawImageUrl,
+      isValidUrl: rawImageUrl && rawImageUrl !== "/community-event.png",
+    },
+  })
+
   // Try to use image service if available, otherwise use raw URL
   let finalImageUrl = rawImageUrl
   try {
@@ -670,9 +752,27 @@ async function transformRapidApiEventWithImages(event: any, index: number): Prom
       event.name || event.title || "Untitled Event",
     )
     finalImageUrl = imageResult.url
+
+    // Log image validation result
+    logger.debug("Image validation result", {
+      component: "events-api",
+      action: "image_validation",
+      metadata: {
+        eventTitle: event.name || event.title,
+        originalUrl: rawImageUrl,
+        finalUrl: finalImageUrl,
+        isValid: imageResult.isValid,
+        source: imageResult.source,
+      },
+    })
   } catch (error) {
     logger.warn("Image service not available, using raw image URL", {
+      component: "events-api",
       error: formatErrorMessage(error),
+      metadata: {
+        eventTitle: event.name || event.title,
+        rawImageUrl,
+      },
     })
   }
 
@@ -1241,15 +1341,14 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
         },
       })
 
-      // If no events found from any API, provide fallback events
+      // If no events found from any API, return empty results instead of fallback events
       if (result.events.length === 0) {
-        logger.info("No events found from APIs, using fallback events")
-        const fallbackEvents = generateFallbackEvents(params.size || 20)
-        result.events = fallbackEvents.slice(0, params.size || 20)
-        result.totalCount = fallbackEvents.length
-        result.sources = ["Fallback"]
+        logger.info("No events found from APIs, returning empty results")
+        result.events = []
+        result.totalCount = 0
+        result.sources = []
         if (warnings.length > 0) {
-          result.error = `APIs had issues: ${warnings.join("; ")} - Showing sample events`
+          result.error = `APIs had issues: ${warnings.join("; ")} - No events available`
         }
       }
 
@@ -1269,14 +1368,14 @@ export async function searchEvents(params: EventSearchParams): Promise<EventSear
       )
 
       // Return fallback events on complete failure
-      const fallbackEvents = generateFallbackEvents(params.size || 20)
+      // Return empty results on complete failure instead of fallback events
       return {
-        events: fallbackEvents.slice(0, params.size || 20),
-        totalCount: fallbackEvents.length,
+        events: [],
+        totalCount: 0,
         page: params.page || 0,
-        totalPages: Math.ceil(fallbackEvents.length / (params.size || 20)),
-        sources: ["Fallback"],
-        error: `Search failed: ${errorMessage} - Showing sample events`,
+        totalPages: 0,
+        sources: [],
+        error: `Search failed: ${errorMessage} - No events available`,
         responseTime,
         cached: false,
       }
@@ -1300,6 +1399,66 @@ function removeDuplicateEvents(events: EventDetailProps[]): EventDetailProps[] {
 // Apply additional filters
 function applyFilters(events: EventDetailProps[], params: EventSearchParams): EventDetailProps[] {
   let filtered = events
+
+  // First, apply content quality filtering - exclude events without proper content
+  const originalCount = filtered.length
+  filtered = filtered.filter((event) => {
+    // Check for valid image (not placeholder or fallback) - stricter validation
+    const hasValidImage = event.image &&
+                         event.image !== "/community-event.png" &&
+                         event.image !== "/placeholder.svg" &&
+                         !event.image.includes("placeholder") &&
+                         !event.image.includes("event-") &&
+                         !event.image.includes("?height=") &&
+                         !event.image.includes("?text=") &&
+                         event.image.startsWith("http") &&
+                         event.image.length > 20 // Ensure it's not just a short URL
+
+    // Check for meaningful description (not generic fallbacks) - stricter validation
+    const hasValidDescription = event.description &&
+                               event.description.length > 50 && // Increased from 20 to 50
+                               event.description !== "No description available" &&
+                               event.description !== "No description available." &&
+                               event.description !== "This is a sample event. Please try again later." &&
+                               !event.description.includes("TBA") &&
+                               !event.description.includes("To be announced") &&
+                               !event.description.includes("No description") &&
+                               !event.description.toLowerCase().includes("coming soon") &&
+                               !event.description.toLowerCase().includes("more details")
+
+    // Event must have BOTH a valid image AND a valid description (stricter requirement)
+    const hasValidContent = hasValidImage && hasValidDescription
+
+    if (!hasValidContent) {
+      logger.debug("Event filtered out due to insufficient content", {
+        component: "events-api",
+        action: "content_quality_filter",
+        metadata: {
+          eventTitle: event.title,
+          hasValidImage,
+          hasValidDescription,
+          imageUrl: event.image,
+          descriptionLength: event.description?.length || 0,
+          reason: !hasValidImage ? "invalid_image" : "invalid_description"
+        },
+      })
+    }
+
+    return hasValidContent
+  })
+
+  const contentFilteredCount = filtered.length
+  if (contentFilteredCount < originalCount) {
+    logger.info("Content quality filtering applied", {
+      component: "events-api",
+      action: "content_quality_filter",
+      metadata: {
+        originalCount,
+        filteredCount: contentFilteredCount,
+        eventsRemoved: originalCount - contentFilteredCount,
+      },
+    })
+  }
 
   // Apply geographic filtering based on coordinates and radius
   if (params.coordinates && params.radius) {
@@ -1337,11 +1496,11 @@ function applyFilters(events: EventDetailProps[], params: EventSearchParams): Ev
       component: "events-api",
       action: "geographic_filter",
       metadata: {
-        originalCount: events.length,
+        originalCount: contentFilteredCount,
         filteredCount: filtered.length,
         userLocation: params.coordinates,
         radius: radiusInMiles,
-        eventsRemoved: events.length - filtered.length,
+        eventsRemoved: contentFilteredCount - filtered.length,
       },
     })
   }
@@ -1554,11 +1713,9 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
     const uniqueEvents = removeDuplicateEvents(allEvents)
     let featuredEvents = uniqueEvents.sort((a, b) => b.attendees - a.attendees).slice(0, limit)
 
-    // If we still don't have enough events, use fallback events
+    // If we don't have enough events, just return what we have instead of using fallback events
     if (featuredEvents.length < Math.min(limit, 3)) {
-      logger.info("Using fallback events due to insufficient API results")
-      const fallbackEvents = generateFallbackEvents(limit - featuredEvents.length)
-      featuredEvents = [...featuredEvents, ...fallbackEvents].slice(0, limit)
+      logger.info("Insufficient API results for featured events, returning available events only")
     }
 
     // Cache even if we have fewer events than requested
@@ -1573,9 +1730,9 @@ export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> 
       error: formatErrorMessage(error),
     })
 
-    // Return fallback events instead of empty array
-    logger.info("Returning fallback events due to complete failure")
-    return generateFallbackEvents(limit)
+    // Return empty array instead of fallback events
+    logger.info("Returning empty array due to complete failure")
+    return []
   }
 }
 

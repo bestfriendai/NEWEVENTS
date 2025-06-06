@@ -1,67 +1,172 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { kv } from "@vercel/kv"
-import { Ratelimit } from "@upstash/ratelimit"
-import { searchEvents } from "@/lib/events"
-import { logger } from "@/lib/logger"
-import { memoryCache } from "@/lib/cache"
+import { unifiedEventsService } from "@/lib/api/unified-events-service"
+import { logger } from "@/lib/utils/logger"
+import { memoryCache } from "@/lib/utils/cache"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
-// Basic rate limit setup
-const ratelimit = new Ratelimit({
-  redis: kv,
-  limiter: Ratelimit.slidingWindow(5, "10 s"), // 5 requests per 10 seconds
-  analytics: true,
-})
+// Input validation helper
+function validateSearchParams(searchParams: URLSearchParams) {
+  const errors: string[] = []
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const searchTerm = searchParams.get("searchTerm") || ""
+  const searchTerm = searchParams.get("searchTerm") || searchParams.get("keyword") || ""
   const category = searchParams.get("category") || ""
-  const page = Number.parseInt(searchParams.get("page") || "1", 10)
-  const limit = Number.parseInt(searchParams.get("limit") || "10", 10)
+  const page = Number.parseInt(searchParams.get("page") || "0", 10)
+  const limit = Number.parseInt(searchParams.get("limit") || "20", 10)
+  const lat = searchParams.get("lat") ? Number.parseFloat(searchParams.get("lat")!) : undefined
+  const lng = searchParams.get("lng") ? Number.parseFloat(searchParams.get("lng")!) : undefined
+  const radius = Number.parseInt(searchParams.get("radius") || "25", 10)
 
-  const identifier = request.ip ?? "127.0.0.1" // Use IP address for rate limiting
-
-  const { success, reset } = await ratelimit.limit(identifier)
-
-  if (!success) {
-    const now = Date.now()
-    const retryAfter = Math.max(0, reset * 1000 - now) / 1000
-
-    logger.warn(`Rate limit exceeded for IP: ${identifier}. Retry after: ${retryAfter} seconds`)
-
-    return new NextResponse("Too Many Requests", {
-      status: 429,
-      headers: {
-        "Retry-After": String(retryAfter),
-      },
-    })
+  // Validate search term length
+  if (searchTerm.length > 200) {
+    errors.push("Search term too long (max 200 characters)")
   }
 
-  try {
-    // Check if we're hitting rate limits and return cached data if available
-    const cacheKey = `events_${JSON.stringify(searchParams)}`
-    const cachedResult = memoryCache.get(cacheKey)
+  // Validate pagination
+  if (page < 0) {
+    errors.push("Page must be non-negative")
+  }
+  if (limit < 1 || limit > 100) {
+    errors.push("Limit must be between 1 and 100")
+  }
 
-    if (cachedResult) {
-      logger.info("Returning cached events due to potential rate limiting")
-      return NextResponse.json(cachedResult)
-    }
+  // Validate coordinates
+  if (lat !== undefined && (lat < -90 || lat > 90)) {
+    errors.push("Latitude must be between -90 and 90")
+  }
+  if (lng !== undefined && (lng < -180 || lng > 180)) {
+    errors.push("Longitude must be between -180 and 180")
+  }
 
-    const { events, total } = await searchEvents({
+  // Validate radius
+  if (radius < 1 || radius > 500) {
+    errors.push("Radius must be between 1 and 500 km")
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    params: {
       searchTerm,
       category,
       page,
       limit,
+      lat,
+      lng,
+      radius,
+    },
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const validation = validateSearchParams(searchParams)
+
+    if (!validation.isValid) {
+      logger.warn("Invalid search parameters", {
+        component: "EventsAPI",
+        action: "GET",
+        errors: validation.errors,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid parameters",
+          errors: validation.errors
+        },
+        { status: 400 }
+      )
+    }
+
+    const { searchTerm, category, page, limit, lat, lng, radius } = validation.params
+
+    logger.info("Events API request", {
+      component: "EventsAPI",
+      action: "GET",
+      metadata: { searchTerm, category, page, limit, lat, lng, radius },
     })
 
-    // Cache the result
-    memoryCache.set(cacheKey, { events, total }, 5) // Cache for 5 seconds
+    // Create cache key
+    const cacheKey = `events_${JSON.stringify(validation.params)}`
+    const cachedResult = memoryCache.get(cacheKey)
 
-    return NextResponse.json({ events, total })
-  } catch (e: any) {
-    logger.error(`Error in GET /api/events: ${e.message}`, { error: e })
-    return NextResponse.json({ message: "Internal server error", error: e.message }, { status: 500 })
+    if (cachedResult) {
+      logger.info("Returning cached events", {
+        component: "EventsAPI",
+        action: "cache_hit",
+        cacheKey,
+      })
+      return NextResponse.json({
+        ...cachedResult,
+        cached: true,
+        responseTime: Date.now() - startTime,
+      })
+    }
+
+    // Search events using unified service
+    const result = await unifiedEventsService.searchEvents({
+      query: searchTerm,
+      category,
+      lat,
+      lng,
+      radius,
+      limit,
+      offset: page * limit,
+    })
+
+    const response = {
+      success: true,
+      events: result.events,
+      totalCount: result.totalCount,
+      hasMore: result.hasMore,
+      sources: result.sources,
+      error: result.error,
+      responseTime: Date.now() - startTime,
+      cached: false,
+    }
+
+    // Cache successful results for 5 minutes
+    if (!result.error && result.events.length > 0) {
+      memoryCache.set(cacheKey, response, 300)
+    }
+
+    logger.info("Events API response", {
+      component: "EventsAPI",
+      action: "success",
+      metadata: {
+        eventsCount: result.events.length,
+        sources: result.sources,
+        responseTime: response.responseTime,
+      },
+    })
+
+    return NextResponse.json(response)
+  } catch (error) {
+    const responseTime = Date.now() - startTime
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+
+    logger.error("Events API error", {
+      component: "EventsAPI",
+      action: "error",
+      error: errorMessage,
+      responseTime,
+    })
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Internal server error",
+        error: errorMessage,
+        events: [],
+        totalCount: 0,
+        hasMore: false,
+        sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
+        responseTime,
+      },
+      { status: 500 }
+    )
   }
 }

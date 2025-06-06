@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,15 +7,20 @@ import { QueryProvider } from "@/providers/query-provider"
 import { Toaster } from "@/components/ui/toaster"
 // Import the AuthProvider
 import { AuthProvider } from "@/lib/auth/auth-provider"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 const inter = Inter({ subsets: ["latin"] })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 export const metadata: Metadata = {
   title: "DateAI - Discover Amazing Events",
   description: "Find the perfect events for your next date or social gathering with AI-powered recommendations",
   keywords: ["events", "dating", "social", "activities", "concerts", "festivals", "AI", "recommendations"],
   authors: [{ name: "DateAI Team" }],
-  viewport: "width=device-width, initial-scale=1",
   generator: "v0.dev",
   robots: "index, follow",
   openGraph: {
@@ -56,14 +61,16 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={inter.className}>
-        <AuthProvider>
-          <QueryProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              <div className="min-h-screen bg-background">{children}</div>
-              <Toaster />
-            </ThemeProvider>
-          </QueryProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <QueryProvider>
+              <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                <div className="min-h-screen bg-background">{children}</div>
+                <Toaster />
+              </ThemeProvider>
+            </QueryProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

@@ -154,7 +154,13 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
     if (!mapRef.current || !mapboxLoaded || filteredEvents.length === 0 || typeof window === "undefined") return
 
     // Clear existing markers
-    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.forEach((marker) => {
+      try {
+        marker.remove()
+      } catch (e) {
+        // Ignore errors when removing markers
+      }
+    })
     markersRef.current = []
 
     // Add markers for each event
@@ -163,29 +169,55 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
 
       const { lat, lng } = event.coordinates
 
+      // Validate coordinates
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        console.warn(`Invalid coordinates for event ${event.title}:`, { lat, lng })
+        return
+      }
+
       // Create marker element
       const markerEl = document.createElement("div")
       markerEl.className = "event-marker"
-      markerEl.style.width = "20px"
-      markerEl.style.height = "20px"
-      markerEl.style.borderRadius = "50%"
-      markerEl.style.background = getCategoryColor(event.category)
-      markerEl.style.border = "2px solid white"
-      markerEl.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)"
-      markerEl.style.cursor = "pointer"
-      markerEl.style.transition = "transform 0.2s ease"
-      markerEl.style.position = "relative" // Add position relative for the pulse
+      markerEl.style.cssText = `
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: ${getCategoryColor(event.category)};
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+      `
+
+      // Add inner dot for better visibility
+      const innerDot = document.createElement("div")
+      innerDot.style.cssText = `
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: white;
+        position: absolute;
+      `
+      markerEl.appendChild(innerDot)
 
       // Add pulse effect
       const pulse = document.createElement("div")
       pulse.className = "marker-pulse"
-      pulse.style.position = "absolute"
-      pulse.style.width = "100%"
-      pulse.style.height = "100%"
-      pulse.style.borderRadius = "50%"
-      pulse.style.backgroundColor = getCategoryColor(event.category)
-      pulse.style.opacity = "0.6"
-      pulse.style.animation = "pulse 1.5s infinite"
+      pulse.style.cssText = `
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: ${getCategoryColor(event.category)};
+        opacity: 0.6;
+        animation: pulse 2s infinite;
+        z-index: -1;
+      `
       markerEl.appendChild(pulse)
 
       // Create and add marker
@@ -197,24 +229,57 @@ export function EventsMap({ initialEvents = [], className = "" }: EventsMapProps
         .addTo(mapRef.current)
 
       // Add click event
-      marker.getElement().addEventListener("click", () => {
+      marker.getElement().addEventListener("click", (e) => {
+        e.stopPropagation()
         setSelectedEvent(event)
 
         // Fly to marker
         mapRef.current.flyTo({
           center: [lng, lat],
-          zoom: 10,
+          zoom: 12,
           duration: 1500,
         })
       })
 
-      // Add hover effect
+      // Add hover effects
       marker.getElement().addEventListener("mouseenter", () => {
         markerEl.style.transform = "scale(1.3)"
+        markerEl.style.zIndex = "100"
       })
 
       marker.getElement().addEventListener("mouseleave", () => {
         markerEl.style.transform = "scale(1)"
+        markerEl.style.zIndex = "10"
+      })
+
+      // Add tooltip on hover
+      const tooltip = document.createElement("div")
+      tooltip.className = "marker-tooltip"
+      tooltip.style.cssText = `
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 1000;
+      `
+      tooltip.textContent = event.title
+      markerEl.appendChild(tooltip)
+
+      marker.getElement().addEventListener("mouseenter", () => {
+        tooltip.style.opacity = "1"
+      })
+
+      marker.getElement().addEventListener("mouseleave", () => {
+        tooltip.style.opacity = "0"
       })
 
       markersRef.current.push(marker)

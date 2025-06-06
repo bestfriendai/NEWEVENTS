@@ -54,7 +54,6 @@ export function EventCard({
       name: "Organizer",
       avatar: "/avatar-1.png",
     },
-    attendees: 0,
     description: "",
     address: "",
     price: "Price TBA",
@@ -226,8 +225,8 @@ export function EventCard({
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex items-center text-xs text-gray-400">
-                  <Users size={12} className="mr-1" />
-                  <span className="text-purple-400 font-medium">{eventData.attendees}</span> attending
+                  <MapPin size={12} className="mr-1" />
+                  <span className="text-purple-400 font-medium truncate">{eventData.location || "Location TBA"}</span>
                 </div>
               </div>
 
@@ -328,8 +327,8 @@ export function EventCard({
 
           <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-800/30">
             <div className="flex items-center text-xs text-gray-400">
-              <Users size={12} className="mr-1" />
-              <span className="text-purple-400 font-medium">{eventData.attendees}</span> attending
+              <MapPin size={12} className="mr-1" />
+              <span className="text-purple-400 font-medium truncate max-w-[120px]">{eventData.location || "Location TBA"}</span>
             </div>
             <motion.div
               whileHover={{ x: 2 }}

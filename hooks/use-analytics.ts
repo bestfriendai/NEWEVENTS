@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import { logger } from "@/lib/utils/logger"
 
 export interface AnalyticsEvent {
   event_id?: number
@@ -12,11 +13,18 @@ export interface AnalyticsEvent {
 export function useAnalytics() {
   const trackEvent = useCallback(async (event: AnalyticsEvent) => {
     try {
-      // For now, just log to console in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Analytics Event:', event)
-      }
-      
+      // Log analytics event using structured logging
+      logger.info('Analytics event tracked', {
+        component: 'Analytics',
+        action: 'trackEvent',
+        metadata: {
+          eventId: event.event_id,
+          userId: event.user_id,
+          action: event.action,
+          ...event.metadata
+        }
+      })
+
       // In production, you would send this to your analytics service
       // await fetch('/api/analytics', {
       //   method: 'POST',
@@ -24,7 +32,11 @@ export function useAnalytics() {
       //   body: JSON.stringify(event)
       // })
     } catch (error) {
-      console.warn('Failed to track analytics event:', error)
+      logger.warn('Failed to track analytics event', {
+        component: 'Analytics',
+        action: 'trackEventError',
+        metadata: { event, error: error instanceof Error ? error.message : String(error) }
+      })
     }
   }, [])
 

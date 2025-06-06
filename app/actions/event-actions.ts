@@ -30,6 +30,8 @@ export async function fetchEvents(params: {
   page?: number
   sort?: string
   categories?: string[]
+  startDate?: string
+  endDate?: string
 }): Promise<EventSearchResult> {
   try {
     logger.info("Server action: fetchEvents called", { params })
@@ -43,6 +45,8 @@ export async function fetchEvents(params: {
       limit: Math.max(params.size || 50, 100), // Increase minimum limit to 100
       offset: (params.page || 0) * (params.size || 20),
       category: params.categories?.[0], // Use first category for now
+      startDate: params.startDate,
+      endDate: params.endDate,
     }
 
     const result = await unifiedEventsService.searchEvents(searchParams)

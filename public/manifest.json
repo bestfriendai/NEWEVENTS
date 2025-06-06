@@ -10,49 +10,19 @@
   "scope": "/",
   "lang": "en",
   "categories": ["lifestyle", "social", "entertainment"],
-  "icons": [
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png"
-    }
-  ],
+  "icons": [],
   "shortcuts": [
     {
       "name": "Find Events",
       "short_name": "Events",
       "description": "Search for events near you",
-      "url": "/events",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "url": "/events"
     },
     {
       "name": "My Favorites",
       "short_name": "Favorites",
       "description": "View your favorite events",
-      "url": "/favorites",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "url": "/favorites"
     }
   ],
   "screenshots": [

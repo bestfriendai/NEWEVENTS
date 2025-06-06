@@ -18,6 +18,11 @@ class ImageService {
     try {
       // If no image URL provided, use category fallback
       if (!imageUrl || imageUrl === "/community-event.png") {
+        logger.debug("No image URL provided, using category fallback", {
+          component: "image-service",
+          category,
+          eventTitle,
+        })
         return {
           url: this.getCategoryFallbackImage(category),
           isValid: false,
@@ -26,25 +31,38 @@ class ImageService {
       }
 
       // Validate the provided image URL
-      if (this.isValidImageUrl(imageUrl)) {
-        // Try to verify the image is accessible
-        const isAccessible = await this.verifyImageAccessibility(imageUrl)
+      const isValidUrl = this.isValidImageUrl(imageUrl)
 
-        if (isAccessible) {
-          return {
-            url: imageUrl,
-            isValid: true,
-            source: "original",
-          }
+      logger.debug("Image URL validation", {
+        component: "image-service",
+        imageUrl,
+        isValidUrl,
+        eventTitle,
+      })
+
+      if (isValidUrl) {
+        // For now, trust that valid URLs are accessible
+        // In production, you might want to do a HEAD request here
+        logger.debug("Image URL validated successfully", {
+          component: "image-service",
+          imageUrl,
+          eventTitle,
+        })
+
+        return {
+          url: imageUrl,
+          isValid: true,
+          source: "original",
         }
       }
 
-      // If validation fails, use category fallback
+      // If validation fails, log details and use category fallback
       logger.debug("Image validation failed, using category fallback", {
         component: "image-service",
         originalUrl: imageUrl,
         category,
         eventTitle,
+        reason: "URL validation failed",
       })
 
       return {
@@ -58,6 +76,7 @@ class ImageService {
         error: error instanceof Error ? error.message : String(error),
         originalUrl: imageUrl,
         category,
+        eventTitle,
       })
 
       return {
@@ -69,7 +88,7 @@ class ImageService {
   }
 
   /**
-   * Validate image URL format
+   * Validate image URL format - Enhanced for better coverage
    */
   private isValidImageUrl(url: string): boolean {
     if (!url || typeof url !== "string") return false
@@ -78,72 +97,93 @@ class ImageService {
       const urlObj = new URL(url)
       if (!["http:", "https:"].includes(urlObj.protocol)) return false
 
-      // Check for image extensions or known image services
+      // Check for image extensions
       const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".avif"]
+
+      // Comprehensive list of trusted image hosting services
       const imageServices = [
-        "images.unsplash.com",
+        // Event platforms
         "img.evbuc.com",
+        "cdn.evbuc.com",
+        "eventbrite.com",
         "s1.ticketm.net",
+        "s1.ticketmaster.net",
         "media.ticketmaster.com",
         "tmol-prd.s3.amazonaws.com",
         "livenationinternational.com",
-        "cdn.evbuc.com",
-        "eventbrite.com",
+        "livenation.com",
+        "ticketmaster.com",
         "rapidapi.com",
-        "pexels.com",
-        "pixabay.com",
-        "cloudinary.com",
+
+        // Major CDNs and cloud services
         "amazonaws.com",
+        "cloudinary.com",
+        "cloudfront.net",
+        "fastly.com",
+        "akamai.net",
+        "imgix.net",
+        "imgix.com",
+
+        // Image hosting services
+        "images.unsplash.com",
+        "source.unsplash.com",
+        "images.pexels.com",
+        "cdn.pixabay.com",
+        "pixabay.com",
+        "pexels.com",
+        "i.imgur.com",
+        "imgur.com",
+
+        // Google services
         "googleusercontent.com",
-        "fbcdn.net",
-        "cdninstagram.com",
-        "encrypted-tbn0.gstatic.com", // Google Images
-        "encrypted-tbn1.gstatic.com",
-        "encrypted-tbn2.gstatic.com",
-        "encrypted-tbn3.gstatic.com",
         "lh3.googleusercontent.com",
         "lh4.googleusercontent.com",
         "lh5.googleusercontent.com",
         "lh6.googleusercontent.com",
-        "i.imgur.com",
-        // Additional image services for better coverage
+        "encrypted-tbn0.gstatic.com",
+        "encrypted-tbn1.gstatic.com",
+        "encrypted-tbn2.gstatic.com",
+        "encrypted-tbn3.gstatic.com",
+        "gstatic.com",
+
+        // Social media
+        "fbcdn.net",
+        "cdninstagram.com",
+        "instagram.com",
+        "facebook.com",
+
+        // Placeholder services
         "picsum.photos",
         "via.placeholder.com",
         "placehold.it",
         "dummyimage.com",
-        "source.unsplash.com",
-        "images.pexels.com",
-        "cdn.pixabay.com",
+        "placeholder.com",
+
+        // Other common image hosts
         "res.cloudinary.com",
-        "d2v9y0dukr6mq2.cloudfront.net", // AWS CloudFront
+        "d2v9y0dukr6mq2.cloudfront.net",
         "images-na.ssl-images-amazon.com",
         "m.media-amazon.com",
-        "imgur.com",
-        "cdn.pixabay.com",
-        "images.pexels.com",
+        "media.giphy.com",
+        "giphy.com",
       ]
 
       const hasImageExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
       const isFromImageService = imageServices.some((service) => url.toLowerCase().includes(service.toLowerCase()))
 
-      return hasImageExtension || isFromImageService
+      // Additional check for query parameters that indicate images
+      const hasImageParams = url.toLowerCase().includes('image') ||
+                            url.toLowerCase().includes('photo') ||
+                            url.toLowerCase().includes('picture') ||
+                            url.toLowerCase().includes('img')
+
+      return hasImageExtension || isFromImageService || hasImageParams
     } catch {
       return false
     }
   }
 
-  /**
-   * Verify image accessibility (simplified check)
-   */
-  private async verifyImageAccessibility(url: string): Promise<boolean> {
-    try {
-      // In a real implementation, you might want to do a HEAD request
-      // For now, we'll just assume valid URLs are accessible
-      return this.isValidImageUrl(url)
-    } catch {
-      return false
-    }
-  }
+
 
   /**
    * Get category-specific fallback image

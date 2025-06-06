@@ -56,16 +56,24 @@ export function EventMap({ event }: EventMapProps) {
 
         // Create marker element
         const el = document.createElement("div")
-        el.className = "marker"
-        el.style.width = "24px"
-        el.style.height = "24px"
-        el.style.borderRadius = "50%"
-        el.style.backgroundColor = "#8B5CF6"
-        el.style.border = "3px solid white"
-        el.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)"
+        el.className = "custom-marker"
+        el.style.cssText = `
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background-color: #8B5CF6;
+          border: 3px solid white;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+          cursor: pointer;
+          position: relative;
+          z-index: 1000;
+        `
 
-        // Create and add marker
-        const marker = await createMarker({ element: el })
+        // Create and add marker with no default styling
+        const marker = await createMarker({
+          element: el,
+          anchor: 'center'
+        })
         marker.setLngLat([lng, lat]).addTo(mapInstance)
 
         // Create and add popup

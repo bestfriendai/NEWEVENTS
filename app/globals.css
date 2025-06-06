@@ -158,12 +158,14 @@
 /* Mapbox custom styles */
 .mapboxgl-popup {
   max-width: 300px;
+  z-index: 1000;
 }
 
 .mapboxgl-popup-content {
   padding: 0;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  background: white;
 }
 
 .mapboxgl-popup-close-button {
@@ -180,21 +182,63 @@
 .mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
 .mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
 .mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
-  border-bottom-color: #111827;
+  border-bottom-color: #ffffff;
 }
 
 .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
 .mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
 .mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
-  border-top-color: #111827;
+  border-top-color: #ffffff;
 }
 
 .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
-  border-right-color: #111827;
+  border-right-color: #ffffff;
 }
 
 .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
-  border-left-color: #111827;
+  border-left-color: #ffffff;
+}
+
+/* Ensure markers are visible and override default styles */
+.mapboxgl-marker {
+  z-index: 10;
+}
+
+/* Override default marker styles to prevent white boxes */
+.mapboxgl-marker .mapboxgl-marker-anchor {
+  display: none !important;
+}
+
+.mapboxgl-marker svg {
+  display: none !important;
+}
+
+/* Custom marker styles */
+.custom-marker {
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Dialog overlay improvements */
+.dialog-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Line clamp utility */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Event marker animations */
@@ -203,23 +247,33 @@
 }
 
 .event-marker:hover {
-  transform: scale(1.1);
-  z-index: 10;
+  transform: scale(1.2);
+  z-index: 100;
+}
+
+/* Marker pulse animation */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.marker-pulse {
+  animation: pulse 2s infinite;
 }
 
 /* User location marker pulse animation */
 .user-location-marker {
   animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
 }
 
 /* Shadow glow utilities */

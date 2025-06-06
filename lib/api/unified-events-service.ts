@@ -26,6 +26,7 @@ export interface UnifiedEventsResponse {
     ticketmaster: number
     cached: number
   }
+  responseTime?: number
 }
 
 interface DatabaseEvent {
@@ -59,19 +60,39 @@ class UnifiedEventsService {
   private supabase
 
   constructor() {
-    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: {
+        persistSession: false
+      }
+    })
   }
 
   /**
    * Search for events from multiple sources and store in Supabase
    */
   async searchEvents(params: UnifiedEventSearchParams): Promise<UnifiedEventsResponse> {
+    const startTime = Date.now()
+
     try {
       logger.info("Starting unified events search", {
         component: "UnifiedEventsService",
         action: "searchEvents",
         metadata: params,
       })
+
+      // Input validation
+      if (params.lat && (params.lat < -90 || params.lat > 90)) {
+        throw new Error("Invalid latitude: must be between -90 and 90")
+      }
+      if (params.lng && (params.lng < -180 || params.lng > 180)) {
+        throw new Error("Invalid longitude: must be between -180 and 180")
+      }
+      if (params.radius && (params.radius < 1 || params.radius > 500)) {
+        throw new Error("Invalid radius: must be between 1 and 500 km")
+      }
+      if (params.limit && (params.limit < 1 || params.limit > 200)) {
+        throw new Error("Invalid limit: must be between 1 and 200")
+      }
 
       const sources = { rapidapi: 0, ticketmaster: 0, cached: 0 }
       const allEvents: EventDetailProps[] = []
@@ -161,11 +182,13 @@ class UnifiedEventsService {
         },
       })
 
+      const responseTime = Date.now() - startTime
       return {
         events: paginatedEvents,
         totalCount: filteredEvents.length,
         hasMore: filteredEvents.length > offset + limit,
         sources,
+        responseTime,
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
@@ -315,7 +338,7 @@ class UnifiedEventsService {
           stack: error instanceof Error ? error.stack : undefined,
           hasApiKey: !!serverEnv.RAPIDAPI_KEY,
           apiHost: serverEnv.RAPIDAPI_HOST,
-          params: searchParams,
+          params: params,
         },
       })
       return []
@@ -442,7 +465,7 @@ class UnifiedEventsService {
           errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
           hasApiKey: !!serverEnv.TICKETMASTER_API_KEY,
-          params: ticketmasterParams,
+          params: params,
         },
       })
       return []
@@ -1078,9 +1101,7 @@ class UnifiedEventsService {
         image: template.image,
         organizer: {
           name: "Event Organizer",
-          avatar: "/avatar-1.png",
         },
-        attendees: Math.floor(Math.random() * 500) + 50,
         isFavorite: false,
         coordinates:
           params?.lat && params?.lng
