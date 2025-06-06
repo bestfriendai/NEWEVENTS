@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import ClientPage from "./ClientPage"
+import SimpleHome from "./page-simple"
 
 export const metadata: Metadata = {
   title: "DateAI - Discover Amazing Events",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 }
 
 export default function Home() {
-  return <ClientPage />
+  return <SimpleHome />
 }

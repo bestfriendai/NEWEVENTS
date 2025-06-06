@@ -51,6 +51,9 @@ import { cn } from "@/lib/utils"
 // New advanced components
 import { SmartSearchInput } from "@/components/search/SmartSearchInput"
 import { InfiniteEventsGrid } from "@/components/events/InfiniteEventsGrid"
+import { EnhancedEventCard } from "@/components/events/enhanced-event-card"
+import { EnhancedLoadingSkeleton } from "@/components/events/enhanced-loading-skeleton"
+import { SmartEventFilters } from "@/components/events/smart-event-filters"
 
 // Dynamic import for Mapbox component to avoid SSR issues
 const EventsMap = dynamic(() => import("@/components/events/EventsMap"), {

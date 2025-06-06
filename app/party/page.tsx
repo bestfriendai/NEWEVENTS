@@ -213,6 +213,9 @@ export default function PartyPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [eventsPerPage] = useState(24)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [favoriteEvents, setFavoriteEvents] = useState<Set<string>>(new Set())
 
   // Load party events with enhanced filtering and location-based search
   const loadPartyEvents = useCallback(async () => {

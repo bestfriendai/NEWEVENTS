@@ -32,16 +32,34 @@ export interface EnhancedEventSearchProps {
 }
 
 const CATEGORIES = [
-  "Music",
-  "Arts",
-  "Sports",
-  "Food",
-  "Business",
-  "Technology",
-  "Health",
-  "Education",
-  "Entertainment",
-  "Community",
+  { name: "Music", icon: "🎵", color: "bg-purple-500" },
+  { name: "Arts", icon: "🎨", color: "bg-pink-500" },
+  { name: "Sports", icon: "⚽", color: "bg-green-500" },
+  { name: "Food", icon: "🍕", color: "bg-orange-500" },
+  { name: "Business", icon: "💼", color: "bg-blue-500" },
+  { name: "Technology", icon: "💻", color: "bg-indigo-500" },
+  { name: "Health", icon: "🏥", color: "bg-red-500" },
+  { name: "Education", icon: "📚", color: "bg-yellow-500" },
+  { name: "Entertainment", icon: "🎭", color: "bg-teal-500" },
+  { name: "Community", icon: "👥", color: "bg-gray-500" },
+]
+
+const SORT_OPTIONS = [
+  { value: "relevance", label: "Most Relevant" },
+  { value: "date", label: "Date" },
+  { value: "popularity", label: "Most Popular" },
+  { value: "price_low", label: "Price: Low to High" },
+  { value: "price_high", label: "Price: High to Low" },
+  { value: "distance", label: "Distance" },
+]
+
+const POPULAR_SEARCHES = [
+  "concerts near me",
+  "weekend events",
+  "free events",
+  "food festivals",
+  "art exhibitions",
+  "tech meetups",
 ]
 
 const RADIUS_OPTIONS = [
@@ -73,6 +91,9 @@ export function EnhancedEventSearch({
     initialParams.endDate ? new Date(initialParams.endDate) : undefined,
   )
   const [showFilters, setShowFilters] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [sortBy, setSortBy] = useState("relevance")
 
   // Hooks
   const { trackSearch } = useAnalytics()
@@ -126,6 +147,11 @@ export function EnhancedEventSearch({
       return
     }
 
+    // Save search term to recent searches
+    if (searchParams.keyword) {
+      saveToRecentSearches(searchParams.keyword)
+    }
+
     logger.info("Performing enhanced event search", {
       component: "EnhancedEventSearch",
       action: "search",
@@ -135,6 +161,7 @@ export function EnhancedEventSearch({
     try {
       await searchEvents(searchParams)
       await trackSearch(searchParams)
+      setShowSuggestions(false)
     } catch (error) {
       logger.error(
         "Search failed",
@@ -145,7 +172,7 @@ export function EnhancedEventSearch({
         error instanceof Error ? error : new Error(String(error)),
       )
     }
-  }, [buildSearchParams, searchEvents, clearEvents, trackSearch])
+  }, [buildSearchParams, searchEvents, clearEvents, trackSearch, saveToRecentSearches])
 
   /**
    * Handle category toggle
@@ -184,6 +211,33 @@ export function EnhancedEventSearch({
     },
     [handleSearch],
   )
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("recentEventSearches")
+      if (saved) {
+        try {
+          setRecentSearches(JSON.parse(saved))
+        } catch (e) {
+          console.warn("Failed to parse recent searches")
+        }
+      }
+    }
+  }, [])
+
+  // Save search to recent searches
+  const saveToRecentSearches = useCallback((searchTerm: string) => {
+    if (!searchTerm.trim()) return
+
+    setRecentSearches(prev => {
+      const updated = [searchTerm, ...prev.filter(s => s !== searchTerm)].slice(0, 5)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("recentEventSearches", JSON.stringify(updated))
+      }
+      return updated
+    })
+  }, [])
 
   // Effect to notify parent components
   useEffect(() => {
