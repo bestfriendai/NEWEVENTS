@@ -5,7 +5,7 @@
  * Provides global query client with performance optimizations
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState, ReactNode } from 'react'
 import { logger } from '@/lib/utils/logger'
@@ -66,7 +66,7 @@ function createQueryClient() {
     },
     
     // Global error handler
-    queryCache: {
+    queryCache: new QueryCache({
       onError: (error, query) => {
         logger.error('Query error:', {
           error: error instanceof Error ? error.message : String(error),
@@ -74,10 +74,10 @@ function createQueryClient() {
           queryHash: query.queryHash,
         })
       },
-    },
+    }),
     
     // Global mutation error handler
-    mutationCache: {
+    mutationCache: new MutationCache({
       onError: (error, variables, context, mutation) => {
         logger.error('Mutation error:', {
           error: error instanceof Error ? error.message : String(error),
@@ -92,7 +92,7 @@ function createQueryClient() {
           variables,
         })
       },
-    },
+    }),
   })
 }
 
