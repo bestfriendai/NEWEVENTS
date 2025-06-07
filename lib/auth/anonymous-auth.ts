@@ -117,10 +117,9 @@ export async function ensureUserSession() {
         const { data, error } = await supabase.auth.signInAnonymously()
 
         if (error) {
-          logger.warn("Supabase anonymous auth failed, using local anonymous ID. Supabase error:", {
+          logger.warn("Supabase anonymous auth failed, using local anonymous ID", {
             component: "anonymous-auth",
             action: "supabase_anonymous_failed",
-            supabaseError: error
           })
           return { userId: getAnonymousUserId(), isSupabase: false }
         }

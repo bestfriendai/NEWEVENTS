@@ -34,34 +34,34 @@ export async function fetchEvents(params: {
   endDate?: string
 }): Promise<EventSearchResult> {
   try {
-    logger.info("Server action: fetchEvents called", { params });
+    logger.info("Server action: fetchEvents called", { params })
 
-    // Convert params to UnifiedEventSearchParams as per the plan
+    // Convert to unified API parameters
     const searchParams: UnifiedEventSearchParams = {
-        query: params.keyword,
-        lat: params.coordinates?.lat,
-        lng: params.coordinates?.lng,
-        radius: params.radius,
-        limit: params.size || 50, // Default to 50 if not provided, allows fetching more events
-        page: params.page,   // Use params.page directly
-        category: params.categories?.[0], // Keep if needed, or adjust based on how categories are handled
-        startDate: params.startDate,
-        endDate: params.endDate,
-        // sortBy: params.sort, // Map sort if necessary, UnifiedEventSearchParams has sortBy
-    };
+      query: params.keyword,
+      lat: params.coordinates?.lat,
+      lng: params.coordinates?.lng,
+      radius: params.radius || 25,
+      limit: Math.max(params.size || 50, 100), // Increase minimum limit to 100
+      offset: (params.page || 0) * (params.size || 20),
+      category: params.categories?.[0], // Use first category for now
+      startDate: params.startDate,
+      endDate: params.endDate,
+    }
 
-    const result = await unifiedEventsService.searchEvents(searchParams);
+    const result = await unifiedEventsService.searchEvents(searchParams)
 
-    // Format the result for the client
-    const sourcesArray: string[] = [];
-    if (result.sources.rapidapi > 0) sourcesArray.push("RapidAPI");
-    if (result.sources.ticketmaster > 0) sourcesArray.push("Ticketmaster");
-    if (result.sources.eventbrite > 0) sourcesArray.push("Eventbrite"); // Added Eventbrite
+    // Convert sources object to array for backward compatibility
+    const sourcesArray: string[] = []
+    if (result.sources.rapidapi > 0) sourcesArray.push("RapidAPI")
+    if (result.sources.ticketmaster > 0) sourcesArray.push("Ticketmaster")
+    if (result.sources.cached > 0) sourcesArray.push("Cached")
 
-    const pageSize = params.size || 50; // Default page size if not provided, consistent with limit
-    const currentPage = params.page || 0;
-    const totalPages = result.totalCount > 0 && pageSize > 0 ? Math.ceil(result.totalCount / pageSize) : 0;
-    
+    // Calculate pagination info
+    const pageSize = params.size || 20
+    const currentPage = params.page || 0
+    const totalPages = Math.ceil(result.totalCount / pageSize)
+
     return {
       events: result.events,
       totalCount: result.totalCount,
@@ -69,10 +69,8 @@ export async function fetchEvents(params: {
       totalPages,
       sources: sourcesArray,
       error: result.error ? { message: result.error } : undefined,
-      // cached: undefined, // Caching is handled by react-query, so this might be removed or set to false
-      responseTime: result.responseTime,
-    };
-
+      cached: result.sources.cached > 0,
+    }
   } catch (error) {
     logger.error("Server action: fetchEvents failed", { error, params })
 
@@ -95,15 +93,15 @@ export async function fetchEvents(params: {
  */
 export async function getFeaturedEvents(limit = 6): Promise<EventDetailProps[]> {
   try {
-    logger.info("Server action: getFeaturedEvents called", { limit });
+    logger.info("Server action: getFeaturedEvents called", { limit })
 
-    // This can now be a more specific call to the unified service as per the plan
+    // Default to NYC coordinates for featured events
     const result = await unifiedEventsService.getFeaturedEventsNearUser(
       40.7128, // NYC lat
       -74.006, // NYC lng
-      50,      // radius in km
-      limit    // Use limit directly as per plan
-    );
+      50, // radius
+      Math.max(limit, 50), // Ensure we get at least 50 events instead of 20
+    )
 
     logger.info("Server action: getFeaturedEvents completed", {
       eventCount: result.events.length,

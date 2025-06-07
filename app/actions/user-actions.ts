@@ -1,24 +1,238 @@
 "use server"
 
 import { z } from "zod"
-import { createClient, SupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/supabase-js"
 import { env } from "@/lib/env"
-import { logger } from "@/lib/utils/logger";
+import { logger } from "@/lib/utils/logger"
 
-// Import your REAL repositories
-import { 
-    UserRepository as RealUserRepository,
-    UserEntity as ImportedUserEntity, 
-    UserPreferencesEntity 
-} from '@/lib/backend/repositories/user-repository';
-import { 
-    FavoritesRepository as RealFavoritesRepository
-} from '@/lib/backend/repositories/favorites-repository';
+// Production user repository using Supabase
+class UserRepository {
+  private supabase
 
-// Use the imported UserEntity as the primary UserEntity type for this file
-export type UserEntity = ImportedUserEntity;
+  constructor() {
+    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  }
 
-// Mock analytics service (kept as per plan)
+  async findById(id: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        logger.error('Failed to find user by ID', {
+          component: 'UserRepository',
+          action: 'findById',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error finding user', {
+        component: 'UserRepository',
+        action: 'findById',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to find user' }
+    }
+  }
+
+  async create(userData: any) {
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .insert(userData)
+        .select()
+        .single()
+
+      if (error) {
+        logger.error('Failed to create user', {
+          component: 'UserRepository',
+          action: 'create'
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error creating user', {
+        component: 'UserRepository',
+        action: 'create'
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to create user' }
+    }
+  }
+
+  async update(id: string, updates: any) {
+    try {
+      const { data, error } = await this.supabase
+        .from('users')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        logger.error('Failed to update user', {
+          component: 'UserRepository',
+          action: 'update',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating user', {
+        component: 'UserRepository',
+        action: 'update',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to update user' }
+    }
+  }
+
+  async updateLastLogin(id: string) {
+    try {
+      const { error } = await this.supabase
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) {
+        logger.error('Failed to update last login', {
+          component: 'UserRepository',
+          action: 'updateLastLogin',
+          metadata: { userId: id }
+        }, error)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating last login', {
+        component: 'UserRepository',
+        action: 'updateLastLogin',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { error: 'Failed to update last login' }
+    }
+  }
+
+  async getUserPreferences(id: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', id)
+        .single()
+
+      if (error) {
+        logger.error('Failed to get user preferences', {
+          component: 'UserRepository',
+          action: 'getUserPreferences',
+          metadata: { userId: id }
+        }, error)
+        return { data: null, error: error.message }
+      }
+
+      return { data, error: null }
+    } catch (error) {
+      logger.error('Unexpected error getting user preferences', {
+        component: 'UserRepository',
+        action: 'getUserPreferences',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { data: null, error: 'Failed to get user preferences' }
+    }
+  }
+
+  async updateUserPreferences(id: string, preferences: any) {
+    try {
+      const { error } = await this.supabase
+        .from('user_preferences')
+        .upsert({ user_id: id, ...preferences })
+
+      if (error) {
+        logger.error('Failed to update user preferences', {
+          component: 'UserRepository',
+          action: 'updateUserPreferences',
+          metadata: { userId: id }
+        }, error)
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch (error) {
+      logger.error('Unexpected error updating user preferences', {
+        component: 'UserRepository',
+        action: 'updateUserPreferences',
+        metadata: { userId: id }
+      }, error instanceof Error ? error : new Error(String(error)))
+      return { error: 'Failed to update user preferences' }
+    }
+  }
+}
+
+// Mock favorites repository
+class MockFavoritesRepository {
+  private favorites: Array<{ userId: string; eventId: number; event: any }> = []
+
+  async addFavorite(userId: string, eventId: number) {
+    const existing = this.favorites.find((f) => f.userId === userId && f.eventId === eventId)
+    if (!existing) {
+      this.favorites.push({
+        userId,
+        eventId,
+        event: {
+          id: eventId,
+          title: `Event ${eventId}`,
+          description: "Sample event description",
+          category: "Concerts",
+          date: "2024-02-15",
+          time: "7:00 PM",
+          location: "Sample Venue",
+          address: "123 Main St, City, State",
+          price: "$50",
+          image: "/event-1.png",
+          organizer: {
+            name: "Event Organizer",
+            avatar: "/avatar-1.png",
+          },
+          attendees: 150,
+          isFavorite: true,
+          coordinates: { lat: 40.7128, lng: -74.006 },
+          ticketLinks: [],
+        },
+      })
+    }
+    return { data: true, error: null }
+  }
+
+  async removeFavorite(userId: string, eventId: number) {
+    this.favorites = this.favorites.filter((f) => !(f.userId === userId && f.eventId === eventId))
+    return { data: true, error: null }
+  }
+
+  async getUserFavorites(userId: string, limit = 50) {
+    const userFavorites = this.favorites.filter((f) => f.userId === userId).slice(0, limit)
+    return {
+      data: userFavorites.map((f) => f.event),
+      error: null,
+    }
+  }
+
+  async isFavorited(userId: string, eventId: number) {
+    const exists = this.favorites.some((f) => f.userId === userId && f.eventId === eventId)
+    return { data: exists, error: null }
+  }
+}
+
+// Mock analytics service
 class MockAnalyticsService {
   async trackEvent(data: any) {
     logger.debug("Analytics event tracked", data)
@@ -26,7 +240,6 @@ class MockAnalyticsService {
   }
 
   async getUserAnalytics(userId: string) {
-    // This is a mock implementation
     return {
       totalEvents: 25,
       favoriteEvents: 8,
@@ -34,12 +247,11 @@ class MockAnalyticsService {
       averagePrice: 75,
       preferredTime: "evening",
       topVenues: ["Madison Square Garden", "Central Park", "Brooklyn Bowl"],
-      userId, // Added to make it slightly more "real"
     }
   }
 }
 
-// Mock cache service (kept as per plan)
+// Mock cache service
 class MockCacheService {
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>()
 
@@ -54,13 +266,19 @@ class MockCacheService {
       this.cache.delete(fullKey)
       return null
     }
+
     return cached.data as T
   }
 
   async set(key: string, data: any, options?: { ttl?: number; namespace?: string }): Promise<void> {
     const fullKey = options?.namespace ? `${options.namespace}:${key}` : key
     const ttl = (options?.ttl || 300) * 1000 // Convert to milliseconds
-    this.cache.set(fullKey, { data, timestamp: Date.now(), ttl })
+
+    this.cache.set(fullKey, {
+      data,
+      timestamp: Date.now(),
+      ttl,
+    })
   }
 
   async delete(key: string, options?: { namespace?: string }): Promise<void> {
@@ -77,11 +295,33 @@ class MockCacheService {
   }
 }
 
-// Initialize REAL services (and kept mocks)
-const userRepository = new RealUserRepository();
-const favoritesRepository = new RealFavoritesRepository();
-const analyticsService = new MockAnalyticsService(); // Kept as per plan
-const cacheService = new MockCacheService(); // Kept as per plan
+// Mock Supabase client
+function createMockSupabaseClient() {
+  return {
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: "mock-user-id",
+            email: "user@example.com",
+            user_metadata: {
+              name: "Test User",
+              avatar_url: "/avatar-1.png",
+            },
+          },
+        },
+        error: null,
+      }),
+      signOut: async () => ({ error: null }),
+    },
+  }
+}
+
+// Initialize mock services
+const userRepository = new MockUserRepository()
+const favoritesRepository = new MockFavoritesRepository()
+const analyticsService = new MockAnalyticsService()
+const cacheService = new MockCacheService()
 
 // Validation schemas
 const UserUpdateSchema = z.object({
@@ -108,12 +348,12 @@ const UserUpdateSchema = z.object({
         .optional(),
     })
     .optional(),
-});
+})
 
 const FavoriteActionSchema = z.object({
   eventId: z.number().positive(),
   action: z.enum(["add", "remove"]),
-});
+})
 
 export interface UserActionResult<T = any> {
   success: boolean
@@ -121,71 +361,109 @@ export interface UserActionResult<T = any> {
   error?: string
 }
 
+export interface UserEntity {
+  id: string
+  email: string
+  name: string
+  avatar_url?: string
+  is_active: boolean
+  location_lat?: number
+  location_lng?: number
+  location_name?: string
+  preferences?: any
+}
+
 /**
  * Get current user profile
  */
 export async function getCurrentUser(): Promise<UserActionResult<UserEntity>> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
-    const cacheKey = `user:profile:${user.id}`;
-    const cachedUser = await cacheService.get<UserEntity>(cacheKey, { ttl: 300, namespace: "users" });
+    // Try cache first
+    const cacheKey = `user:profile:${user.id}`
+    const cachedUser = await cacheService.get<UserEntity>(cacheKey, {
+      ttl: 300, // 5 minutes
+      namespace: "users",
+    })
 
     if (cachedUser) {
-      return { success: true, data: cachedUser };
+      return {
+        success: true,
+        data: cachedUser,
+      }
     }
 
-    const result = await userRepository.findById(user.id);
+    // Get from database
+    const result = await userRepository.findById(user.id)
 
-    if (result.error && result.error !== "Not found") { // Assuming "Not found" might be a string from repo
-      const createData: Omit<UserEntity, "id" | "created_at" | "updated_at"> = {
+    if (result.error) {
+      // User doesn't exist in our database, create them
+      const newUser = await userRepository.create({
+        id: user.id,
         email: user.email!,
-        name: user.user_metadata?.name || user.email?.split("@")[0] || undefined,
-        avatar_url: user.user_metadata?.avatar_url || undefined,
+        name: user.user_metadata?.name || user.email?.split("@")[0],
+        avatar_url: user.user_metadata?.avatar_url,
         is_active: true,
-        location_lat: undefined,
-        location_lng: undefined,
-        location_name: undefined,
-        preferences: undefined, // Default preferences can be set by DB or another call
-        last_login: new Date().toISOString(),
-      };
-      const newUserResult = await userRepository.create(createData);
+      })
 
-      if (newUserResult.error) {
-        return { success: false, error: newUserResult.error };
+      if (newUser.error) {
+        return {
+          success: false,
+          error: newUser.error,
+        }
       }
-      if (newUserResult.data) {
-        await cacheService.set(cacheKey, newUserResult.data, { ttl: 300, namespace: "users" });
-        return { success: true, data: newUserResult.data };
-      } else {
-         return { success: false, error: "Failed to create or retrieve user after creation." };
+
+      // Cache the new user
+      await cacheService.set(cacheKey, newUser.data!, {
+        ttl: 300,
+        namespace: "users",
+      })
+
+      return {
+        success: true,
+        data: newUser.data!,
       }
-    } else if (result.data) {
-      await cacheService.set(cacheKey, result.data, { ttl: 300, namespace: "users" });
-      await userRepository.updateLastLogin(user.id);
-      return { success: true, data: result.data };
     }
-    
-    return { success: false, error: result.error || "User not found and creation attempt failed." };
 
+    // Cache the existing user
+    await cacheService.set(cacheKey, result.data!, {
+      ttl: 300,
+      namespace: "users",
+    })
+
+    // Update last login
+    await userRepository.updateLastLogin(user.id)
+
+    return {
+      success: true,
+      data: result.data!,
+    }
   } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error getting current user", {
-      component: "user-actions",
-      action: "get_current_user_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError 
-    });
-    return { success: false, error: "Failed to get user profile" };
+    logger.error(
+      "Error getting current user",
+      {
+        component: "user-actions",
+        action: "get_current_user_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to get user profile",
+    }
   }
 }
 
@@ -196,132 +474,162 @@ export async function updateUserProfile(
   updates: z.infer<typeof UserUpdateSchema>,
 ): Promise<UserActionResult<UserEntity>> {
   try {
-    const validationResult = UserUpdateSchema.safeParse(updates);
+    // Validate input
+    const validationResult = UserUpdateSchema.safeParse(updates)
     if (!validationResult.success) {
-      return { success: false, error: "Invalid update data: " + validationResult.error.format()._errors.join(', ') };
+      return {
+        success: false,
+        error: "Invalid update data",
+      }
     }
 
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
     logger.info("Updating user profile", {
       component: "user-actions",
-      action: "update_user_profile",
-      userId: user.id,
-      updates: validationResult.data,
-    });
+      action: "update_profile",
+      metadata: { userId: user.id, updates: Object.keys(validationResult.data) },
+    })
 
-    const userUpdates: Partial<Omit<UserEntity, "id" | "created_at" | "updated_at">> = {};
-    if (validationResult.data.name) userUpdates.name = validationResult.data.name;
-    if (validationResult.data.location) {
-      userUpdates.location_lat = validationResult.data.location.lat;
-      userUpdates.location_lng = validationResult.data.location.lng;
-      userUpdates.location_name = validationResult.data.location.name;
+    // Prepare update data
+    const updateData: Partial<UserEntity> = {}
+
+    if (validationResult.data.name) {
+      updateData.name = validationResult.data.name
     }
 
-    if (Object.keys(userUpdates).length > 0) {
-      const userUpdateResult = await userRepository.update(user.id, userUpdates);
-      if (userUpdateResult.error) {
-        return { success: false, error: userUpdateResult.error };
-      }
+    if (validationResult.data.location) {
+      updateData.location_lat = validationResult.data.location.lat
+      updateData.location_lng = validationResult.data.location.lng
+      updateData.location_name = validationResult.data.location.name
     }
 
     if (validationResult.data.preferences) {
-      const prefsToUpdate: Partial<Omit<UserPreferencesEntity, "id" | "user_id" | "created_at" | "updated_at">> = {};
-      if (validationResult.data.preferences.favoriteCategories) {
-        prefsToUpdate.favorite_categories = validationResult.data.preferences.favoriteCategories;
-      }
-      if (validationResult.data.preferences.pricePreference) {
-        prefsToUpdate.price_preference = validationResult.data.preferences.pricePreference;
-      }
-      if (validationResult.data.preferences.timePreference) {
-        prefsToUpdate.time_preference = validationResult.data.preferences.timePreference;
-      }
-      if (validationResult.data.preferences.radiusPreference) {
-        prefsToUpdate.radius_preference = validationResult.data.preferences.radiusPreference;
-      }
-      if (validationResult.data.preferences.notificationSettings) {
-        prefsToUpdate.notification_settings = validationResult.data.preferences.notificationSettings;
-      }
-      
-      if (Object.keys(prefsToUpdate).length > 0) {
-        const prefUpdateResult = await userRepository.updateUserPreferences(user.id, prefsToUpdate);
-        if (prefUpdateResult.error) {
-            return { success: false, error: prefUpdateResult.error };
-        }
+      updateData.preferences = validationResult.data.preferences
+    }
+
+    // Update in database
+    const result = await userRepository.update(user.id, updateData)
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error,
       }
     }
 
-    await cacheService.delete(`user:profile:${user.id}`, { namespace: "users" });
-    const { data: updatedUser, error: findError } = await userRepository.findById(user.id);
-
-    if (findError) {
-      return { success: false, error: findError };
+    // Update user preferences if provided
+    if (validationResult.data.preferences) {
+      await userRepository.updateUserPreferences(user.id, validationResult.data.preferences)
     }
 
-    return { success: true, data: updatedUser! };
-  } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error updating user profile", {
+    // Clear cache
+    await cacheService.delete(`user:profile:${user.id}`, { namespace: "users" })
+
+    logger.info("User profile updated successfully", {
       component: "user-actions",
-      action: "update_user_profile_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to update profile" };
+      action: "update_profile_success",
+      metadata: { userId: user.id },
+    })
+
+    return {
+      success: true,
+      data: result.data!,
+    }
+  } catch (error) {
+    logger.error(
+      "Error updating user profile",
+      {
+        component: "user-actions",
+        action: "update_profile_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to update profile",
+    }
   }
 }
 
 /**
  * Get user preferences
  */
-export async function getUserPreferences(): Promise<UserActionResult<UserPreferencesEntity>> {
+export async function getUserPreferences(): Promise<UserActionResult> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { 
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
-    const cacheKey = `user:preferences:${user.id}`;
-    const cachedPreferences = await cacheService.get<UserPreferencesEntity>(cacheKey, { ttl: 600, namespace: "users" });
+    // Try cache first
+    const cacheKey = `user:preferences:${user.id}`
+    const cachedPreferences = await cacheService.get(cacheKey, {
+      ttl: 600, // 10 minutes
+      namespace: "users",
+    })
 
     if (cachedPreferences) {
-      return { success: true, data: cachedPreferences };
+      return {
+        success: true,
+        data: cachedPreferences,
+      }
     }
 
-    const result = await userRepository.getUserPreferences(user.id);
+    // Get from database
+    const result = await userRepository.getUserPreferences(user.id)
 
     if (result.error) {
-      return { success: false, error: result.error };
+      return {
+        success: false,
+        error: result.error,
+      }
     }
-    
-    if (result.data) {
-        await cacheService.set(cacheKey, result.data, { ttl: 600, namespace: "users" });
-        return { success: true, data: result.data };
-    }
-    return { success: false, error: "Preferences not found." };
 
+    // Cache the preferences
+    await cacheService.set(cacheKey, result.data!, {
+      ttl: 600,
+      namespace: "users",
+    })
+
+    return {
+      success: true,
+      data: result.data!,
+    }
   } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error getting user preferences", {
-      component: "user-actions",
-      action: "get_user_preferences_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to get preferences" };
+    logger.error(
+      "Error getting user preferences",
+      {
+        component: "user-actions",
+        action: "get_preferences_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to get preferences",
+    }
   }
 }
 
@@ -333,163 +641,312 @@ export async function toggleEventFavorite(
   action: "add" | "remove",
 ): Promise<UserActionResult<boolean>> {
   try {
-    const validationResult = FavoriteActionSchema.safeParse({ eventId, action });
+    // Validate input
+    const validationResult = FavoriteActionSchema.safeParse({ eventId, action })
     if (!validationResult.success) {
-      return { success: false, error: "Invalid favorite action: " + validationResult.error.format()._errors.join(', ') };
+      return {
+        success: false,
+        error: "Invalid favorite action",
+      }
     }
 
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
     logger.info("Toggling event favorite", {
       component: "user-actions",
-      action: "toggle_event_favorite",
-      userId: user.id,
-      eventId,
-      favoriteAction: action,
-    });
+      action: "toggle_favorite",
+      metadata: { userId: user.id, eventId, favoriteAction: action },
+    })
 
-    let result;
+    let result
+
     if (action === "add") {
-      result = await favoritesRepository.addFavorite(user.id, eventId);
-      await analyticsService.trackEvent({ event_id: eventId, user_id: user.id, action: "favorite", metadata: { action: "add" } });
+      result = await favoritesRepository.addFavorite(user.id, eventId)
+
+      // Track analytics
+      await analyticsService.trackEvent({
+        event_id: eventId,
+        user_id: user.id,
+        action: "favorite",
+        metadata: { action: "add" },
+      })
     } else {
-      result = await favoritesRepository.removeFavorite(user.id, eventId);
-      await analyticsService.trackEvent({ event_id: eventId, user_id: user.id, action: "favorite", metadata: { action: "remove" } });
+      result = await favoritesRepository.removeFavorite(user.id, eventId)
+
+      // Track analytics
+      await analyticsService.trackEvent({
+        event_id: eventId,
+        user_id: user.id,
+        action: "favorite",
+        metadata: { action: "remove" },
+      })
     }
 
     if (result.error) {
-      return { success: false, error: result.error };
+      return {
+        success: false,
+        error: result.error,
+      }
     }
 
-    await cacheService.delete(`user:favorites:${user.id}`, { namespace: "users" });
-    await cacheService.delete(`user:favorite_ids:${user.id}`, { namespace: "users" });
+    // Clear user favorites cache
+    await cacheService.delete(`user:favorites:${user.id}`, { namespace: "users" })
 
-    // If action was 'add', result.data is FavoriteEntity. We need to return a boolean.
-    // If action was 'remove', result.data is already boolean.
-    return { success: true, data: typeof result.data === 'boolean' ? result.data : true };
-  } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error toggling event favorite", {
+    logger.info("Event favorite toggled successfully", {
       component: "user-actions",
-      action: "toggle_event_favorite_error",
-      eventId,
-      favoriteAction: action,
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to toggle favorite" };
+      action: "toggle_favorite_success",
+      metadata: { userId: user.id, eventId, favoriteAction: action },
+    })
+
+    return {
+      success: true,
+      data: true,
+    }
+  } catch (error) {
+    logger.error(
+      "Error toggling event favorite",
+      {
+        component: "user-actions",
+        action: "toggle_favorite_error",
+        metadata: { eventId, action },
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to update favorite",
+    }
   }
 }
 
 /**
  * Get user's favorite events
  */
-export async function getUserFavorites(limit = 50): Promise<UserActionResult<any[]>> {
+export async function getUserFavorites(limit = 50): Promise<UserActionResult> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
-    }
-    
-    const cacheKey = `user:favorites:${user.id}:${limit}`;
-    const cachedFavorites = await cacheService.get<any[]>(cacheKey, { ttl: 300, namespace: "users" });
-    if (cachedFavorites) {
-      return { success: true, data: cachedFavorites };
+      logger.info("User not authenticated for favorites", {
+        component: "user-actions",
+        action: "get_favorites_not_authenticated",
+      })
+      return {
+        success: true,
+        data: [], // Return empty array instead of error for unauthenticated users
+      }
     }
 
-    const result = await favoritesRepository.getUserFavorites(user.id, limit);
+    // Try cache first
+    const cacheKey = `user:favorites:${user.id}:${limit}`
+    const cachedFavorites = await cacheService.get(cacheKey, {
+      ttl: 300, // 5 minutes
+      namespace: "users",
+    })
+
+    if (cachedFavorites) {
+      return {
+        success: true,
+        data: cachedFavorites,
+      }
+    }
+
+    // Get from database
+    const result = await favoritesRepository.getUserFavorites(user.id, limit)
+
     if (result.error) {
-      return { success: false, error: result.error };
+      logger.warn("Error getting favorites from repository", {
+        component: "user-actions",
+        action: "get_favorites_repository_error",
+        metadata: { error: result.error },
+      })
+      return {
+        success: true,
+        data: [], // Return empty array instead of error
+      }
     }
-    
-    if(result.data){
-        await cacheService.set(cacheKey, result.data, { ttl: 300, namespace: "users" });
-    }
-    return { success: true, data: result.data || [] };
-  } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error getting user favorites", {
+
+    const favoritesData = result.data || []
+
+    // Cache the favorites
+    await cacheService.set(cacheKey, favoritesData, {
+      ttl: 300,
+      namespace: "users",
+    })
+
+    logger.info("User favorites loaded", {
       component: "user-actions",
-      action: "get_user_favorites_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to get favorites" };
+      action: "get_favorites_success",
+      metadata: { count: favoritesData.length, userId: user.id },
+    })
+
+    return {
+      success: true,
+      data: favoritesData,
+    }
+  } catch (error) {
+    logger.error(
+      "Error getting user favorites",
+      {
+        component: "user-actions",
+        action: "get_favorites_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    // Return empty array instead of error to prevent UI crashes
+    return {
+      success: true,
+      data: [],
+    }
   }
 }
 
 /**
- * Check if an event is favorited by the current user
+ * Check if event is favorited by user
  */
 export async function isEventFavorited(eventId: number): Promise<UserActionResult<boolean>> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: true,
+        data: false, // Not authenticated = not favorited
+      }
     }
 
-    const result = await favoritesRepository.isFavorited(user.id, eventId);
-    if (result.error) {
-      return { success: false, error: result.error };
+    // Try cache first
+    const cacheKey = `user:favorite_check:${user.id}:${eventId}`
+    const cachedResult = await cacheService.get<boolean>(cacheKey, {
+      ttl: 300, // 5 minutes
+      namespace: "users",
+    })
+
+    if (cachedResult !== null) {
+      return {
+        success: true,
+        data: cachedResult,
+      }
     }
-    return { success: true, data: result.data! };
+
+    // Check database
+    const result = await favoritesRepository.isFavorited(user.id, eventId)
+
+    if (result.error) {
+      return {
+        success: true,
+        data: false, // Default to not favorited on error
+      }
+    }
+
+    // Cache the result
+    await cacheService.set(cacheKey, result.data!, {
+      ttl: 300,
+      namespace: "users",
+    })
+
+    return {
+      success: true,
+      data: result.data!,
+    }
   } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error checking if event is favorited", {
-      component: "user-actions",
-      action: "is_event_favorited_error",
-      eventId,
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to check favorite status" };
+    logger.error(
+      "Error checking if event is favorited",
+      {
+        component: "user-actions",
+        action: "is_favorited_error",
+        metadata: { eventId },
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: true,
+      data: false, // Default to not favorited on error
+    }
   }
 }
 
 /**
- * Get user analytics data (mocked)
+ * Get user analytics
  */
-export async function getUserAnalytics(): Promise<UserActionResult<any>> {
+export async function getUserAnalytics(): Promise<UserActionResult> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
-    const data = await analyticsService.getUserAnalytics(user.id);
-    return { success: true, data };
+    // Try cache first
+    const cacheKey = `user:analytics:${user.id}`
+    const cachedAnalytics = await cacheService.get(cacheKey, {
+      ttl: 1800, // 30 minutes
+      namespace: "users",
+    })
+
+    if (cachedAnalytics) {
+      return {
+        success: true,
+        data: cachedAnalytics,
+      }
+    }
+
+    // Get from analytics service
+    const analytics = await analyticsService.getUserAnalytics(user.id)
+
+    // Cache the analytics
+    await cacheService.set(cacheKey, analytics, {
+      ttl: 1800,
+      namespace: "users",
+    })
+
+    return {
+      success: true,
+      data: analytics,
+    }
   } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error getting user analytics", {
-      component: "user-actions",
-      action: "get_user_analytics_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to get analytics" };
+    logger.error(
+      "Error getting user analytics",
+      {
+        component: "user-actions",
+        action: "get_analytics_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to get analytics",
+    }
   }
 }
 
@@ -498,34 +955,67 @@ export async function getUserAnalytics(): Promise<UserActionResult<any>> {
  */
 export async function deleteUserAccount(): Promise<UserActionResult<boolean>> {
   try {
-    const supabase: SupabaseClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = createMockSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "User not authenticated" };
+      return {
+        success: false,
+        error: "User not authenticated",
+      }
     }
 
-    logger.warn("Mock deleteUserAccount called for user", { userId: user.id });
-
-    await cacheService.delete(`user:profile:${user.id}`, { namespace: "users" });
-    await cacheService.delete(`user:favorites:${user.id}`, { namespace: "users" });
-    await cacheService.delete(`user:favorite_ids:${user.id}`, { namespace: "users" });
-
-    // In a real scenario, you would also delete from 'users', 'user_preferences', 'favorites' tables
-    // and call supabase.auth.admin.deleteUser(user.id) if using admin rights.
-
-    return { success: true, data: true };
-  } catch (error) {
-    const actualError = error instanceof Error ? error : new Error(String(error));
-    logger.error("Error deleting user account", {
+    logger.warn("User account deletion requested", {
       component: "user-actions",
-      action: "delete_user_account_error",
-      message: actualError.message,
-      stack: actualError.stack,
-      errorObject: actualError
-    });
-    return { success: false, error: "Failed to delete account" };
+      action: "delete_account",
+      metadata: { userId: user.id },
+    })
+
+    // Soft delete - mark as inactive
+    const result = await userRepository.update(user.id, {
+      is_active: false,
+      email: `deleted_${Date.now()}_${user.email}`, // Anonymize email
+    })
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error,
+      }
+    }
+
+    // Clear all user caches
+    await cacheService.clearNamespace(`users:${user.id}`)
+
+    // Sign out user
+    await supabase.auth.signOut()
+
+    logger.info("User account deleted successfully", {
+      component: "user-actions",
+      action: "delete_account_success",
+      metadata: { userId: user.id },
+    })
+
+    return {
+      success: true,
+      data: true,
+    }
+  } catch (error) {
+    logger.error(
+      "Error deleting user account",
+      {
+        component: "user-actions",
+        action: "delete_account_error",
+      },
+      error instanceof Error ? error : new Error(String(error)),
+    )
+
+    return {
+      success: false,
+      error: "Failed to delete account",
+    }
   }
 }
