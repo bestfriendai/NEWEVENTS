@@ -1,0 +1,265 @@
+/* EventsExplorer.module.css */
+
+.container {
+  display: flex;
+  height: calc(100vh - 100px);
+  background-color: #ffffff;
+}
+
+/* Filters Panel */
+.filtersPanel {
+  width: 300px;
+  padding: 16px;
+  border-right: 1px solid #e2e8f0;
+  overflow-y: auto;
+  background-color: #f8fafc;
+}
+
+.filtersTitle {
+  margin: 0 0 16px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.filterGroup {
+  margin-bottom: 16px;
+}
+
+.filterLabel {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.filterInput {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.helpText {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* Main Content */
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Map Container */
+.mapContainer {
+  height: 40%;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f3f4f6;
+}
+
+.mapPlaceholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}
+
+.mapIcon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  color: #9ca3af;
+}
+
+/* Events Container */
+.eventsContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.eventsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Loading States */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 12px;
+  animation: spin 1s linear infinite;
+  color: #3b82f6;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error States */
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.errorIcon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 12px;
+  color: #ef4444;
+}
+
+.noLocationContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background-color: #fffbeb;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.locationIcon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 12px;
+  color: #f59e0b;
+}
+
+/* Load More */
+.loadMoreContainer {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.loadMoreButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.buttonIcon,
+.buttonSpinner {
+  width: 16px;
+  height: 16px;
+}
+
+.buttonSpinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Event Card Placeholder */
+.eventCard {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.eventCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.eventCardHeader {
+  padding-bottom: 8px;
+}
+
+.eventCardTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.eventCardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eventDetail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.eventIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.eventImage {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+/* Status Messages */
+.endMessage,
+.noEventsMessage {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 16px;
+}
+
+.noEventsMessage {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .filtersPanel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  
+  .mapContainer {
+    height: 200px;
+  }
+}

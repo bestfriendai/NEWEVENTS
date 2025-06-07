@@ -5,20 +5,23 @@
  * Provides optimized data fetching, caching, and infinite scroll
  */
 
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query" // Added keepPreviousData
 import { useState, useEffect, useCallback } from "react"
 import { logger } from "@/lib/utils/logger"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 import { fetchEvents } from "@/app/actions/event-actions"
 
-interface EventsQueryParams {
-  lat?: number
-  lng?: number
-  radius?: number
-  category?: string
-  query?: string
-  startDate?: string
-  endDate?: string
+export interface EventsQueryParams { // Added export
+  keyword?: string; // Changed from query to keyword to match fetchEvents action
+  coordinates?: { lat: number; lng: number };
+  radius?: number;
+  category?: string; // Kept from original, fetchEvents can take categories[0]
+  startDate?: string;
+  endDate?: string;
+  // Add other params as needed by fetchEvents action if they are to be passed from UI
+  // For example:
+  // size?: number; // This is handled by queryFn pageParam logic for infinite query
+  // page?: number; // This is handled by pageParam in infinite query
 }
 
 interface EventsResponse {
@@ -108,43 +111,62 @@ export function useEventsQuery(params: EventsQueryParams, options: UseEventsQuer
   const {
     enabled = true,
     staleTime = 5 * 60 * 1000, // 5 minutes
-    cacheTime = 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus = false,
-  } = options
+  } = options // gcTime is not part of UseEventsQueryOptions, it's a direct useQuery option
 
   return useQuery({
     queryKey: eventsQueryKeys.list(params),
     queryFn: () => fetchEventsOld(params),
     enabled,
     staleTime,
-    cacheTime,
+    gcTime: options.cacheTime || 10 * 60 * 1000, // Apply gcTime directly, use options.cacheTime if provided
     refetchOnWindowFocus,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 }
 
-// Hook for infinite scroll events
-export function useInfiniteEventsQuery(params: EventsQueryParams, options: UseEventsQueryOptions = {}) {
+// This is the only hook you'll need for fetching lists of events
+export function useInfiniteEvents(params: EventsQueryParams, options: UseEventsQueryOptions = {}) { // Renamed and params updated
   const {
     enabled = true,
-    staleTime = 5 * 60 * 1000,
-    cacheTime = 10 * 60 * 1000,
     refetchOnWindowFocus = false,
-  } = options
+  } = options; // staleTime and gcTime (from options.cacheTime) will be set directly in useInfiniteQuery
 
   return useInfiniteQuery({
     queryKey: eventsQueryKeys.infinite(params),
-    queryFn: ({ pageParam = 0 }) => fetchEventsOld({ ...params, pageParam }),
-    getNextPageParam: (lastPage, allPages) => {
-      return lastPage.hasMore ? allPages.length : undefined
+    
+    queryFn: ({ pageParam = 0 }) => {
+        const actionParams = {
+            keyword: params.keyword,
+            coordinates: params.coordinates,
+            radius: params.radius,
+            categories: params.category ? [params.category] : undefined,
+            startDate: params.startDate,
+            endDate: params.endDate,
+            page: pageParam,
+            size: 20,
+        };
+        return fetchEvents(actionParams);
     },
+
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.page < lastPage.totalPages - 1) {
+        return lastPage.page + 1;
+      }
+      return undefined;
+    },
+    
+    initialPageParam: 0,
+
+    placeholderData: keepPreviousData, // Corrected for v5
+    
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: options.cacheTime || 10 * 60 * 1000, // Use gcTime, respect options.cacheTime
     enabled,
-    staleTime,
-    cacheTime,
     refetchOnWindowFocus,
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: 2, // Kept from original
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Kept
   })
 }
 
@@ -153,8 +175,7 @@ export function usePopularEventsQuery(options: UseEventsQueryOptions = {}) {
   const {
     enabled = true,
     staleTime = 10 * 60 * 1000, // 10 minutes for popular events
-    cacheTime = 30 * 60 * 1000, // 30 minutes cache
-  } = options
+  } = options // gcTime is not part of UseEventsQueryOptions
 
   return useQuery({
     queryKey: eventsQueryKeys.popular(),
@@ -168,7 +189,7 @@ export function usePopularEventsQuery(options: UseEventsQueryOptions = {}) {
     },
     enabled,
     staleTime,
-    cacheTime,
+    gcTime: options.cacheTime || 30 * 60 * 1000, // Apply gcTime directly
     retry: 2,
   })
 }
@@ -178,8 +199,7 @@ export function useTrendingEventsQuery(options: UseEventsQueryOptions = {}) {
   const {
     enabled = true,
     staleTime = 2 * 60 * 1000, // 2 minutes for trending
-    cacheTime = 5 * 60 * 1000, // 5 minutes cache
-  } = options
+  } = options // gcTime is not part of UseEventsQueryOptions
 
   return useQuery({
     queryKey: eventsQueryKeys.trending(),
@@ -193,7 +213,7 @@ export function useTrendingEventsQuery(options: UseEventsQueryOptions = {}) {
     },
     enabled,
     staleTime,
-    cacheTime,
+    gcTime: options.cacheTime || 5 * 60 * 1000, // Apply gcTime directly
     retry: 2,
   })
 }
@@ -293,10 +313,9 @@ export function useOptimizedEventsPage(params: UseEventsQueryParams): UseEventsQ
 
     try {
       const result = await fetchEvents({
-        coordinates: {
+        coordinates: { // Removed name property
           lat: params.lat,
           lng: params.lng,
-          name: "Current Location",
         },
         radius: params.radius || 25,
         categories: params.category ? [params.category] : undefined,

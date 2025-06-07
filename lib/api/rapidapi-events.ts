@@ -1,4 +1,15 @@
-import { logger } from "@/lib/utils/logger"
+import { logger } from "@/lib/utils/logger";
+import type { EventDetailProps } from "@/components/event-detail-modal"; // Added import
+
+// Added interface for the new exported function
+export interface RapidApiUnifiedSearchParams {
+  keyword?: string;
+  coordinates?: { lat: number; lng: number };
+  radius?: number; // Will be used to potentially filter results if API doesn't support it directly or to adjust search query
+  startDateTime?: string;
+  endDateTime?: string; // RapidAPI's 'date' param is less flexible, might need to adjust or filter
+  size?: number; // Maps to 'start' and internal pagination if API limit is small
+}
 
 interface RapidAPIEvent {
   event_id: string
@@ -61,6 +72,34 @@ interface EventSearchResponse {
 }
 
 class RapidAPIEventsService {
+  // Helper to transform RapidAPIEvent to EventDetailProps
+  // This leverages existing methods like categorizeEvent and extractPrice
+  transformToEventDetail(event: RapidAPIEvent): EventDetailProps {
+    const startDate = new Date(event.start_time);
+    const endDate = event.end_time ? new Date(event.end_time) : undefined;
+
+    return {
+      id: parseInt(event.event_id.replace(/[^0-9]/g, '').slice(0, 9)) || Math.floor(Math.random() * 1000000), // Create a numeric ID
+      title: event.name,
+      description: event.description || "No description available.",
+      date: startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      time: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+      location: event.venue?.name || "Venue TBA",
+      address: event.venue?.full_address || "Address TBA",
+      category: this.categorizeEvent(event),
+      price: this.extractPrice(event),
+      image: event.thumbnail || undefined,
+      attendees: undefined, // RapidAPI doesn't provide this directly
+      organizer: {
+        name: event.publisher || "Organizer TBA",
+      },
+      ticketLinks: event.ticket_links?.map(tl => ({ source: tl.source, link: tl.link })) || [],
+      isFavorite: false, // Default, to be handled by user state
+      coordinates: event.venue?.latitude && event.venue?.longitude
+        ? { lat: event.venue.latitude, lng: event.venue.longitude }
+        : undefined,
+    };
+  }
   private readonly baseUrl = "https://real-time-events-search.p.rapidapi.com"
   private readonly apiKey = process.env.RAPIDAPI_KEY || ""
   private readonly apiHost = "real-time-events-search.p.rapidapi.com"
@@ -477,3 +516,57 @@ class RapidAPIEventsService {
 }
 
 export const rapidAPIEventsService = new RapidAPIEventsService()
+
+// New exported function as requested by the plan
+export async function searchRapidApiEvents(
+  params: RapidApiUnifiedSearchParams
+): Promise<EventDetailProps[]> {
+  try {
+    // Map RapidApiUnifiedSearchParams to EventSearchParams for the service
+    const serviceParams: EventSearchParams = {
+      query: params.keyword || "",
+      // RapidAPI 'date' param can be 'any', 'today', 'tomorrow', 'this_week', 'next_week', 'this_weekend', or 'YYYY-MM-DD'
+      // For simplicity, if startDateTime is provided, we might use it or 'any'.
+      // A more sophisticated mapping would be needed for date ranges.
+      date: params.startDateTime ? new Date(params.startDateTime).toISOString().split('T')[0] : "any",
+      // is_virtual: false, // Assuming we search for non-virtual by default unless specified
+      start: 0, // Assuming page 0 for now, 'size' would control how many to fetch
+    };
+
+    // The RapidAPI endpoint used by the service seems to have a 'start' param for pagination,
+    // but not an explicit 'size' or 'limit'. The service fetches a batch.
+    // We might need to make multiple calls if params.size is larger than what one call returns,
+    // or rely on the unified service to handle overall pagination.
+    // For now, we'll fetch one batch.
+
+    const rawEvents = await rapidAPIEventsService.searchEvents(serviceParams);
+
+    const transformedEvents = rawEvents.map(event =>
+      rapidAPIEventsService.transformToEventDetail(event)
+    );
+    
+    // If radius and coordinates are provided, we might need to filter results client-side
+    // if the API itself doesn't filter by radius effectively or if we used a broader query.
+    // This is a placeholder for more complex geo-filtering if needed.
+    let filteredEvents = transformedEvents;
+    if (params.coordinates && params.radius) {
+        // Placeholder for distance calculation and filtering
+        // Example: filteredEvents = transformedEvents.filter(event => isWithinRadius(event.coordinates, params.coordinates, params.radius));
+    }
+
+    // Respect the size parameter if provided
+    if (params.size && filteredEvents.length > params.size) {
+      return filteredEvents.slice(0, params.size);
+    }
+
+    return filteredEvents;
+
+  } catch (error) {
+    logger.error("searchRapidApiEvents wrapper failed", {
+      error: error instanceof Error ? error.message : String(error),
+      params,
+    });
+    // Consistent with other services, return empty array on error for unified service to handle
+    return [];
+  }
+}

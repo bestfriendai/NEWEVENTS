@@ -3,6 +3,8 @@ import { env, serverEnv } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 import { searchTicketmasterEvents, type TicketmasterSearchParams } from "./ticketmaster-api"
 import type { EventDetailProps } from "@/components/event-detail-modal"
+import { searchRapidApiEvents } from './rapidapi-events'; // Added
+import { searchEventbriteEvents } from './eventbrite-api'; // Added
 
 export interface UnifiedEventSearchParams {
   // Location-based search
@@ -60,7 +62,8 @@ export interface UnifiedEventsResponse {
   sources: {
     rapidapi: number
     ticketmaster: number
-    cached: number
+    eventbrite: number // Added
+    // cached: number // Removed as per plan
   }
   responseTime?: number
 }
@@ -107,144 +110,151 @@ class UnifiedEventsService {
    * Search for events from multiple sources and store in Supabase
    */
   async searchEvents(params: UnifiedEventSearchParams): Promise<UnifiedEventsResponse> {
-    const startTime = Date.now()
-
-    // Normalize and validate parameters
-    const normalizedParams = this.normalizeSearchParams(params)
+    const startTime = Date.now();
+    const normalizedParams = this.normalizeSearchParams(params);
 
     try {
       logger.info("Starting unified events search", {
         component: "UnifiedEventsService",
         action: "searchEvents",
         metadata: { original: params, normalized: normalizedParams },
-      })
+      });
 
-      // Input validation
+      // Input validation (kept from original)
       if (normalizedParams.lat && (normalizedParams.lat < -90 || normalizedParams.lat > 90)) {
-        throw new Error("Invalid latitude: must be between -90 and 90")
+        throw new Error("Invalid latitude: must be between -90 and 90");
       }
       if (normalizedParams.lng && (normalizedParams.lng < -180 || normalizedParams.lng > 180)) {
-        throw new Error("Invalid longitude: must be between -180 and 180")
+        throw new Error("Invalid longitude: must be between -180 and 180");
       }
       if (normalizedParams.radius && (normalizedParams.radius < 1 || normalizedParams.radius > 500)) {
-        throw new Error("Invalid radius: must be between 1 and 500 km")
+        throw new Error("Invalid radius: must be between 1 and 500 km");
       }
       if (normalizedParams.limit && (normalizedParams.limit < 1 || normalizedParams.limit > 200)) {
-        throw new Error("Invalid limit: must be between 1 and 200")
+        throw new Error("Invalid limit: must be between 1 and 200");
       }
 
-      const sources = { rapidapi: 0, ticketmaster: 0, cached: 0 }
-      const allEvents: EventDetailProps[] = []
+      // --- NO CACHING LOGIC HERE ---
+      // Caching should be handled by the data-fetching hook (react-query) or at the API route level, not in the core service.
 
-      // First, check for cached events in Supabase (quick check)
-      const cachedEvents = await this.getCachedEvents(normalizedParams)
-      if (cachedEvents.length > 0) {
-        allEvents.push(...cachedEvents)
-        sources.cached = cachedEvents.length
-        logger.info(`Found ${cachedEvents.length} cached events`)
+      const allEvents: EventDetailProps[] = [];
+      const sources = { rapidapi: 0, ticketmaster: 0, eventbrite: 0 }; // Updated sources
+
+      // Create all API call promises
+      const apiPromises = [];
+
+      if (serverEnv.TICKETMASTER_API_KEY) {
+        apiPromises.push(
+          searchTicketmasterEvents({
+            keyword: normalizedParams.query,
+            coordinates: normalizedParams.lat && normalizedParams.lng ? { lat: normalizedParams.lat, lng: normalizedParams.lng } : undefined,
+            radius: normalizedParams.radius,
+            startDateTime: normalizedParams.startDate,
+            endDateTime: normalizedParams.endDate,
+            size: normalizedParams.limit,
+            page: normalizedParams.page,
+          }).then(result => ({ source: 'ticketmaster', data: result })) // result is { events: EventDetailProps[], totalCount: number, error?: string }
+            .catch(e => {
+              logger.error("Ticketmaster fetch failed in unified service", e);
+              return { source: 'ticketmaster', data: { events: [], totalCount: 0, error: e instanceof Error ? e.message : String(e) } };
+            })
+        );
       }
 
-      // If we don't have enough cached events, fetch from APIs in parallel
-      const remainingLimit = (normalizedParams.limit || 50) - allEvents.length
-      if (remainingLimit > 0) {
-        const apiLimit = Math.max(remainingLimit, 50) // Reduced back to 50
-
-        // Run API calls in parallel for better performance
-        const apiPromises: Promise<{ source: string; events: EventDetailProps[] }>[] = []
-
-        // RapidAPI promise with better error handling
-        if (serverEnv.RAPIDAPI_KEY) {
-          apiPromises.push(
-            this.fetchFromRapidAPI(normalizedParams, apiLimit)
-              .then((events) => ({ source: "rapidapi", events }))
-              .catch((error) => {
-                logger.error("RapidAPI fetch failed", {
-                  error: error instanceof Error ? error.message : String(error),
-                  stack: error instanceof Error ? error.stack : undefined,
-                })
-                return { source: "rapidapi", events: [] }
-              }),
-          )
-        }
-
-        // Ticketmaster promise with better error handling and rate limiting
-        if (serverEnv.TICKETMASTER_API_KEY) {
-          // Add a small delay before Ticketmaster call to avoid immediate rate limiting
-          await new Promise((resolve) => setTimeout(resolve, 100))
-
-          apiPromises.push(
-            this.fetchFromTicketmaster(normalizedParams, Math.min(apiLimit, 50)) // Limit Ticketmaster to 50 events max
-              .then((events) => ({ source: "ticketmaster", events }))
-              .catch((error) => {
-                logger.error("Ticketmaster fetch failed", {
-                  error: error instanceof Error ? error.message : String(error),
-                  stack: error instanceof Error ? error.stack : undefined,
-                })
-                return { source: "ticketmaster", events: [] }
-              }),
-          )
-        }
-
-        // Wait for all API calls to complete
-        const apiResults = await Promise.all(apiPromises)
-
-        // Process results and store events
-        for (const result of apiResults) {
-          if (result.events.length > 0) {
-            // Store events in background (don't wait)
-            this.storeEvents(result.events, result.source as "rapidapi" | "ticketmaster").catch((error) =>
-              logger.error(`Failed to store ${result.source} events`, { error }),
-            )
-
-            allEvents.push(...result.events)
-            sources[result.source as keyof typeof sources] = result.events.length
-          }
-        }
+      if (serverEnv.RAPIDAPI_KEY) {
+        apiPromises.push(
+          searchRapidApiEvents({ // This is the new wrapper function
+            keyword: normalizedParams.query,
+            coordinates: normalizedParams.lat && normalizedParams.lng ? { lat: normalizedParams.lat, lng: normalizedParams.lng } : undefined,
+            radius: normalizedParams.radius,
+            startDateTime: normalizedParams.startDate,
+            endDateTime: normalizedParams.endDate,
+            size: normalizedParams.limit,
+          }).then(events => ({ source: 'rapidapi', data: { events } })) // searchRapidApiEvents returns EventDetailProps[]
+            .catch(e => {
+              logger.error("RapidAPI fetch failed in unified service", e);
+              return { source: 'rapidapi', data: { events: [], error: e instanceof Error ? e.message : String(e) } };
+            })
+        );
       }
+      
+       if (serverEnv.EVENTBRITE_PRIVATE_TOKEN) {
+         apiPromises.push(
+           searchEventbriteEvents({ // from eventbrite-api.ts
+             keyword: normalizedParams.query,
+             coordinates: normalizedParams.lat && normalizedParams.lng ? { lat: normalizedParams.lat, lng: normalizedParams.lng } : undefined,
+             radius: normalizedParams.radius,
+             startDateTime: normalizedParams.startDate,
+             endDateTime: normalizedParams.endDate,
+             size: normalizedParams.limit,
+             // page: normalizedParams.page, // Eventbrite searchEvents takes page
+           }).then(events => ({ source: 'eventbrite', data: { events } })) // searchEventbriteEvents returns EventDetailProps[]
+             .catch(e => {
+               logger.error("Eventbrite fetch failed in unified service", e);
+               return { source: 'eventbrite', data: { events: [], error: e instanceof Error ? e.message : String(e) } };
+             })
+         );
+       }
 
-      // Remove duplicates and apply advanced filtering
-      const uniqueEvents = this.removeDuplicates(allEvents)
-      const filteredEvents = this.applyAdvancedFilters(uniqueEvents, normalizedParams)
+      // Wait for all promises to settle
+      const results = await Promise.allSettled(apiPromises);
 
-      // Apply sorting
-      const sortedEvents = this.applySorting(filteredEvents, normalizedParams)
+      // Process the results
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+            const { source, data } = result.value;
+            // Ensure data and data.events exist before trying to access them
+            if (data && data.events && data.events.length > 0) {
+                allEvents.push(...data.events);
+                sources[source as keyof typeof sources] = data.events.length;
+            } else if (data && 'error' in data && data.error) { // Type guard for error property
+                logger.warn(`API source ${source} returned an error: ${data.error}`);
+            }
+        } else if (result.status === 'rejected') {
+            logger.error("An API call was rejected in Promise.allSettled", { reason: result.reason });
+        }
+      });
 
-      // Apply pagination
-      const { paginatedEvents, totalCount, hasMore } = this.applyPagination(sortedEvents, normalizedParams)
+      // Deduplicate and apply final filtering/sorting (kept from original)
+      const uniqueEvents = this.removeDuplicates(allEvents);
+      const filteredEvents = this.applyAdvancedFilters(uniqueEvents, normalizedParams);
+      const sortedEvents = this.applySorting(filteredEvents, normalizedParams);
+      const { paginatedEvents, totalCount, hasMore } = this.applyPagination(sortedEvents, normalizedParams);
 
       logger.info("Unified events search completed", {
         component: "UnifiedEventsService",
         action: "searchEvents",
         metadata: {
-          totalFound: filteredEvents.length,
+          totalFound: filteredEvents.length, // Using filteredEvents.length for total before pagination
           returned: paginatedEvents.length,
           sources,
         },
-      })
-
-      const responseTime = Date.now() - startTime
+      });
+      
       return {
         events: paginatedEvents,
-        totalCount,
+        totalCount, // This totalCount is from applyPagination
         hasMore,
         sources,
-        responseTime,
-      }
+        responseTime: Date.now() - startTime,
+      };
+
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       logger.error("Unified events search failed", {
         component: "UnifiedEventsService",
         action: "searchEvents",
         error: errorMessage,
-      })
+        stack: error instanceof Error ? error.stack : undefined,
+      });
 
       return {
         events: [],
         totalCount: 0,
         hasMore: false,
         error: errorMessage,
-        sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
-      }
+        sources: { rapidapi: 0, ticketmaster: 0, eventbrite: 0 }, // Updated sources
+      };
     }
   }
 
@@ -297,7 +307,7 @@ class UnifiedEventsService {
           events: featuredEventsNew,
           totalCount: featuredEventsNew.length,
           hasMore: false,
-          sources: { rapidapi: 0, ticketmaster: 0, cached: featuredEventsNew.length },
+          sources: { rapidapi: 0, ticketmaster: 0, eventbrite: 0 }, // Corrected sources
         }
       }
 
@@ -305,7 +315,7 @@ class UnifiedEventsService {
         events: featuredEvents,
         totalCount: featuredEvents.length,
         hasMore: false,
-        sources: { rapidapi: 0, ticketmaster: 0, cached: featuredEvents.length },
+        sources: { rapidapi: 0, ticketmaster: 0, eventbrite: 0 }, // Corrected sources
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
@@ -320,7 +330,7 @@ class UnifiedEventsService {
         totalCount: 0,
         hasMore: false,
         error: errorMessage,
-        sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
+        sources: { rapidapi: 0, ticketmaster: 0, eventbrite: 0 }, // Corrected sources
       }
     }
   }
