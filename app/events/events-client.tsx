@@ -10,7 +10,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { logger } from "@/lib/utils/logger"
 import { geocodeLocation, reverseGeocode } from "@/app/actions/location-actions"
-import { EventsMap } from "@/components/events-map"
+import dynamic from "next/dynamic"
+
+const EventsMap = dynamic(() => import("@/components/events-map").then(mod => mod.EventsMap), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full bg-gray-900 flex items-center justify-center">
+      <div className="text-center text-white">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+        <p>Loading Map...</p>
+      </div>
+    </div>
+  ),
+})
 
 // Simple event interface to avoid import issues
 interface SimpleEvent {
@@ -154,7 +166,8 @@ export function EventsClient() {
   ): Promise<SimpleEvent[]> => {
     try {
       // Show loading state immediately
-      setLoadingState("loading")
+      setError(null); // Clear previous errors
+      setIsLoading(true);
       
       // Use AbortController for timeout handling
       const controller = new AbortController()
@@ -171,7 +184,7 @@ export function EventsClient() {
           // Implement exponential backoff
           const delay = 2 ** retryCount * 1000 // 1s, 2s, 4s
           logger.warn(`Rate limited. Retrying in ${delay}ms`, { component: "EventsClient", retryCount })
-          setLoadingState("retrying")
+          // setIsLoading(true) is already set for the main operation or will be set by the recursive call's start
           await new Promise((resolve) => setTimeout(resolve, delay))
           return fetchEventsForLocation(lat, lng, locationName, retryCount + 1)
         }
@@ -183,7 +196,7 @@ export function EventsClient() {
       // Show partial results immediately if we have them
       if (data.data?.events?.length > 0) {
         setEvents(data.data.events.slice(0, 20)) // Increased from 10 to 20 for better initial load
-        setLoadingState("partial")
+        // setIsLoading(true) // Removed: isLoading should be false once first batch of data is set, or managed by a different state for 'loading more'
 
         // Then process the rest in chunks for better performance
         setTimeout(() => {
@@ -191,28 +204,28 @@ export function EventsClient() {
             setEvents(data.data.events.slice(0, 50)) // Load next 30 events
             setTimeout(() => {
               setEvents(data.data.events) // Load remaining events
-              setLoadingState("complete")
+              // setIsLoading(false) // This will be handled by the finally block of the main try/catch or at the end of successful full load
             }, 200)
           } else {
             setEvents(data.data.events)
-            setLoadingState("complete")
+            // setIsLoading(false) // Handled at the end
           }
         }, 150)
       } else {
         setEvents(data.data?.events || [])
-        setLoadingState("complete")
+        // setIsLoading(false) // Handled at the end
       }
-      
+      setIsLoading(false); // Set loading to false after all data processing is initiated or complete
       return data.data?.events || []
-    } catch (error) {
+    } catch (err) {
       // Handle errors gracefully
-      setLoadingState("error")
-      logger.error("Error fetching events", { error, locationName })
+      setIsLoading(false);
+      logger.error("Error fetching events", { error: err, locationName });
       
       // Show error message to user
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load events")
+      setError(err instanceof Error ? err.message : "Failed to load events");
       
-      return []
+      return [];
     }
   }
 
@@ -509,11 +522,7 @@ export function EventsClient() {
           </div>
         ) : (
           <EventsMap
-            center={mapCenter}
-            events={events}
-            selectedEventId={selectedEvent?.id || null}
-            onEventSelect={handleEventSelect}
-            onError={setMapLoadError}
+            initialEvents={events}
           />
         )}
       </div>

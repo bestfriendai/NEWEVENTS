@@ -1,17 +1,9 @@
 import { API_CONFIG } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
-import type { EventDetail } from "@/types/event.types"
+import type { Event, EventSearchParams } from "@/types/event.types";
+import type { EventDetailProps as EventDetail } from "@/components/event-detail-modal";
 
-interface EventSearchParams {
-  location?: string
-  keyword?: string
-  radius?: number
-  categories?: string[]
-  startDate?: string
-  endDate?: string
-  size?: number
-  page?: number
-}
+// Removed local EventSearchParams, using imported one
 
 interface EventsResponse {
   events: EventDetail[]
@@ -24,7 +16,7 @@ class RealEventsAPI {
     try {
       const url = new URL("https://app.ticketmaster.com/discovery/v2/events.json")
       url.searchParams.set("apikey", API_CONFIG.ticketmaster.apiKey)
-      url.searchParams.set("size", String(params.size || 20))
+      url.searchParams.set("size", String(params.limit || 20))
       url.searchParams.set("page", String(params.page || 0))
 
       if (params.keyword) {
@@ -129,7 +121,7 @@ class RealEventsAPI {
       }
 
       url.searchParams.set("expand", "venue,organizer,ticket_availability")
-      url.searchParams.set("page_size", String(params.size || 20))
+      url.searchParams.set("page_size", String(params.limit || 20))
 
       logger.info("Fetching events from Eventbrite", {
         component: "RealEventsAPI",
@@ -203,7 +195,7 @@ class RealEventsAPI {
         url.searchParams.set("start_date", params.startDate.split("T")[0])
       }
 
-      url.searchParams.set("limit", String(params.size || 20))
+      url.searchParams.set("limit", String(params.limit || 20))
 
       const headers = {
         "X-RapidAPI-Key": API_CONFIG.rapidapi.key,
@@ -301,25 +293,45 @@ class RealEventsAPI {
       }
     }
 
-    // Remove duplicates based on title and date
-    const uniqueEvents = results.filter(
-      (event, index, self) =>
-        index ===
-        self.findIndex((e) => e.title.toLowerCase() === event.title.toLowerCase() && e.start_date === event.start_date),
-    )
-
-    // Sort by date
-    uniqueEvents.sort((a, b) => {
-      const dateA = new Date(a.start_date || "").getTime()
-      const dateB = new Date(b.start_date || "").getTime()
-      return dateA - dateB
-    })
-
-    return {
-      events: uniqueEvents,
-      totalCount,
-      hasMore,
+    // Deduplicate events by their 'id' to prevent React key errors
+    const eventMap: { [id: number]: EventDetail } = {};
+    for (const event of results) {
+      if (event.id !== undefined && !eventMap[event.id]) {
+        eventMap[event.id] = event;
+      } else if (event.id === undefined) {
+        logger.warn('Event found with undefined ID in RealEventsAPI.searchEvents', { eventData: event });
+      } else {
+        // Optionally log that a duplicate ID was found and skipped if that's useful information
+        // logger.info(`Duplicate event ID ${event.id} found and skipped in RealEventsAPI.searchEvents.`, { existing: eventMap[event.id], newEvent: event });
+      }
     }
+    const uniqueEventsById: EventDetail[] = Object.values(eventMap);
+
+    // Sort by date (applied to the ID-deduplicated list)
+    uniqueEventsById.sort((a, b) => {
+      // EventDetailProps uses 'date' (string) and 'time' (string)
+      // Combining date and time for more precise sorting if time is available, otherwise just date.
+      const dateTimeStrA = a.time ? `${a.date} ${a.time}` : a.date;
+      const dateTimeStrB = b.time ? `${b.date} ${b.time}` : b.date;
+
+      const dateA = dateTimeStrA ? new Date(dateTimeStrA).getTime() : 0;
+      const dateB = dateTimeStrB ? new Date(dateTimeStrB).getTime() : 0;
+      
+      // Handle cases where dates might be invalid or missing
+      if (dateA === 0 && dateB === 0) return 0;
+      if (dateA === 0) return 1; // Put events with no/invalid date at the end
+      if (dateB === 0) return -1; // Put events with no/invalid date at the end
+      return dateA - dateB;
+    });
+
+    // The original totalCount might be misleading after ID-based deduplication.
+    // If an accurate count of unique events is needed, it should be uniqueEventsById.length.
+    // For now, we'll return the original totalCount, but this might need review based on product requirements.
+    return {
+      events: uniqueEventsById,
+      totalCount: uniqueEventsById.length, // Reflecting the count of truly unique events after ID deduplication
+      hasMore,
+    };
   }
 }
 

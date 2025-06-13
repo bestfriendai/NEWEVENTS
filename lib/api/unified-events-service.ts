@@ -634,98 +634,141 @@ class UnifiedEventsService {
   }
 
   /**
-   * Store events in Supabase
+   * Store events in Supabase, optimizing for batch operations.
    */
   private async storeEvents(events: EventDetailProps[], source: "rapidapi" | "ticketmaster"): Promise<void> {
-    try {
-      logger.info(`Storing ${events.length} events from ${source}`, {
+    logger.info(`Attempting to store ${events.length} events from ${source}`, {
+      component: "UnifiedEventsService",
+      action: "storeEvents",
+      metadata: { source, initialCount: events.length },
+    });
+
+    if (!events || events.length === 0) {
+      logger.info(`No events provided to store from ${source}.`, {
         component: "UnifiedEventsService",
         action: "storeEvents",
-        metadata: { source, count: events.length },
-      })
+        metadata: { source, count: 0 },
+      });
+      return;
+    }
 
-      const databaseEvents: DatabaseEvent[] = events.map((event) => ({
-        external_id: (event as any).externalId || `${source}_${event.id}`,
-        source,
-        title: event.title,
-        description: event.description,
-        category: event.category,
-        start_date: this.parseEventDateTime(event.date, event.time),
-        location_name: event.location,
-        location_address: event.address,
-        location_lat: event.coordinates?.lat || undefined,
-        location_lng: event.coordinates?.lng || undefined,
-        price_min: this.extractMinPrice(event.price),
-        price_max: this.extractMaxPrice(event.price),
-        price_currency: "USD",
-        image_url: event.image,
-        organizer_name: event.organizer?.name,
-        organizer_avatar: event.organizer?.logo,
-        attendee_count: event.attendees,
-        ticket_links: (event as any).ticketLinks || [],
-        tags: [],
-        is_active: true,
-      }))
+    const databaseEvents: DatabaseEvent[] = events.map((event) => ({
+      external_id: (event as any).externalId || `${source}_${event.id}`.slice(0, 255), // Ensure external_id is a string and not excessively long
+      source,
+      title: event.title,
+      description: event.description || '', // Ensure description is not null
+      category: event.category,
+      start_date: this.parseEventDateTime(event.date, event.time),
+      // end_date: Optional, not mapped directly from EventDetailProps unless available
+      location_name: event.location,
+      location_address: event.address || '', // Ensure address is not null
+      location_lat: event.coordinates?.lat,
+      location_lng: event.coordinates?.lng,
+      price_min: this.extractMinPrice(event.price),
+      price_max: this.extractMaxPrice(event.price),
+      price_currency: "USD", // Defaulting to USD
+      image_url: event.image,
+      organizer_name: event.organizer?.name,
+      organizer_avatar: event.organizer?.logo,
+      attendee_count: event.attendees,
+      ticket_links: (event as any).ticketLinks || [],
+      tags: (event as any).tags || [],
+      is_active: true,
+      // created_at and updated_at will be set by Supabase
+    }));
 
-      // Store events individually to avoid constraint conflicts
-      let storedCount = 0
-      let skippedCount = 0
+    let storedCount = 0;
+    let skippedCount = 0;
 
-      for (const event of databaseEvents) {
-        try {
-          // Check if event already exists
-          const { data: existing, error: selectError } = await this.supabase
-            .from("events")
-            .select("id")
-            .eq("external_id", event.external_id)
-            .eq("source", event.source)
-            .maybeSingle()
+    try {
+      const externalIds = databaseEvents
+        .map(event => event.external_id)
+        .filter(id => typeof id === 'string' && id.length > 0); // Ensure IDs are valid strings
 
-          if (selectError) {
-            logger.error("Error checking existing event", {
-              error: selectError.message,
-              eventId: event.external_id,
-            })
-            continue
-          }
+      const existingEventKeys = new Set<string>();
 
-          if (existing) {
-            skippedCount++
-            continue
-          }
+      if (externalIds.length > 0) {
+        const { data: existingEventsData, error: selectError } = await this.supabase
+          .from("events")
+          .select("external_id, source") // Only select necessary columns
+          .eq("source", source)
+          .in("external_id", externalIds);
 
-          // Insert new event
-          const { error: insertError } = await this.supabase.from("events").insert(event)
-
-          if (insertError) {
-            logger.error("Error inserting event", {
-              error: insertError.message,
-              code: insertError.code,
-              eventId: event.external_id,
-              title: event.title,
-            })
-          } else {
-            storedCount++
-          }
-        } catch (eventError) {
-          logger.error("Error processing individual event", {
-            error: eventError instanceof Error ? eventError.message : String(eventError),
-            eventId: event.external_id,
-          })
+        if (selectError) {
+          logger.error("Error fetching existing events for comparison", {
+            error: selectError.message,
+            code: selectError.code,
+            source,
+          });
+          // Depending on desired behavior, might throw or return. For now, log and proceed cautiously.
+        } else if (existingEventsData) {
+          existingEventsData.forEach(existing => {
+            if (existing.external_id && existing.source) {
+              existingEventKeys.add(`${existing.source}_${existing.external_id}`);
+            }
+          });
         }
       }
 
+      const eventsToInsert: DatabaseEvent[] = [];
+      for (const event of databaseEvents) {
+        // Ensure external_id is a string before creating the key
+        const eventKey = typeof event.external_id === 'string' && event.external_id.length > 0 
+                         ? `${event.source}_${event.external_id}` 
+                         : null;
+        if (eventKey && existingEventKeys.has(eventKey)) {
+          skippedCount++;
+        } else {
+          // Add only if it's a new event or couldn't be checked (e.g. no external_id)
+          eventsToInsert.push(event);
+        }
+      }
+
+      if (eventsToInsert.length > 0) {
+        const { error: insertError, count } = await this.supabase
+          .from("events")
+          .insert(eventsToInsert, { count: 'exact' }); // Pass count option directly to insert
+
+        if (insertError) {
+          logger.error("Error batch inserting new events", {
+            error: insertError.message,
+            code: insertError.code,
+            countAttempted: eventsToInsert.length,
+          });
+          // Note: 'count' might be null or 0 on error. Some events might have been inserted if it's a partial success.
+        } else {
+          storedCount = count ?? 0; // Default to 0 if count is null
+          if (count !== null && count !== eventsToInsert.length) {
+            logger.warn("Mismatch between attempted inserts and reported success count by Supabase", {
+               attempted: eventsToInsert.length,
+               succeeded: count,
+               source,
+            });
+          }
+        }
+      } else {
+        logger.info(`No new events to insert from ${source} after filtering.`, {
+            totalChecked: databaseEvents.length,
+            skipped: skippedCount,
+            source,
+        });
+      }
+
       logger.info(`Event storage completed for ${source}`, {
-        total: databaseEvents.length,
+        totalProcessed: databaseEvents.length,
         stored: storedCount,
         skipped: skippedCount,
-      })
-    } catch (error) {
-      logger.error("Error in storeEvents", {
-        error: error instanceof Error ? error.message : String(error),
         source,
-        batchSize: events.length,
-      })
+      });
+
+    } catch (error: unknown) { // Catch unknown for broader error type handling
+      logger.error("Critical error in storeEvents batch processing", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        source,
+        batchSize: databaseEvents.length,
+      });
+      // Depending on the error, you might want to re-throw or handle specific cases.
     }
   }
 
@@ -761,18 +804,29 @@ class UnifiedEventsService {
   }
 
   /**
-   * Remove duplicate events based on title and location
+   * Remove duplicate events based on their numeric id
    */
   private removeDuplicates(events: EventDetailProps[]): EventDetailProps[] {
-    const seen = new Set<string>()
-    return events.filter((event) => {
-      const key = `${event.title.toLowerCase()}_${event.location.toLowerCase()}_${event.date}`
-      if (seen.has(key)) {
-        return false
+    const uniqueEventsById = new Map<number, EventDetailProps>()
+    for (const event of events) {
+      if (!event.id) {
+        // Handle events that might not have an ID, though this should be rare for EventDetailProps
+        // Depending on requirements, these could be skipped or assigned a temporary unique key
+        // For now, we'll assume valid events always have an ID and skip those that don't for safety.
+        logger.warn("Event without ID encountered during deduplication", { eventTitle: event.title });
+        continue;
       }
-      seen.add(key)
-      return true
-    })
+      if (!uniqueEventsById.has(event.id)) {
+        uniqueEventsById.set(event.id, event)
+      } else {
+        // Optional: Log if a duplicate ID is found and skipped
+        logger.info(`Duplicate event ID ${event.id} found and skipped: "${event.title}" at "${event.location}"`, {
+          component: "UnifiedEventsService",
+          action: "removeDuplicates"
+        });
+      }
+    }
+    return Array.from(uniqueEventsById.values())
   }
 
   /**

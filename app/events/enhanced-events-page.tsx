@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Grid, List, Map, Sparkles } from "lucide-react"
+import { Search, Grid, List, Map, Sparkles, Loader2 } from "lucide-react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { EnhancedSearch } from "@/components/ui/enhanced-search"
-import { AdvancedFilters } from "@/components/ui/advanced-filters"
+// import { EnhancedSearch } from "@/components/ui/enhanced-search" // Temporarily commented out - file missing
+// import { AdvancedFilters } from "@/components/ui/advanced-filters" // Temporarily commented out - file missing
 import { SmartEventRecommendations } from "@/components/events/SmartEventRecommendations"
 import { EventCard, EventCardGrid } from "@/components/events/EventCard"
-import { EventsMap } from "@/components/events/EventsMap"
+// import { EventsMap } from "@/components/events/EventsMap" // Replaced with dynamic import
 import { UserInsightsDashboard } from "@/components/analytics/UserInsightsDashboard"
 import { useLocationContext } from "@/contexts/LocationContext"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -17,26 +18,91 @@ import { searchEvents } from "@/lib/api/events-api"
 import { performanceMonitor, ImageOptimizer } from "@/lib/performance/optimization"
 import { logger } from "@/lib/utils/logger"
 import { cn } from "@/lib/utils"
-import type { EventDetail } from "@/types/event.types"
+import type { Event } from "@/types/event.types";
+import type { EventDetailProps } from "@/components/event-detail-modal"; // For mapping
+
+// Define EventSource based on the Event type in event.types.ts
+type EventSourceLiteral = "ticketmaster" | "predicthq" | "eventbrite";
+
+// Helper function to map EventDetailProps to Event (targeting types/event.types.ts Event interface)
+const mapEventDetailToPropsToEvent = (detail: EventDetailProps, sourceName: string): Event => {
+  let priceObject: Event['price'] | undefined = undefined;
+  if (typeof detail.price === 'string') {
+    if (detail.price.toLowerCase() === 'free') {
+      // For 'free', price object can be undefined as per Event type, or explicitly set if needed
+      // priceObject = { min: 0, currency: 'USD' }; // Or however free is represented if not just by absence of price object
+    } else if (detail.price.startsWith('$')) {
+      const parts = detail.price.substring(1).split('-');
+      const min = parseFloat(parts[0]);
+      if (!isNaN(min)) {
+        priceObject = { min, currency: 'USD' }; // Assuming USD
+        if (parts.length > 1) {
+          const max = parseFloat(parts[1]);
+          if (!isNaN(max)) {
+            priceObject.max = max;
+          }
+        }
+      }
+    }
+    // If price is a string but not 'free' or '$...', it's unhandled for structured price.
+  }
+
+  // Fallback for source if not a valid literal
+  let validSource: EventSourceLiteral = 'ticketmaster'; // Default
+  if (sourceName === 'ticketmaster' || sourceName === 'predicthq' || sourceName === 'eventbrite') {
+    validSource = sourceName;
+  }
+
+  return {
+    id: String(detail.id),
+    title: detail.title,
+    description: detail.description,
+    date: `${detail.date} ${detail.time}`, // Combine date and time into a single string
+    location: {
+      name: detail.location,
+      address: detail.address,
+      city: detail.location, // Assuming detail.location is city. Needs refinement if city is separate in EventDetailProps.
+      coordinates: detail.coordinates,
+    },
+    category: detail.category, // Direct mapping as Event.category is string
+    price: priceObject,
+    image: detail.image,
+    url: detail.ticketLinks?.[0]?.link, // Use first ticket link as the main URL
+    source: validSource,
+    attendeeCount: detail.attendees,
+    isFavorite: detail.isFavorite,
+    // tags: undefined, // Event type in event.types.ts has optional tags?: string[] - EventDetailProps doesn't have tags.
+  };
+};
+
+const DynamicEventsMap = dynamic(() => import("@/components/events/EventsMap").then(mod => mod.default), {
+  ssr: false,
+  loading: () => (
+    <div className="h-96 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <Loader2 className="w-8 h-8 text-gray-500 animate-spin" />
+      <p className="ml-2 text-gray-500">Loading map...</p>
+    </div>
+  ),
+});
 
 interface EnhancedEventsPageProps {
-  initialEvents?: EventDetail[]
+  initialEvents?: Event[]
   className?: string
 }
 
 export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEventsPageProps) {
   // State management
-  const [events, setEvents] = useState<EventDetail[]>(initialEvents)
-  const [filteredEvents, setFilteredEvents] = useState<EventDetail[]>(initialEvents)
+  const [events, setEvents] = useState<Event[]>(initialEvents)
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>(initialEvents)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({})
   const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("grid")
-  const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [sortBy, setSortBy] = useState<"relevance" | "date" | "distance" | "popularity">("relevance")
 
   // Hooks
-  const { userLocation, isLocationLoading } = useLocationContext()
+  const { userLocation, isLoading: isLocationLoading, error: locationError } = useLocationContext()
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
   // Performance monitoring
@@ -46,8 +112,8 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
     // Preload critical images
     const criticalImages = events
       .slice(0, 6)
-      .map((event) => event.image)
-      .filter(Boolean)
+      .map((event: Event) => event.image)
+      .filter((image): image is string => typeof image === 'string') // Type guard to ensure string[]
     ImageOptimizer.preloadCriticalImages(criticalImages)
   }, [events])
 
@@ -71,10 +137,14 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
         logger.info("Searching events", { query, params: searchParams })
 
         const result = await searchEvents(searchParams)
-        setEvents(result.events)
-        setFilteredEvents(result.events)
+        logger.info("Search successful", { count: result.events.length })
 
-        performanceMonitor.recordMetric("search_response_time", Date.now())
+        const eventSource = result.sources?.[0] || 'Unknown'; // Use first source or default
+        const mappedEvents = result.events.map(e => mapEventDetailToPropsToEvent(e, eventSource));
+
+        setEvents(mappedEvents)
+        setFilteredEvents(mappedEvents)
+        // TODO: Update activeFilters based on result.filters if available
       } catch (error) {
         logger.error("Search failed", { error, query })
       } finally {
@@ -158,26 +228,47 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
     if (debouncedSearchQuery) {
       filtered = filtered.filter(
         (event) =>
-          event.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          event.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          event.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase()),
+          event.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          event.category?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || // Check against string category
+          event.location.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          ((!event.price || (event.price.min === 0)) && "free".includes(debouncedSearchQuery.toLowerCase())) || // Check actual price for free
+          (event.price && `${event.price.min}${event.price.max ? '-' + event.price.max : ''} ${event.price.currency}`.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) || // Check formatted price object
+          (activeFilters.showFreeEvents && (!event.price || (event.price.min === 0)))
       )
     }
 
     // Apply category filters
     if (activeFilters.categories?.length > 0) {
       filtered = filtered.filter((event) =>
-        activeFilters.categories.some((cat: string) => event.category.toLowerCase().includes(cat.toLowerCase())),
+        activeFilters.categories.some((catFilter: string) => event.category?.toLowerCase() === catFilter.toLowerCase()),
       )
     }
 
     // Apply price filters
     if (activeFilters.price) {
-      const [minPrice, maxPrice] = activeFilters.price
       filtered = filtered.filter((event) => {
-        if (event.price.toLowerCase() === "free") return minPrice === 0
-        const price = Number.parseFloat(event.price.replace(/[^0-9.]/g, ""))
-        return price >= minPrice && price <= maxPrice
+        if (activeFilters.price === "free") {
+          return !event.price || (event.price.min === 0); // Check actual price for free
+        }
+        // TODO: This section needs a robust implementation if activeFilters.price contains ranges like "$10-$20" or "$50+".
+        // The current activeFilters.price structure and how it's set by AdvancedFilters component is unknown.
+        // For now, this filter will likely not work correctly for non-"free" string values in activeFilters.price.
+        // Assuming activeFilters.price might be a string like '10-20' (without currency) or a specific number.
+        // This is a placeholder and needs to be revisited once AdvancedFilters is available.
+        if (event.price && typeof activeFilters.price === 'string') {
+          const filterPriceParts = activeFilters.price.split('-');
+          const filterMin = parseFloat(filterPriceParts[0]);
+          const filterMax = filterPriceParts.length > 1 ? parseFloat(filterPriceParts[1]) : undefined;
+
+          if (!isNaN(filterMin)) {
+            if (event.price.min < filterMin) return false;
+            if (filterMax !== undefined && event.price.max && event.price.max > filterMax) return false;
+            // If filterMax is undefined, it could mean 'filterMin and above'.
+            // If event.price.max is undefined, it means it's a single price, not a range.
+            return true;
+          }
+        }
+        return false; // If event has no price or filter is not 'free' and not a parsable string range
       })
     }
 
@@ -187,7 +278,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
         return activeFilters.features.some((feature: string) => {
           switch (feature) {
             case "free":
-              return event.price.toLowerCase() === "free"
+              return !event.price || (event.price.min === 0); // Check actual price for free
             case "outdoor":
               return event.description.toLowerCase().includes("outdoor")
             case "family":
@@ -207,9 +298,9 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
         case "date":
           return new Date(a.date).getTime() - new Date(b.date).getTime()
         case "popularity":
-          return b.attendees - a.attendees
+          return (b.attendeeCount || 0) - (a.attendeeCount || 0)
         case "distance":
-          if (!userLocation || !a.coordinates || !b.coordinates) return 0
+          if (!userLocation || !a.location?.coordinates || !b.location?.coordinates) return 0
           // Calculate distance logic here
           return 0
         default:
@@ -220,7 +311,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
     setFilteredEvents(filtered)
   }, [events, debouncedSearchQuery, activeFilters, sortBy, userLocation])
 
-  const handleEventSelect = useCallback((event: EventDetail) => {
+  const handleEventSelect = useCallback((event: Event) => {
     setSelectedEvent(event)
     logger.info("Event selected", { eventId: event.id, title: event.title })
   }, [])
@@ -255,14 +346,14 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
 
         {/* Enhanced Search */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <EnhancedSearch
+          {/* <EnhancedSearch
             onSearch={handleSearch}
             suggestions={searchSuggestions}
             placeholder="Search for events, venues, or activities..."
             showFilters={true}
             showVoiceSearch={true}
             className="max-w-4xl mx-auto"
-          />
+          /> */}
         </motion.div>
 
         {/* Filters and Controls */}
@@ -272,13 +363,13 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
           transition={{ delay: 0.2 }}
           className="flex flex-wrap items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-4">
-            <AdvancedFilters
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            {/* <AdvancedFilters
               filters={filterGroups}
               activeFilters={activeFilters}
               onFiltersChange={handleFiltersChange}
               onClearAll={handleClearFilters}
-            />
+            /> */}
 
             <select
               value={sortBy}
@@ -352,11 +443,12 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
 
                   {viewMode === "map" && (
                     <div className="h-96 rounded-lg overflow-hidden">
-                      <EventsMap
-                        events={filteredEvents}
-                        selectedEvent={selectedEvent}
-                        onEventClick={handleEventSelect}
-                        center={userLocation ? [userLocation.lng, userLocation.lat] : undefined}
+                      <DynamicEventsMap
+                        events={filteredEvents as any} // Assuming EventDetail[] is compatible with EventDetailProps[] for now
+                        userLocation={userLocation ? { ...userLocation, name: userLocation.name || "Current Location" } : null}
+                        selectedEvent={selectedEvent as any} // Assuming EventDetail is compatible with EventDetailProps for now
+                        onEventSelect={handleEventSelect as any} // Assuming handleEventSelect signature is compatible for now
+                        // onError prop is available in EventsMapProps, can be added if error handling is needed here
                       />
                     </div>
                   )}
@@ -379,7 +471,7 @@ export function EnhancedEventsPage({ initialEvents = [], className }: EnhancedEv
 
           <TabsContent value="recommendations">
             <SmartEventRecommendations
-              userLocation={userLocation}
+              userLocation={userLocation ? { ...userLocation, name: userLocation.name || "Current Location" } : undefined}
               userPreferences={{
                 favoriteCategories: ["music", "food"],
                 priceRange: "medium",

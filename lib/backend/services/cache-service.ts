@@ -34,8 +34,8 @@ export class CacheService {
           {
             component: "CacheService",
             action: "get_supabase_error",
+            error: error instanceof Error ? error : new Error(String(error)),
           },
-          error instanceof Error ? error : new Error(String(error)),
         )
         throw error
       }
@@ -66,7 +66,7 @@ export class CacheService {
 
       // Try database cache
       const supabase = await this.getSupabase()
-      const { data, error } = await supabase.from("event_cache").select("*").eq("cache_key", fullKey).single()
+      const { data, error } = await supabase.from("event_cache").select("cache_key, expires_at, data").eq("cache_key", fullKey).single()
 
       if (error) {
         if (error.code === "PGRST116") {
@@ -114,8 +114,8 @@ export class CacheService {
           component: "CacheService",
           action: "get_error",
           metadata: { key: fullKey },
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       // Return null on error to allow fallback to fresh data
@@ -164,8 +164,8 @@ export class CacheService {
           component: "CacheService",
           action: "set_error",
           metadata: { key: fullKey, ttl },
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       // Return false but don't throw - caching is optional
@@ -206,8 +206,8 @@ export class CacheService {
           component: "CacheService",
           action: "delete_error",
           metadata: { key: fullKey },
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       return false
@@ -248,8 +248,8 @@ export class CacheService {
           component: "CacheService",
           action: "clear_namespace_error",
           metadata: { namespace },
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       return false
@@ -287,8 +287,8 @@ export class CacheService {
           component: "CacheService",
           action: "getOrSet_factory_error",
           metadata: { key: `${options.namespace || "default"}:${key}` },
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       return null
@@ -324,8 +324,8 @@ export class CacheService {
         {
           component: "CacheService",
           action: "cleanup_expired_error",
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       return 0
@@ -367,8 +367,8 @@ export class CacheService {
         {
           component: "CacheService",
           action: "get_stats_error",
+          error: error instanceof Error ? error : new Error(String(error)),
         },
-        error instanceof Error ? error : new Error(String(error)),
       )
 
       return {

@@ -185,8 +185,10 @@ const featuredArtists = [
 ]
 
 export default function PartyPage() {
+  // Log userLocation at component start
   // Location context
   const { userLocation, getCurrentLocation, searchLocation, isLoading: locationLoading, error: locationError } = useLocationContext()
+  console.log('PartyPage: Initial userLocation from context:', userLocation);
 
   // State management
   const [isLoading, setIsLoading] = useState(true)
@@ -219,6 +221,7 @@ export default function PartyPage() {
 
   // Load party events with enhanced filtering and location-based search
   const loadPartyEvents = useCallback(async () => {
+    console.log('PartyPage: loadPartyEvents called');
     try {
       setIsLoading(true)
       setError(null)
@@ -334,36 +337,30 @@ export default function PartyPage() {
         })
       }
 
+      // Define configurations for parallel searches
+      const searchConfigs = [
+        { query: searchTerm, limit: searchParams.limit }, // Main search uses limit from base searchParams
+        { query: "nightlife club bar lounge dance party", limit: 75 },
+        { query: "festival music concert live entertainment", limit: 75 },
+        { query: "brunch social gathering celebration event", limit: 75 },
+        { query: "dj electronic house techno dance music", limit: 75 },
+      ];
+
       // Execute multiple parallel searches for better party coverage
-      const parallelSearches = [
-        // Main search with comprehensive terms
-        unifiedEventsService.searchEvents(searchParams),
+      const parallelSearches = searchConfigs.map(config => {
+        const currentSearchParams = {
+          ...searchParams, // Base params including date, category, and potentially location
+          query: config.query,
+          limit: config.limit,
+        };
 
-        // Additional targeted searches for more party events
-        unifiedEventsService.searchEvents({
-          ...searchParams,
-          query: "nightlife club bar lounge dance party",
-          limit: 75,
-        }),
-
-        unifiedEventsService.searchEvents({
-          ...searchParams,
-          query: "festival music concert live entertainment",
-          limit: 75,
-        }),
-
-        unifiedEventsService.searchEvents({
-          ...searchParams,
-          query: "brunch social gathering celebration event",
-          limit: 75,
-        }),
-
-        unifiedEventsService.searchEvents({
-          ...searchParams,
-          query: "dj electronic house techno dance music",
-          limit: 75,
-        }),
-      ]
+        logger.debug(`PartyPage: Preparing API call for query: "${config.query}"`, {
+          component: "PartyPage",
+          userLocation,
+          currentSearchParams
+        });
+        return unifiedEventsService.searchEvents(currentSearchParams);
+      });
 
       logger.info("Executing parallel party searches", {
         component: "PartyPage",
@@ -378,6 +375,7 @@ export default function PartyPage() {
       let successfulSources = 0
       let totalSources = 0
 
+      console.log('PartyPage: Raw searchResults from Promise.allSettled:', searchResults.map(r => r.status === 'fulfilled' ? r.value.events?.length : r.reason));
       searchResults.forEach((result, index) => {
         totalSources++
         if (result.status === 'fulfilled' && result.value.events) {
@@ -396,6 +394,7 @@ export default function PartyPage() {
       })
 
       // Remove duplicates based on event ID or title+date
+      console.log('PartyPage: allEvents before deduplication (IDs):', allEvents.map(e => e?.id));
       const uniqueEvents = allEvents.filter((event, index, self) =>
         index === self.findIndex(e =>
           e.id === event.id ||
@@ -411,6 +410,7 @@ export default function PartyPage() {
         totalSources,
       })
 
+      console.log('PartyPage: uniqueEvents after deduplication (IDs):', uniqueEvents.map(e => e?.id));
       const searchResult = {
         events: uniqueEvents,
         sources: successfulSources,
@@ -488,6 +488,7 @@ export default function PartyPage() {
             return hasImage && hasDescription
           })
 
+          console.log('PartyPage: Setting events from fallback (qualityEvents IDs):', qualityEvents.map(e => e?.id));
           setEvents(qualityEvents)
           setApiStatus("success")
           setError(null)
@@ -498,6 +499,7 @@ export default function PartyPage() {
           })
         } else {
           const fallbackEvents = generateFallbackPartyEvents()
+          console.log('PartyPage: Setting events from generateFallbackPartyEvents (IDs):', fallbackEvents.map(e => e?.id));
           setEvents(fallbackEvents)
           setSearchStats({ successful: 0, total: 1, events: fallbackEvents.length })
         }
@@ -1251,6 +1253,8 @@ export default function PartyPage() {
                     </motion.div>
                   ) : (
                     <>
+                      {/* Log event IDs to check for duplicates */}
+                      {console.log('PartyPage event IDs being mapped:', paginatedEvents.map(e => e.id))}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {paginatedEvents.map((event, i) => {
                           // Calculate distance if user location is available

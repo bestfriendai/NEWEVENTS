@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, MapPin, Heart, ExternalLink } from "lucide-react"
@@ -68,6 +69,13 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+          <DialogHeader>
+            <VisuallyHidden>
+              <DialogTitle>{event.title}</DialogTitle>
+              {/* Optionally, add a DialogDescription here if needed for more context for screen readers */}
+              {/* <DialogDescription>Detailed information about {event.title}.</DialogDescription> */}
+            </VisuallyHidden>
+          </DialogHeader>
         {/* Hero Image Section */}
         <div className="relative h-56 overflow-hidden">
           <Image

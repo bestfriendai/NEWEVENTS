@@ -2,139 +2,87 @@ import { type NextRequest, NextResponse } from "next/server"
 import { unifiedEventsService } from "@/lib/api/unified-events-service"
 import { logger } from "@/lib/utils/logger"
 import { memoryCache } from "@/lib/utils/cache"
+import { z } from "zod";
 
 export const runtime = "nodejs"
 
-// Enhanced input validation helper
-function validateEnhancedEventSearchParams(params: any) {
-  const errors: string[] = []
+// Helper for boolean string coercion
+const booleanCoercion = z.preprocess((val) => {
+    if (typeof val === 'string') {
+        if (val.toLowerCase() === 'true') return true;
+        if (val.toLowerCase() === 'false') return false;
+    }
+    return val;
+}, z.boolean());
 
-  // Parse and validate basic parameters
-  const query = params.query || ""
-  const location = params.location || ""
-  const category = params.category || "all"
-  const categories = params.categories || []
-  const page = Number.parseInt(params.page || "0", 10)
-  const limit = Number.parseInt(params.limit || "20", 10)
-  const offset = params.offset ? Number.parseInt(params.offset, 10) : undefined
-  const lat = params.lat ? Number.parseFloat(params.lat) : undefined
-  const lng = params.lng ? Number.parseFloat(params.lng) : undefined
-  const radius = Number.parseInt(params.radius || "25", 10)
+// Zod schema for ISO date string validation using the existing isValidDateString function
+const isoDateStringUsingExternalValidatorSchema = z.string().refine(isValidDateString, {
+    message: "Invalid date format. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)",
+});
 
-  // Parse price parameters
-  const priceMin = params.priceMin ? Number.parseFloat(params.priceMin) : undefined
-  const priceMax = params.priceMax ? Number.parseFloat(params.priceMax) : undefined
+const enhancedEventSearchSchema = z.object({
+    query: z.string().max(200, "Search term too long (max 200 characters)").default(""),
+    location: z.string().default(""),
+    category: z.string().default("all"),
+    categories: z.array(z.string()).default([]),
+    page: z.coerce.number().int().nonnegative("Page must be non-negative").default(0),
+    limit: z.coerce.number().int().min(1, "Limit must be between 1 and 100").max(100, "Limit must be between 1 and 100").default(20),
+    offset: z.coerce.number().int().nonnegative("Offset must be non-negative").optional(),
+    lat: z.coerce.number().min(-90, "Latitude must be between -90 and 90").max(90, "Latitude must be between -90 and 90").optional(),
+    lng: z.coerce.number().min(-180, "Longitude must be between -180 and 180").max(180, "Longitude must be between -180 and 180").optional(),
+    radius: z.coerce.number().int().min(1, "Radius must be between 1 and 500 km").max(500, "Radius must be between 1 and 500 km").default(25),
+    priceMin: z.coerce.number().nonnegative("Minimum price must be non-negative").optional(),
+    priceMax: z.coerce.number().nonnegative("Maximum price must be non-negative").optional(),
+    sortBy: z.enum(["date", "distance", "popularity", "price", "relevance"]).default("date"),
+    sortOrder: z.enum(["asc", "desc"]).default("asc"),
+    tags: z.array(z.string()).default([]),
+    source: z.enum(["all", "rapidapi", "ticketmaster", "eventbrite"]).default("all"),
+    hasImages: booleanCoercion.default(false),
+    hasDescription: booleanCoercion.default(false),
+    forceRefresh: booleanCoercion.default(false),
+    startDate: isoDateStringUsingExternalValidatorSchema.optional(),
+    endDate: isoDateStringUsingExternalValidatorSchema.optional(),
+}).refine(data => {
+    if (data.priceMin !== undefined && data.priceMax !== undefined && data.priceMin > data.priceMax) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Minimum price cannot be greater than maximum price",
+    path: ["priceMin"],
+}).refine(data => {
+    if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Start date cannot be after end date",
+    path: ["startDate"],
+});
 
-  // Parse sorting parameters
-  const sortBy = params.sortBy || "date"
-  const sortOrder = params.sortOrder || "asc"
-
-  // Parse advanced filters
-  const tags = params.tags || []
-  const source = params.source || "all"
-  const hasImages = params.hasImages === true || params.hasImages === "true"
-  const hasDescription = params.hasDescription === true || params.hasDescription === "true"
-  const forceRefresh = params.forceRefresh === true || params.forceRefresh === "true"
-
-  // Parse date parameters
-  const startDate = params.startDate || undefined
-  const endDate = params.endDate || undefined
-
-  // Validate search term length
-  if (query.length > 200) {
-    errors.push("Search term too long (max 200 characters)")
-  }
-
-  // Validate pagination
-  if (page < 0) {
-    errors.push("Page must be non-negative")
-  }
-  if (limit < 1 || limit > 100) {
-    errors.push("Limit must be between 1 and 100")
-  }
-  if (offset !== undefined && offset < 0) {
-    errors.push("Offset must be non-negative")
-  }
-
-  // Validate coordinates
-  if (lat !== undefined && (lat < -90 || lat > 90)) {
-    errors.push("Latitude must be between -90 and 90")
-  }
-  if (lng !== undefined && (lng < -180 || lng > 180)) {
-    errors.push("Longitude must be between -180 and 180")
-  }
-
-  // Validate radius
-  if (radius < 1 || radius > 500) {
-    errors.push("Radius must be between 1 and 500 km")
-  }
-
-  // Validate price range
-  if (priceMin !== undefined && priceMin < 0) {
-    errors.push("Minimum price must be non-negative")
-  }
-  if (priceMax !== undefined && priceMax < 0) {
-    errors.push("Maximum price must be non-negative")
-  }
-  if (priceMin !== undefined && priceMax !== undefined && priceMin > priceMax) {
-    errors.push("Minimum price cannot be greater than maximum price")
-  }
-
-  // Validate sorting parameters
-  const validSortBy = ["date", "distance", "popularity", "price", "relevance"]
-  if (!validSortBy.includes(sortBy)) {
-    errors.push(`Invalid sortBy value. Must be one of: ${validSortBy.join(", ")}`)
-  }
-
-  const validSortOrder = ["asc", "desc"]
-  if (!validSortOrder.includes(sortOrder)) {
-    errors.push(`Invalid sortOrder value. Must be one of: ${validSortOrder.join(", ")}`)
-  }
-
-  // Validate source parameter
-  const validSources = ["all", "rapidapi", "ticketmaster", "eventbrite"]
-  if (!validSources.includes(source)) {
-    errors.push(`Invalid source value. Must be one of: ${validSources.join(", ")}`)
-  }
-
-  // Validate date parameters
-  if (startDate && !isValidDateString(startDate)) {
-    errors.push("Invalid startDate format. Use ISO 8601 format")
-  }
-  if (endDate && !isValidDateString(endDate)) {
-    errors.push("Invalid endDate format. Use ISO 8601 format")
-  }
-  if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-    errors.push("Start date cannot be after end date")
-  }
-
-  return {
-    success: errors.length === 0,
-    errors,
-    params: {
-      query,
-      location,
-      category,
-      categories,
-      page,
-      limit,
-      offset,
-      lat,
-      lng,
-      radius,
-      priceMin,
-      priceMax,
-      sortBy,
-      sortOrder,
-      tags,
-      source,
-      hasImages,
-      hasDescription,
-      forceRefresh,
-      startDate,
-      endDate,
-    },
-  }
+// New validation function using Zod
+function zodValidateEnhancedEventSearchParams(params: any) {
+    const result = enhancedEventSearchSchema.safeParse(params);
+    if (result.success) {
+        return {
+            success: true,
+            errors: [],
+            params: result.data,
+        };
+    } else {
+        const errors = result.error.issues.map(issue => {
+            // You can customize error messages further if needed, e.g., by including the path
+            // return `${issue.path.join('.')} - ${issue.message}`;
+            return issue.message;
+        });
+        return {
+            success: false,
+            errors: errors,
+            // Return the original params, or the (partially) parsed data if you prefer
+            // For now, returning original params on failure to align with previous behavior of having params available
+            params: params, 
+        };
+    }
 }
 
 // Helper function to validate date strings
@@ -231,7 +179,14 @@ export async function GET(request: NextRequest) {
       endDate: searchParams.get("endDate"),
     }
 
-    const validation = validateEnhancedEventSearchParams(enhancedParams)
+    // Determine which validation to use (this logic might need to be revisited based on how useEnhancedValidation is set)
+    // For now, assuming 'useEnhancedValidation' is a boolean flag defined elsewhere or intended to be.
+    // If it's always true for this path, this conditional can be simplified.
+    const useEnhancedValidation = true; // Placeholder: Determine actual logic for this flag if it varies
+
+    const validation = useEnhancedValidation
+      ? zodValidateEnhancedEventSearchParams(enhancedParams) // Use the object with all parsed params
+      : validateSearchParams(searchParams); // Legacy validator uses raw URLSearchParams
 
     if (!validation.success) {
       logger.warn("Invalid search parameters", {

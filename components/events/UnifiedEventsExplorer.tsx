@@ -61,7 +61,13 @@ export default function UnifiedEventsExplorer({
       const response = await unifiedEventsApi.fetchEvents(filters)
 
       if (response.success) {
-        setEvents(response.data)
+        // Deduplicate events by id to prevent duplicate key errors
+        const eventMap: { [id: string]: Event } = {};
+        for (const event of response.data) {
+          eventMap[event.id] = event;
+        }
+        const uniqueEvents: Event[] = Object.values(eventMap);
+        setEvents(uniqueEvents);
         if (response.errors && response.errors.length > 0) {
           logger.warn("Some event sources failed:", response.errors)
         }

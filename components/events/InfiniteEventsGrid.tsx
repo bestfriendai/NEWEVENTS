@@ -101,7 +101,11 @@ export function InfiniteEventsGrid({
         if (isNewSearch || pageToLoad === 0) {
           setEvents(eventsWithCoords)
         } else {
-          setEvents((prev) => [...prev, ...eventsWithCoords])
+          setEvents((prev) => {
+            const existingIds = new Set(prev.map((e) => e.id))
+            const newUnique = eventsWithCoords.filter((e) => !existingIds.has(e.id))
+            return [...prev, ...newUnique]
+          })
         }
 
         setHasMore(pageToLoad < result.totalPages - 1)

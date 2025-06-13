@@ -17,10 +17,10 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
     }
 
     // Try Mapbox first
-    if (API_CONFIG.mapbox.apiKey) {
+    if (API_CONFIG.maps.mapbox.clientApiKey) {
       try {
         const encodedAddress = encodeURIComponent(address.trim())
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${API_CONFIG.mapbox.apiKey}`
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${API_CONFIG.maps.mapbox.clientApiKey}`
 
         const response = await fetch(url, {
           method: "GET",
@@ -99,9 +99,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     }
 
     // Try Mapbox first
-    if (API_CONFIG.mapbox.apiKey) {
+    if (API_CONFIG.maps.mapbox.clientApiKey) {
       try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${API_CONFIG.mapbox.apiKey}`
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${API_CONFIG.maps.mapbox.clientApiKey}`
 
         const response = await fetch(url, {
           method: "GET",

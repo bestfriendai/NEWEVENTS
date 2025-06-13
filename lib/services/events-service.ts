@@ -132,7 +132,26 @@ class EventsService {
     try {
       const { data, error } = await this.supabase
         .from("events")
-        .select("*")
+        .select(`
+        id,
+        title,
+        description,
+        category,
+        start_date,
+        end_date,
+        location_name,
+        location_address,
+        price_min,
+        price_max,
+        price_currency,
+        image_url,
+        organizer_name,
+        organizer_avatar,
+        attendee_count,
+        location_lat,
+        location_lng,
+        is_active
+      `)
         .eq("id", id)
         .eq("is_active", true)
         .single()
