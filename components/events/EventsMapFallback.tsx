@@ -31,7 +31,7 @@ const CATEGORY_COLORS = {
   Parties: "#10B981",
 }
 
-export default function EventsMapFallback({ events, selectedEvent, onEventSelect }: EventsMapFallbackProps) {
+export function EventsMapFallback({ events, selectedEvent, onEventSelect }: EventsMapFallbackProps) {
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -127,3 +127,5 @@ export default function EventsMapFallback({ events, selectedEvent, onEventSelect
     </div>
   )
 }
+
+export default EventsMapFallback

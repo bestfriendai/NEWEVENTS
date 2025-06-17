@@ -1,16 +1,5 @@
-import { FavoritesProvider } from "@/contexts/FavoritesContext"
-import { LocationProvider } from "@/contexts/LocationContext"
+import type { ReactNode } from "react"
 
-export default function EventsLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <LocationProvider>
-      <FavoritesProvider>
-        {children}
-      </FavoritesProvider>
-    </LocationProvider>
-  )
+export default function EventsLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>
 }
