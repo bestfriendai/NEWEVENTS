@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +34,17 @@ interface EventDetailModalProps {
 }
 
 export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDetailModalProps) {
-  const [isFavorite, setIsFavorite] = useState(event.isFavorite || false)
+  const [isFavorite, setIsFavorite] = useState(false)
+
+  // Initialize isFavorite from event prop
+  useEffect(() => {
+    setIsFavorite(event?.isFavorite || false)
+  }, [event?.isFavorite])
+
+  // Early return if no event is provided
+  if (!event) {
+    return null
+  }
 
   const handleFavoriteToggle = () => {
     setIsFavorite(!isFavorite)
@@ -115,7 +125,7 @@ export function EventDetailModal({ event, isOpen, onClose, onFavorite }: EventDe
             <div className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg mb-6">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={event.organizer.logo || "/placeholder.svg"} />
-                <AvatarFallback className="bg-purple-600 text-white">{event.organizer.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="bg-purple-600 text-white">{event.organizer.name?.[0] || "?"}</AvatarFallback>
               </Avatar>
               <div>
                 <div className="text-sm font-medium text-white">Organized by</div>
