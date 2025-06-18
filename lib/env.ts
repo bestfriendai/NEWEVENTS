@@ -23,7 +23,7 @@ export const serverEnv = {
   EVENTBRITE_PUBLIC_TOKEN: process.env.EVENTBRITE_PUBLIC_TOKEN || "",
   PREDICTHQ_API_KEY: process.env.PREDICTHQ_API_KEY || "",
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
-  MAPBOX_API_KEY: process.env.MAPBOX_API_KEY || "", // Server-side Mapbox key
+  MAPBOX_API_KEY: process.env.MAPBOX_API_KEY || "",
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
   NODE_ENV: process.env.NODE_ENV || "development",
 } as const
@@ -59,18 +59,17 @@ export const API_CONFIG = {
     baseUrl: "https://api.tomtom.com",
     apiKey: serverEnv.TOMTOM_API_KEY,
   },
-  // MAPBOX CONFIGURATION - PRIMARY MAPPING SERVICE
   maps: {
     mapbox: {
-      apiKey: serverEnv.MAPBOX_API_KEY, // Server-side only
-      clientApiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY, // Client-side
+      apiKey: serverEnv.MAPBOX_API_KEY,
+      clientApiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY,
       baseUrl: "https://api.mapbox.com",
       geocodingUrl: "https://api.mapbox.com/geocoding/v5/mapbox.places",
       stylesUrl: "https://api.mapbox.com/styles/v1",
       tilesUrl: "https://api.mapbox.com/v4",
     },
     tomtom: {
-      apiKey: serverEnv.TOMTOM_API_KEY, // Fallback mapping service
+      apiKey: serverEnv.TOMTOM_API_KEY,
     },
   },
   supabase: {
@@ -104,7 +103,6 @@ export function getServerConfig() {
       baseUrl: API_CONFIG.tomtom.baseUrl,
       apiKey: API_CONFIG.tomtom.apiKey,
     },
-    // MAPBOX SERVER CONFIG
     mapbox: {
       baseUrl: API_CONFIG.maps.mapbox.baseUrl,
       apiKey: API_CONFIG.maps.mapbox.apiKey,
@@ -124,7 +122,6 @@ export function getClientConfig() {
       url: clientEnv.NEXT_PUBLIC_SUPABASE_URL,
       anonKey: clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     },
-    // MAPBOX CLIENT CONFIG
     mapbox: {
       apiKey: clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY,
       baseUrl: API_CONFIG.maps.mapbox.baseUrl,
@@ -145,17 +142,15 @@ export function getClientConfig() {
 // Validated environment configuration
 export const CLIENT_CONFIG = getClientConfig()
 
-// Validate required environment variables - MAPBOX FOCUSED
+// Validate required environment variables
 export function validateEnv() {
   const requiredClientVars = [
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "NEXT_PUBLIC_MAPBOX_API_KEY", // MAPBOX IS REQUIRED
+    "NEXT_PUBLIC_MAPBOX_API_KEY",
   ] as const
 
-  const requiredServerVars = [
-    "MAPBOX_API_KEY", // Server-side Mapbox key
-  ] as const
+  const requiredServerVars = [] as const // Optional server vars
 
   const missingClient = requiredClientVars.filter((key) => !clientEnv[key])
   const missingServer = requiredServerVars.filter((key) => !serverEnv[key])
@@ -178,7 +173,7 @@ export function validateEnv() {
   }
 }
 
-// Helper functions to check API key availability - MAPBOX FOCUSED
+// Helper functions to check API key availability
 export function hasMapboxApiKey(): boolean {
   return !!(serverEnv.MAPBOX_API_KEY || clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY)
 }
