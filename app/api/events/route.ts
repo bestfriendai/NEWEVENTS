@@ -2,35 +2,54 @@ import { type NextRequest, NextResponse } from "next/server"
 import { unifiedEventsService } from "@/lib/api/unified-events-service"
 import { logger } from "@/lib/utils/logger"
 import { memoryCache } from "@/lib/utils/cache"
-import { z } from "zod";
+import { z } from "zod"
 
 export const runtime = "nodejs"
 
 // Helper for boolean string coercion
 const booleanCoercion = z.preprocess((val) => {
-    if (typeof val === 'string') {
-        if (val.toLowerCase() === 'true') return true;
-        if (val.toLowerCase() === 'false') return false;
-    }
-    return val;
-}, z.boolean());
+  if (typeof val === "string") {
+    if (val.toLowerCase() === "true") return true
+    if (val.toLowerCase() === "false") return false
+  }
+  return val
+}, z.boolean())
 
 // Zod schema for ISO date string validation using the existing isValidDateString function
 const isoDateStringUsingExternalValidatorSchema = z.string().refine(isValidDateString, {
-    message: "Invalid date format. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)",
-});
+  message: "Invalid date format. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ)",
+})
 
-const enhancedEventSearchSchema = z.object({
+const enhancedEventSearchSchema = z
+  .object({
     query: z.string().max(200, "Search term too long (max 200 characters)").default(""),
     location: z.string().default(""),
     category: z.string().default("all"),
     categories: z.array(z.string()).default([]),
     page: z.coerce.number().int().nonnegative("Page must be non-negative").default(0),
-    limit: z.coerce.number().int().min(1, "Limit must be between 1 and 100").max(100, "Limit must be between 1 and 100").default(20),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1, "Limit must be between 1 and 100")
+      .max(100, "Limit must be between 1 and 100")
+      .default(20),
     offset: z.coerce.number().int().nonnegative("Offset must be non-negative").optional(),
-    lat: z.coerce.number().min(-90, "Latitude must be between -90 and 90").max(90, "Latitude must be between -90 and 90").optional(),
-    lng: z.coerce.number().min(-180, "Longitude must be between -180 and 180").max(180, "Longitude must be between -180 and 180").optional(),
-    radius: z.coerce.number().int().min(1, "Radius must be between 1 and 500 km").max(500, "Radius must be between 1 and 500 km").default(25),
+    lat: z.coerce
+      .number()
+      .min(-90, "Latitude must be between -90 and 90")
+      .max(90, "Latitude must be between -90 and 90")
+      .optional(),
+    lng: z.coerce
+      .number()
+      .min(-180, "Longitude must be between -180 and 180")
+      .max(180, "Longitude must be between -180 and 180")
+      .optional(),
+    radius: z.coerce
+      .number()
+      .int()
+      .min(1, "Radius must be between 1 and 500 km")
+      .max(500, "Radius must be between 1 and 500 km")
+      .default(25),
     priceMin: z.coerce.number().nonnegative("Minimum price must be non-negative").optional(),
     priceMax: z.coerce.number().nonnegative("Maximum price must be non-negative").optional(),
     sortBy: z.enum(["date", "distance", "popularity", "price", "relevance"]).default("date"),
@@ -42,54 +61,62 @@ const enhancedEventSearchSchema = z.object({
     forceRefresh: booleanCoercion.default(false),
     startDate: isoDateStringUsingExternalValidatorSchema.optional(),
     endDate: isoDateStringUsingExternalValidatorSchema.optional(),
-}).refine(data => {
-    if (data.priceMin !== undefined && data.priceMax !== undefined && data.priceMin > data.priceMax) {
-        return false;
-    }
-    return true;
-}, {
-    message: "Minimum price cannot be greater than maximum price",
-    path: ["priceMin"],
-}).refine(data => {
-    if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
-        return false;
-    }
-    return true;
-}, {
-    message: "Start date cannot be after end date",
-    path: ["startDate"],
-});
+  })
+  .refine(
+    (data) => {
+      if (data.priceMin !== undefined && data.priceMax !== undefined && data.priceMin > data.priceMax) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Minimum price cannot be greater than maximum price",
+      path: ["priceMin"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
+        return false
+      }
+      return true
+    },
+    {
+      message: "Start date cannot be after end date",
+      path: ["startDate"],
+    },
+  )
 
 // New validation function using Zod
 function zodValidateEnhancedEventSearchParams(params: any) {
-    const result = enhancedEventSearchSchema.safeParse(params);
-    if (result.success) {
-        return {
-            success: true,
-            errors: [],
-            params: result.data,
-        };
-    } else {
-        const errors = result.error.issues.map(issue => {
-            // You can customize error messages further if needed, e.g., by including the path
-            // return `${issue.path.join('.')} - ${issue.message}`;
-            return issue.message;
-        });
-        return {
-            success: false,
-            errors: errors,
-            // Return the original params, or the (partially) parsed data if you prefer
-            // For now, returning original params on failure to align with previous behavior of having params available
-            params: params, 
-        };
+  const result = enhancedEventSearchSchema.safeParse(params)
+  if (result.success) {
+    return {
+      success: true,
+      errors: [],
+      params: result.data,
     }
+  } else {
+    const errors = result.error.issues.map((issue) => {
+      // You can customize error messages further if needed, e.g., by including the path
+      // return `${issue.path.join('.')} - ${issue.message}`;
+      return issue.message
+    })
+    return {
+      success: false,
+      errors: errors,
+      // Return the original params, or the (partially) parsed data if you prefer
+      // For now, returning original params on failure to align with previous behavior of having params available
+      params: params,
+    }
+  }
 }
 
 // Helper function to validate date strings
 function isValidDateString(dateString: string): boolean {
   try {
     const date = new Date(dateString)
-    return !isNaN(date.getTime()) && dateString.includes('T') // Basic ISO format check
+    return !isNaN(date.getTime()) && dateString.includes("T") // Basic ISO format check
   } catch {
     return false
   }
@@ -182,11 +209,11 @@ export async function GET(request: NextRequest) {
     // Determine which validation to use (this logic might need to be revisited based on how useEnhancedValidation is set)
     // For now, assuming 'useEnhancedValidation' is a boolean flag defined elsewhere or intended to be.
     // If it's always true for this path, this conditional can be simplified.
-    const useEnhancedValidation = true; // Placeholder: Determine actual logic for this flag if it varies
+    const useEnhancedValidation = true // Placeholder: Determine actual logic for this flag if it varies
 
     const validation = useEnhancedValidation
       ? zodValidateEnhancedEventSearchParams(enhancedParams) // Use the object with all parsed params
-      : validateSearchParams(searchParams); // Legacy validator uses raw URLSearchParams
+      : validateSearchParams(searchParams) // Legacy validator uses raw URLSearchParams
 
     if (!validation.success) {
       logger.warn("Invalid search parameters", {
@@ -198,9 +225,9 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           message: "Invalid parameters",
-          errors: validation.errors
+          errors: validation.errors,
         },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -246,7 +273,7 @@ export async function GET(request: NextRequest) {
       sortBy: validatedParams.sortBy,
       sortOrder: validatedParams.sortOrder,
       limit: validatedParams.limit,
-      offset: validatedParams.offset || (validatedParams.page * validatedParams.limit),
+      offset: validatedParams.offset || validatedParams.page * validatedParams.limit,
       tags: validatedParams.tags.length > 0 ? validatedParams.tags : undefined,
       source: validatedParams.source !== "all" ? validatedParams.source : undefined,
       hasImages: validatedParams.hasImages || undefined,
@@ -309,7 +336,7 @@ export async function GET(request: NextRequest) {
         sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
         responseTime,
       },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

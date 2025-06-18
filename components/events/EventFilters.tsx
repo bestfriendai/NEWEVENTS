@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useCallback, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Filter, X, Calendar, MapPin, DollarSign, Tag, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,8 +22,8 @@ export interface EventFilters {
   priceRange: { min: number; max: number }
   distance: number
   searchQuery: string
-  sortBy: 'date' | 'distance' | 'popularity' | 'price'
-  sortOrder: 'asc' | 'desc'
+  sortBy: "date" | "distance" | "popularity" | "price"
+  sortOrder: "asc" | "desc"
 }
 
 interface EventFiltersProps {
@@ -33,65 +35,152 @@ interface EventFiltersProps {
 }
 
 const CATEGORIES = [
-  { id: 'Music', label: 'Music', icon: '🎵' },
-  { id: 'Arts', label: 'Arts & Culture', icon: '🎨' },
-  { id: 'Sports', label: 'Sports', icon: '⚽' },
-  { id: 'Food', label: 'Food & Drink', icon: '🍽️' },
-  { id: 'Business', label: 'Business', icon: '💼' },
-  { id: 'Event', label: 'Other Events', icon: '🎪' }
+  { id: "Music", label: "Music", icon: "🎵" },
+  { id: "Arts", label: "Arts & Culture", icon: "🎨" },
+  { id: "Sports", label: "Sports", icon: "⚽" },
+  { id: "Food", label: "Food & Drink", icon: "🍽️" },
+  { id: "Business", label: "Business", icon: "💼" },
+  { id: "Event", label: "Other Events", icon: "🎪" },
 ]
 
 const SORT_OPTIONS = [
-  { value: 'date', label: 'Date' },
-  { value: 'distance', label: 'Distance' },
-  { value: 'popularity', label: 'Popularity' },
-  { value: 'price', label: 'Price' }
+  { value: "date", label: "Date" },
+  { value: "distance", label: "Distance" },
+  { value: "popularity", label: "Popularity" },
+  { value: "price", label: "Price" },
 ]
 
 export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, className: _className }: EventFiltersProps) {
   const [localFilters, setLocalFilters] = useState<EventFilters>(filters)
+  const [isApplying, setIsApplying] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+  const applyTimeoutRef = useRef<NodeJS.Timeout>()
+  const mountedRef = useRef(true)
 
-  const updateFilters = (updates: Partial<EventFilters>) => {
-    const newFilters = { ...localFilters, ...updates }
-    setLocalFilters(newFilters)
-    onFiltersChange(newFilters)
-    
-    logger.info("Filters updated", {
-      component: "EventFilters",
-      action: "filters_update",
-      metadata: { updates, newFilters }
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      if (applyTimeoutRef.current) {
+        clearTimeout(applyTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Sync with external filters changes
+  useEffect(() => {
+    setLocalFilters(filters)
+    setHasChanges(false)
+  }, [filters])
+
+  // Check for changes
+  useEffect(() => {
+    const filtersChanged = JSON.stringify(localFilters) !== JSON.stringify(filters)
+    setHasChanges(filtersChanged)
+  }, [localFilters, filters])
+
+  const updateLocalFilters = useCallback((updates: Partial<EventFilters>) => {
+    if (!mountedRef.current) return
+
+    setLocalFilters((prev) => {
+      const newFilters = { ...prev, ...updates }
+      logger.info("Local filters updated", {
+        component: "EventFilters",
+        action: "update_local_filters",
+        updates,
+        newFilters,
+      })
+      return newFilters
     })
-  }
+  }, [])
 
-  const handleCategoryToggle = (categoryId: string) => {
-    const newCategories = localFilters.categories.includes(categoryId)
-      ? localFilters.categories.filter(id => id !== categoryId)
-      : [...localFilters.categories, categoryId]
-    
-    updateFilters({ categories: newCategories })
-  }
+  const handleCategoryToggle = useCallback(
+    (categoryId: string) => {
+      const newCategories = localFilters.categories.includes(categoryId)
+        ? localFilters.categories.filter((id) => id !== categoryId)
+        : [...localFilters.categories, categoryId]
 
-  const clearAllFilters = () => {
+      updateLocalFilters({ categories: newCategories })
+    },
+    [localFilters.categories, updateLocalFilters],
+  )
+
+  const handleApplyFilters = useCallback(
+    async (e?: React.MouseEvent) => {
+      // Prevent any default behavior and stop propagation
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+
+      if (isApplying || !hasChanges) {
+        logger.warn("Apply filters blocked", {
+          component: "EventFilters",
+          isApplying,
+          hasChanges,
+          reason: isApplying ? "already_applying" : "no_changes",
+        })
+        return
+      }
+
+      try {
+        setIsApplying(true)
+
+        logger.info("Applying filters", {
+          component: "EventFilters",
+          action: "apply_filters",
+          filters: localFilters,
+        })
+
+        // Apply filters with a small delay to show loading state
+        await new Promise((resolve) => {
+          applyTimeoutRef.current = setTimeout(() => {
+            if (mountedRef.current) {
+              onFiltersChange(localFilters)
+              setHasChanges(false)
+              resolve(void 0)
+            }
+          }, 100)
+        })
+
+        // Close the panel after successful application
+        if (mountedRef.current) {
+          onToggle()
+        }
+      } catch (error) {
+        logger.error("Failed to apply filters", {
+          component: "EventFilters",
+          error: error instanceof Error ? error.message : "Unknown error",
+        })
+      } finally {
+        if (mountedRef.current) {
+          setIsApplying(false)
+        }
+      }
+    },
+    [isApplying, hasChanges, localFilters, onFiltersChange, onToggle],
+  )
+
+  const clearAllFilters = useCallback(() => {
     const defaultFilters: EventFilters = {
       categories: [],
       dateRange: null,
       priceRange: { min: 0, max: 500 },
       distance: 50,
-      searchQuery: '',
-      sortBy: 'date',
-      sortOrder: 'asc'
+      searchQuery: "",
+      sortBy: "date",
+      sortOrder: "asc",
     }
-    
+
     setLocalFilters(defaultFilters)
-    onFiltersChange(defaultFilters)
-    
+
     logger.info("All filters cleared", {
       component: "EventFilters",
-      action: "clear_all_filters"
+      action: "clear_all_filters",
     })
-  }
+  }, [])
 
-  const getActiveFilterCount = () => {
+  const getActiveFilterCount = useCallback(() => {
     let count = 0
     if (localFilters.categories.length > 0) count++
     if (localFilters.dateRange) count++
@@ -99,7 +188,27 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
     if (localFilters.distance < 50) count++
     if (localFilters.searchQuery.trim()) count++
     return count
-  }
+  }, [localFilters])
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return
+
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        handleApplyFilters()
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        onToggle()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown)
+      return () => document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen, handleApplyFilters, onToggle])
 
   return (
     <>
@@ -108,6 +217,7 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
         variant="outline"
         onClick={onToggle}
         className="border-gray-700 text-gray-400 hover:text-white relative"
+        disabled={isApplying}
       >
         <Filter className="h-4 w-4 mr-2" />
         Filter Events
@@ -133,10 +243,10 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
 
             {/* Filter Sidebar */}
             <motion.div
-              initial={{ x: '100%' }}
+              initial={{ x: "100%" }}
               animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed right-0 top-0 h-full w-80 bg-[#1A1D25] border-l border-gray-800 z-50 overflow-y-auto"
             >
               <div className="p-6">
@@ -145,12 +255,14 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <div className="flex items-center">
                     <SlidersHorizontal className="h-5 w-5 text-purple-400 mr-2" />
                     <h2 className="text-xl font-bold text-white">Filters</h2>
+                    {hasChanges && <Badge className="ml-2 bg-yellow-600 text-white text-xs">Modified</Badge>}
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={onToggle}
                     className="text-gray-400 hover:text-white"
+                    disabled={isApplying}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -162,8 +274,9 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <Input
                     placeholder="Search by title, location, or description..."
                     value={localFilters.searchQuery}
-                    onChange={(e) => updateFilters({ searchQuery: e.target.value })}
+                    onChange={(e) => updateLocalFilters({ searchQuery: e.target.value })}
                     className="bg-gray-800 border-gray-700 text-white"
+                    disabled={isApplying}
                   />
                 </div>
 
@@ -183,11 +296,9 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                           checked={localFilters.categories.includes(category.id)}
                           onCheckedChange={() => handleCategoryToggle(category.id)}
                           className="border-gray-600"
+                          disabled={isApplying}
                         />
-                        <Label
-                          htmlFor={category.id}
-                          className="text-sm text-gray-300 cursor-pointer flex items-center"
-                        >
+                        <Label htmlFor={category.id} className="text-sm text-gray-300 cursor-pointer flex items-center">
                           <span className="mr-1">{category.icon}</span>
                           {category.label}
                         </Label>
@@ -205,19 +316,25 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                     Date Range
                   </Label>
                   <DateRangePicker
-                    {...(localFilters.dateRange ? {
-                      dateRange: {
-                        from: localFilters.dateRange.start,
-                        to: localFilters.dateRange.end
-                      }
-                    } : {})}
+                    {...(localFilters.dateRange
+                      ? {
+                          dateRange: {
+                            from: localFilters.dateRange.start,
+                            to: localFilters.dateRange.end,
+                          },
+                        }
+                      : {})}
                     onDateRangeChange={(dateRange) => {
-                      const newDateRange = dateRange && dateRange.from && dateRange.to ? {
-                        start: dateRange.from,
-                        end: dateRange.to
-                      } : null
-                      updateFilters({ dateRange: newDateRange })
+                      const newDateRange =
+                        dateRange && dateRange.from && dateRange.to
+                          ? {
+                              start: dateRange.from,
+                              end: dateRange.to,
+                            }
+                          : null
+                      updateLocalFilters({ dateRange: newDateRange })
                     }}
+                    disabled={isApplying}
                   />
                 </div>
 
@@ -234,12 +351,13 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                       value={[localFilters.priceRange.min, localFilters.priceRange.max]}
                       onValueChange={([min, max]) => {
                         if (min !== undefined && max !== undefined) {
-                          updateFilters({ priceRange: { min, max } })
+                          updateLocalFilters({ priceRange: { min, max } })
                         }
                       }}
                       max={500}
                       step={10}
                       className="mb-3"
+                      disabled={isApplying}
                     />
                     <div className="flex justify-between text-sm text-gray-400">
                       <span>${localFilters.priceRange.min}</span>
@@ -261,12 +379,13 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                       value={[localFilters.distance]}
                       onValueChange={([distance]) => {
                         if (distance !== undefined) {
-                          updateFilters({ distance })
+                          updateLocalFilters({ distance })
                         }
                       }}
                       max={100}
                       step={5}
                       className="mb-3"
+                      disabled={isApplying}
                     />
                     <div className="flex justify-between text-sm text-gray-400">
                       <span>1 mile</span>
@@ -283,7 +402,10 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                   <div className="flex gap-2">
                     <Select
                       value={localFilters.sortBy}
-                      onValueChange={(sortBy: 'date' | 'popularity' | 'price' | 'distance') => updateFilters({ sortBy })}
+                      onValueChange={(sortBy: "date" | "popularity" | "price" | "distance") =>
+                        updateLocalFilters({ sortBy })
+                      }
+                      disabled={isApplying}
                     >
                       <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                         <SelectValue />
@@ -298,7 +420,8 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                     </Select>
                     <Select
                       value={localFilters.sortOrder}
-                      onValueChange={(sortOrder: 'asc' | 'desc') => updateFilters({ sortOrder })}
+                      onValueChange={(sortOrder: "asc" | "desc") => updateLocalFilters({ sortOrder })}
+                      disabled={isApplying}
                     >
                       <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-24">
                         <SelectValue />
@@ -317,16 +440,32 @@ export function EventFilters({ filters, onFiltersChange, isOpen, onToggle, class
                     variant="outline"
                     onClick={clearAllFilters}
                     className="flex-1 border-gray-700 text-gray-400 hover:text-white"
+                    disabled={isApplying}
                   >
                     Clear All
                   </Button>
                   <Button
-                    onClick={onToggle}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    onClick={handleApplyFilters}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                    disabled={isApplying || !hasChanges}
                   >
-                    Apply Filters
+                    {isApplying ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                        />
+                        Applying...
+                      </>
+                    ) : (
+                      <>Apply Filters{hasChanges && " *"}</>
+                    )}
                   </Button>
                 </div>
+
+                {/* Keyboard shortcuts hint */}
+                <div className="mt-4 text-xs text-gray-500 text-center">Press Ctrl+Enter to apply • Esc to close</div>
               </div>
             </motion.div>
           </>
