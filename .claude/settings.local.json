@@ -48,7 +48,9 @@
       "WebFetch(domain:docs.voyageai.com)",
       "mcp__ide__getDiagnostics",
       "Bash(pkill:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(supabase secrets:*)",
+      "Bash(supabase functions:*)"
     ],
     "deny": []
   },
