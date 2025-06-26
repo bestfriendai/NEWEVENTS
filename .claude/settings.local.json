@@ -52,7 +52,8 @@
       "Bash(supabase secrets:*)",
       "Bash(supabase functions:*)",
       "Bash(supabase migration:*)",
-      "Bash(supabase db:*)"
+      "Bash(supabase db:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   },
