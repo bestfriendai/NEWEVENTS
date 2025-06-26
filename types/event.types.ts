@@ -125,3 +125,6 @@ export interface EventOrganizer {
   logo?: string
   verified?: boolean
 }
+
+// Alias for EventDetailProps from components
+export type EventDetail = import('../components/event-detail-modal').EventDetailProps

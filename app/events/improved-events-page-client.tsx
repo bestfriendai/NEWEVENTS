@@ -28,28 +28,10 @@ import { ImprovedEventsMap } from "../../components/events/ImprovedEventsMap"
 import { EnhancedEventCard } from "../../components/events/EnhancedEventCard"
 import { EventsPageSkeleton } from "../../components/events/EventsPageSkeleton"
 import { FeaturedEventsCarousel } from "../../components/events/FeaturedEventsCarousel"
-import { EventFiltersPanel } from "../../components/events/EventFiltersPanel"
+import { EventFilters as EventFiltersPanel } from "../../components/events/EventFilters"
 import { useDebounce } from "../../hooks/use-debounce"
 import { useEnhancedEvents } from "../../hooks/use-enhanced-events"
-
-interface Event {
-  id: string
-  title: string
-  description: string
-  date: string
-  time: string
-  location: string
-  latitude: number
-  longitude: number
-  category: string
-  price: number
-  image: string
-  attendees: number
-  rating: number
-  isFeatured: boolean
-  tags: string[]
-  organizer: string
-}
+import { EventDetailProps } from "@/components/event-detail-modal"
 
 const categories = [
   { id: "all", label: "All Events", icon: Grid3X3 },
@@ -79,17 +61,18 @@ export function ImprovedEventsPageClient() {
   const [dateRange, setDateRange] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
-  const [favoriteEvents, setFavoriteEvents] = useState<Set<string>>(new Set())
+  const [selectedEvent, setSelectedEvent] = useState<EventDetailProps | null>(null)
+  const [favoriteEvents, setFavoriteEvents] = useState<Set<number>>(new Set())
 
   const debouncedSearch = useDebounce(searchQuery, 300)
-  const { events, loading, error, refetch } = useEnhancedEvents({
-    search: debouncedSearch,
-    category: selectedCategory,
-    sortBy,
-    priceRange,
-    dateRange,
-    featuredOnly: showFeaturedOnly,
+  const { events, isLoading: loading, error, refresh: refetch } = useEnhancedEvents({
+    initialParams: {
+      query: debouncedSearch,
+      category: selectedCategory,
+      sortBy,
+      priceRange,
+      dateRange,
+    }
   })
 
   const filteredEvents = useMemo(() => {
@@ -103,7 +86,8 @@ export function ImprovedEventsPageClient() {
         event.location.toLowerCase().includes(debouncedSearch.toLowerCase())
 
       const matchesCategory = selectedCategory === "all" || event.category === selectedCategory
-      const matchesPrice = event.price >= priceRange[0] && event.price <= priceRange[1]
+      const eventPrice = parseFloat(event.price) || 0
+      const matchesPrice = eventPrice >= priceRange[0] && eventPrice <= priceRange[1]
       const matchesFeatured = !showFeaturedOnly || event.isFeatured
 
       return matchesSearch && matchesCategory && matchesPrice && matchesFeatured
@@ -114,7 +98,7 @@ export function ImprovedEventsPageClient() {
     return events?.filter((event) => event.isFeatured).slice(0, 5) || []
   }, [events])
 
-  const toggleFavorite = (eventId: string) => {
+  const toggleFavorite = (eventId: number) => {
     setFavoriteEvents((prev) => {
       const newFavorites = new Set(prev)
       if (newFavorites.has(eventId)) {
@@ -126,7 +110,7 @@ export function ImprovedEventsPageClient() {
     })
   }
 
-  const shareEvent = (event: Event) => {
+  const shareEvent = (event: EventDetailProps) => {
     if (navigator.share) {
       navigator.share({
         title: event.title,

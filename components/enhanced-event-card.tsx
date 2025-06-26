@@ -37,7 +37,7 @@ export function EnhancedEventCard({
   const [imageError, setImageError] = useState(false)
 
   // Hooks
-  const { toggleFavorite, isFavorite } = useUserFavorites()
+  const { addFavorite, removeFavorite, isFavorite } = useUserFavorites()
   const { trackEventView, trackEventFavorite, trackEventShare, trackTicketClick } = useAnalytics()
 
   const eventId = Number(event.id)
@@ -56,13 +56,21 @@ export function EnhancedEventCard({
         metadata: { eventId },
       })
 
-      const success = await toggleFavorite(eventId, event)
-
-      if (success) {
-        await trackEventFavorite(eventId, !isEventFavorited)
+      if (isEventFavorited) {
+        removeFavorite(eventId.toString())
+      } else {
+        addFavorite({
+          id: eventId.toString(),
+          title: event.title,
+          date: event.date,
+          location: event.location,
+          image: event.image
+        })
       }
+      
+      await trackEventFavorite(eventId, !isEventFavorited)
     },
-    [eventId, event, toggleFavorite, trackEventFavorite, isEventFavorited],
+    [eventId, event, isEventFavorited, addFavorite, removeFavorite, trackEventFavorite],
   )
 
   /**
