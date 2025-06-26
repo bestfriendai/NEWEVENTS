@@ -10,6 +10,7 @@ import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/lib/auth/auth-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { LocationProvider } from "@/contexts/LocationContext"
+import { FavoritesProvider } from "@/contexts/FavoritesContext"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -66,17 +67,19 @@ export default function RootLayout({
         <ErrorBoundary>
           <AuthProvider>
             <LocationProvider>
-              <QueryProvider>
-                <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                  <div className="min-h-screen bg-background">{children}</div>
-                  <Toaster />
-                  <SonnerToaster 
-                    position="top-right"
-                    richColors
-                    theme="dark"
-                  />
-                </ThemeProvider>
-              </QueryProvider>
+              <FavoritesProvider>
+                <QueryProvider>
+                  <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                    <div className="min-h-screen bg-background">{children}</div>
+                    <Toaster />
+                    <SonnerToaster 
+                      position="top-right"
+                      richColors
+                      theme="dark"
+                    />
+                  </ThemeProvider>
+                </QueryProvider>
+              </FavoritesProvider>
             </LocationProvider>
           </AuthProvider>
         </ErrorBoundary>
