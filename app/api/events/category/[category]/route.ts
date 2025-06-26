@@ -4,7 +4,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { getEventsByCategory } from "@/app/actions/event-actions"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 
 export async function GET(request: NextRequest, { params }: { params: { category: string } }) {
   try {
@@ -35,14 +35,14 @@ export async function GET(request: NextRequest, { params }: { params: { category
 
     return response
   } catch (error) {
-    logger.error(
+    logError(
       "Category events API error",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "category-events-api",
         action: "request_error",
         metadata: { category: params.category },
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/api/supabase-api"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,13 +8,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.getSession()
 
     if (error) {
-      logger.error(
+      logError(
         "Error getting session",
+        error,
         {
           component: "auth-api",
           action: "get_session_error",
-        },
-        error,
+        }
       )
 
       return NextResponse.json({ error: "Failed to get session" }, { status: 500 })
@@ -22,13 +22,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ session: data.session })
   } catch (error) {
-    logger.error(
+    logError(
       "Unexpected error in session route",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "auth-api",
         action: "session_route_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

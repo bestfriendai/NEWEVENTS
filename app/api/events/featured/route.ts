@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server"
 import { getFeaturedEvents } from "@/app/actions/event-actions"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 
 export async function GET() {
   try {
@@ -26,13 +26,13 @@ export async function GET() {
 
     return response
   } catch (error) {
-    logger.error(
+    logError(
       "Featured events API error",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "featured-events-api",
         action: "request_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

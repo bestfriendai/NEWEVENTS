@@ -45,11 +45,14 @@
       "Bash(plutil:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:docs.voyageai.com)"
+      "WebFetch(domain:docs.voyageai.com)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pkill:*)",
+      "Bash(true)"
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": false,
   "allowedTools": [],
-  "ignorePatterns": [],
-  "enableAllProjectMcpServers": false
+  "ignorePatterns": []
 }

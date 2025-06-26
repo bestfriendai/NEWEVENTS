@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getServerConfig } from "@/lib/env"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 
 export async function GET() {
   try {
@@ -46,13 +46,13 @@ export async function GET() {
     })
 
   } catch (error) {
-    logger.error(
+    logError(
       "PredictHQ API test failed",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "PredictHQTestRoute",
         action: "test_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return NextResponse.json(

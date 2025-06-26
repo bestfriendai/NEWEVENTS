@@ -215,7 +215,7 @@ export async function GET(request: NextRequest) {
       ? zodValidateEnhancedEventSearchParams(enhancedParams) // Use the object with all parsed params
       : validateSearchParams(searchParams) // Legacy validator uses raw URLSearchParams
 
-    if (!validation.success) {
+    if (!('success' in validation ? validation.success : validation.isValid)) {
       logger.warn("Invalid search parameters", {
         component: "EventsAPI",
         action: "GET",
@@ -251,7 +251,7 @@ export async function GET(request: NextRequest) {
           cacheKey,
         })
         return NextResponse.json({
-          ...cachedResult,
+          ...(cachedResult as object),
           cached: true,
           responseTime: Date.now() - startTime,
         })

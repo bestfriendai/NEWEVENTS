@@ -3,7 +3,7 @@
 import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { env } from "@/lib/env"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 
 // Production user repository using Supabase
 class UserRepository {
@@ -22,21 +22,21 @@ class UserRepository {
         .single()
 
       if (error) {
-        logger.error('Failed to find user by ID', {
+        logError('Failed to find user by ID', error, {
           component: 'UserRepository',
           action: 'findById',
           metadata: { userId: id }
-        }, error)
+        })
         return { data: null, error: error.message }
       }
 
       return { data, error: null }
     } catch (error) {
-      logger.error('Unexpected error finding user', {
+      logError('Unexpected error finding user', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'findById',
         metadata: { userId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { data: null, error: 'Failed to find user' }
     }
   }
@@ -50,19 +50,19 @@ class UserRepository {
         .single()
 
       if (error) {
-        logger.error('Failed to create user', {
+        logError('Failed to create user', error, {
           component: 'UserRepository',
           action: 'create'
-        }, error)
+        })
         return { data: null, error: error.message }
       }
 
       return { data, error: null }
     } catch (error) {
-      logger.error('Unexpected error creating user', {
+      logError('Unexpected error creating user', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'create'
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { data: null, error: 'Failed to create user' }
     }
   }
@@ -77,21 +77,21 @@ class UserRepository {
         .single()
 
       if (error) {
-        logger.error('Failed to update user', {
+        logError('Failed to update user', error, {
           component: 'UserRepository',
           action: 'update',
           metadata: { userId: id }
-        }, error)
+        })
         return { data: null, error: error.message }
       }
 
       return { data, error: null }
     } catch (error) {
-      logger.error('Unexpected error updating user', {
+      logError('Unexpected error updating user', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'update',
         metadata: { userId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { data: null, error: 'Failed to update user' }
     }
   }
@@ -104,21 +104,21 @@ class UserRepository {
         .eq('id', id)
 
       if (error) {
-        logger.error('Failed to update last login', {
+        logError('Failed to update last login', error, {
           component: 'UserRepository',
           action: 'updateLastLogin',
           metadata: { userId: id }
-        }, error)
+        })
         return { error: error.message }
       }
 
       return { error: null }
     } catch (error) {
-      logger.error('Unexpected error updating last login', {
+      logError('Unexpected error updating last login', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'updateLastLogin',
         metadata: { userId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { error: 'Failed to update last login' }
     }
   }
@@ -132,21 +132,21 @@ class UserRepository {
         .single()
 
       if (error) {
-        logger.error('Failed to get user preferences', {
+        logError('Failed to get user preferences', error, {
           component: 'UserRepository',
           action: 'getUserPreferences',
           metadata: { userId: id }
-        }, error)
+        })
         return { data: null, error: error.message }
       }
 
       return { data, error: null }
     } catch (error) {
-      logger.error('Unexpected error getting user preferences', {
+      logError('Unexpected error getting user preferences', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'getUserPreferences',
         metadata: { userId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { data: null, error: 'Failed to get user preferences' }
     }
   }
@@ -158,21 +158,21 @@ class UserRepository {
         .upsert({ user_id: id, ...preferences })
 
       if (error) {
-        logger.error('Failed to update user preferences', {
+        logError('Failed to update user preferences', error, {
           component: 'UserRepository',
           action: 'updateUserPreferences',
           metadata: { userId: id }
-        }, error)
+        })
         return { error: error.message }
       }
 
       return { error: null }
     } catch (error) {
-      logger.error('Unexpected error updating user preferences', {
+      logError('Unexpected error updating user preferences', error instanceof Error ? error : new Error(String(error)), {
         component: 'UserRepository',
         action: 'updateUserPreferences',
         metadata: { userId: id }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       return { error: 'Failed to update user preferences' }
     }
   }
@@ -318,7 +318,7 @@ function createMockSupabaseClient() {
 }
 
 // Initialize mock services
-const userRepository = new MockUserRepository()
+const userRepository = new UserRepository()
 const favoritesRepository = new MockFavoritesRepository()
 const analyticsService = new MockAnalyticsService()
 const cacheService = new MockCacheService()
@@ -451,13 +451,13 @@ export async function getCurrentUser(): Promise<UserActionResult<UserEntity>> {
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error getting current user",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "get_current_user_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -548,13 +548,13 @@ export async function updateUserProfile(
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error updating user profile",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "update_profile_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -617,13 +617,13 @@ export async function getUserPreferences(): Promise<UserActionResult> {
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error getting user preferences",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "get_preferences_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -714,14 +714,14 @@ export async function toggleEventFavorite(
       data: true,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error toggling event favorite",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "toggle_favorite_error",
         metadata: { eventId, action },
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -801,13 +801,13 @@ export async function getUserFavorites(limit = 50): Promise<UserActionResult> {
       data: favoritesData,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error getting user favorites",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "get_favorites_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     // Return empty array instead of error to prevent UI crashes
@@ -871,14 +871,14 @@ export async function isEventFavorited(eventId: number): Promise<UserActionResul
       data: result.data!,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error checking if event is favorited",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "is_favorited_error",
         metadata: { eventId },
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -934,13 +934,13 @@ export async function getUserAnalytics(): Promise<UserActionResult> {
       data: analytics,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error getting user analytics",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "get_analytics_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {
@@ -1004,13 +1004,13 @@ export async function deleteUserAccount(): Promise<UserActionResult<boolean>> {
       data: true,
     }
   } catch (error) {
-    logger.error(
+    logError(
       "Error deleting user account",
+      error instanceof Error ? error : new Error(String(error)),
       {
         component: "user-actions",
         action: "delete_account_error",
-      },
-      error instanceof Error ? error : new Error(String(error)),
+      }
     )
 
     return {

@@ -14,15 +14,15 @@ export interface MapViewport {
 // or ensure these definitions align with the version of Mapbox GL being used.
 
 export interface MapboxMap {
-  on(type: string, listener: (e: mapboxgl.EventData) => void): void;
-  off(type: string, listener: (e: mapboxgl.EventData) => void): void;
+  on(type: string, listener: (e: any) => void): void;
+  off(type: string, listener: (e: any) => void): void;
   addSource(id: string, source: mapboxgl.SourceSpecification): void;
   removeSource(id: string): void;
   addLayer(layer: mapboxgl.AnyLayer, before?: string): void;
   removeLayer(id: string): void;
   getLayer(id: string): mapboxgl.AnyLayer | undefined;
   setStyle(style: mapboxgl.Style | string): void;
-  flyTo(options: mapboxgl.FlyToOptions): void;
+  flyTo(options: any): void;
   fitBounds(bounds: mapboxgl.LngLatBoundsLike, options?: mapboxgl.FitBoundsOptions): void;
   queryRenderedFeatures(
     pointOrBox?: mapboxgl.PointLike | [mapboxgl.PointLike, mapboxgl.PointLike],
@@ -81,10 +81,10 @@ export interface MapboxGeoJSONSource {
   getClusterExpansionZoom(clusterId: number, callback: (err: Error | null, zoom: number) => void): void;
 }
 
-export interface MapboxEvent extends Partial<mapboxgl.EventData> { // Make it extend EventData partially or use a more specific base
-  type: string; // Ensure type is present
-  target?: MapboxMap | mapboxgl.Map; // target can be optional or part of EventData
-  originalEvent?: Event; // originalEvent can be optional
+export interface MapboxEvent { 
+  type: string;
+  target?: MapboxMap | mapboxgl.Map;
+  originalEvent?: Event;
   point?: mapboxgl.Point;
   lngLat?: mapboxgl.LngLat;
   features?: mapboxgl.MapboxGeoJSONFeature[];

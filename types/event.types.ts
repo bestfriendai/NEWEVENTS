@@ -41,19 +41,6 @@ export interface EventFilters {
   tags?: string[]
 }
 
-export interface ApiResponse<T> {
-  success: boolean
-  data: T
-  error?: string
-  errors?: string[]
-  pagination?: {
-    page: number
-    limit: number
-    total: number
-    hasMore: boolean
-  }
-}
-
 export interface EventSearchParams {
   // Text search
   query?: string
