@@ -166,11 +166,12 @@ export default function DeploymentReadyPage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-300 mb-4">Verify all API connections are working correctly</p>
-              <Button className="w-full bg-green-600 hover:bg-green-700" asChild>
-                <a href="/api-status">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Test APIs
-                </a>
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => window.location.href = '/api-status'}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Test APIs
               </Button>
             </CardContent>
           </Card>
@@ -184,11 +185,12 @@ export default function DeploymentReadyPage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-300 mb-4">Start discovering events with real data from all sources</p>
-              <Button className="w-full bg-purple-600 hover:bg-purple-700" asChild>
-                <a href="/events">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Find Events
-                </a>
+              <Button 
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                onClick={() => window.location.href = '/events'}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Find Events
               </Button>
             </CardContent>
           </Card>

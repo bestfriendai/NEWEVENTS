@@ -7,15 +7,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     
     const location = searchParams.get("location") || "United States"
-    const limit = parseInt(searchParams.get("limit") || "20")
+    const limit = parseInt(searchParams.get("limit") || "50")
 
-    logger.info("Featured events API called", {
-      component: "events-featured-api",
-      action: "GET", 
+    logger.info("Party events API called", {
+      component: "events-party-api", 
+      action: "GET",
       metadata: { location, limit }
     })
 
-    const events = await unifiedRealEventsAPI.getFeaturedEvents(location, limit)
+    const events = await unifiedRealEventsAPI.getPartyEvents(location, limit)
 
     return NextResponse.json({
       success: true,
@@ -26,16 +26,16 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    logger.error("Error in featured events API", {
-      component: "events-featured-api",
-      action: "GET",
+    logger.error("Error in party events API", {
+      component: "events-party-api",
+      action: "GET", 
       error: error instanceof Error ? error.message : String(error)
     })
 
     return NextResponse.json(
       {
-        success: false, 
-        error: "Failed to fetch featured events",
+        success: false,
+        error: "Failed to fetch party events",
         message: error instanceof Error ? error.message : "Unknown error"
       },
       { status: 500 }
