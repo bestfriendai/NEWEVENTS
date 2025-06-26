@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Search, MapPin, Calendar, Users, Heart, Grid3X3, List, Loader2, AlertCircle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -219,7 +219,7 @@ export default function RealEventsPage() {
   }, [events, searchQuery, selectedCategory, sortBy])
 
   // Handle search submission
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     const searchParams: EventSearchParams = {
       keyword: searchQuery,
       location: location.city && location.state ? `${location.city}, ${location.state}` : "United States",
@@ -231,7 +231,7 @@ export default function RealEventsPage() {
     }
 
     await searchEvents(searchParams)
-  }
+  }, [searchQuery, location, selectedCategory, sortBy, searchEvents])
 
   // Handle filter changes
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function RealEventsPage() {
     }, 500) // Debounce search
 
     return () => clearTimeout(delayedSearch)
-  }, [searchQuery, selectedCategory, sortBy, location])
+  }, [searchQuery, selectedCategory, sortBy, location, handleSearch])
 
   return (
     <AppLayout>

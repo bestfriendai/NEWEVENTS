@@ -12,6 +12,7 @@ import { LocationSelector } from "@/components/location-selector"
 import { useLocation } from "@/hooks/use-location"
 import { useRealEvents } from "@/hooks/use-real-events"
 import { useFavoriteToggle } from "@/contexts/FavoritesContext"
+import type { Event } from "@/types/event.types"
 import { 
   Search, 
   MapPin, 
@@ -25,7 +26,6 @@ import {
   Heart,
   TrendingUp,
   Users,
-  Clock,
   Sparkles,
   ArrowRight,
   Loader2
@@ -41,7 +41,7 @@ const CATEGORIES = [
   { id: "Entertainment", label: "Entertainment", icon: Film, color: "from-yellow-600 to-orange-600" },
 ]
 
-function EventCard({ event }: { event: any }) {
+function EventCard({ event }: { event: Event }) {
   const { toggleFavorite, isFavorite } = useFavoriteToggle()
   const isFav = isFavorite(event.id.toString())
 
@@ -132,8 +132,7 @@ export default function Home() {
   const { 
     featuredEvents, 
     isFeaturedLoading, 
-    loadFeaturedEvents,
-    searchEvents
+    loadFeaturedEvents
   } = useRealEvents()
 
   // Load featured events on mount and when location changes
