@@ -34,6 +34,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { NotificationDropdown } from "@/components/notification-dropdown"
+import { AuthModal } from "@/components/auth/auth-modal"
+import { useAuth } from "@/lib/auth/auth-provider"
+import { getSupabaseClient } from "@/lib/auth/anonymous-auth"
+import { toast } from "sonner"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -42,7 +46,10 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState<{ name: string; email: string; avatar?: string } | null>(null)
   const pathname = usePathname()
+  const { userId, isAuthenticated, isSupabaseAuth } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,6 +64,49 @@ export function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
+
+  // Fetch user profile when authenticated
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isAuthenticated && isSupabaseAuth) {
+        const supabase = getSupabaseClient()
+        if (supabase) {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            setUserProfile({
+              name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+              email: user.email || '',
+              avatar: user.user_metadata?.avatar_url
+            })
+          }
+        }
+      } else if (isAuthenticated && !isSupabaseAuth) {
+        // Anonymous user
+        setUserProfile({
+          name: 'Guest User',
+          email: 'guest@dateai.com'
+        })
+      } else {
+        setUserProfile(null)
+      }
+    }
+
+    fetchUserProfile()
+  }, [isAuthenticated, isSupabaseAuth, userId])
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = getSupabaseClient()
+      if (supabase && isSupabaseAuth) {
+        await supabase.auth.signOut()
+        toast.success("Signed out successfully")
+      }
+      setUserProfile(null)
+    } catch (error) {
+      toast.error("Error signing out")
+      console.error("Sign out error:", error)
+    }
+  }
 
   // Update the navItems array to include all our created pages
   const navItems = [
@@ -199,24 +249,44 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center space-x-1 md:space-x-3">
-            <NotificationDropdown />
+            {isAuthenticated && <NotificationDropdown />}
 
-            <Link href="/create-event">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
-                <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-full shadow-glow-sm transition-all duration-300 px-4">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Event
+            {isAuthenticated && (
+              <Link href="/create-event">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="hidden md:block">
+                  <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-full shadow-glow-sm transition-all duration-300 px-4">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Event
+                  </Button>
+                </motion.div>
+              </Link>
+            )}
+
+            {!isAuthenticated ? (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="text-gray-300 hover:text-white hidden md:block"
+                >
+                  Sign In
                 </Button>
-              </motion.div>
-            </Link>
-
-            <div className="md:hidden">
+                <Button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-full shadow-glow-sm transition-all duration-300 px-4"
+                >
+                  Sign Up
+                </Button>
+              </div>
+            ) : userProfile ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="cursor-pointer">
                     <Avatar className="w-9 h-9 border-2 border-gray-800 shadow-glow-xs">
-                      <AvatarImage src="/avatar-1.png" alt="User" />
-                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">DA</AvatarFallback>
+                      <AvatarImage src={userProfile.avatar || "/avatar-1.png"} alt="User" />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">
+                        {userProfile.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                   </motion.div>
                 </DropdownMenuTrigger>
@@ -226,12 +296,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                 >
                   <DropdownMenuLabel className="flex items-center space-x-2">
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src="/avatar-1.png" alt="User" />
-                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">DA</AvatarFallback>
+                      <AvatarImage src={userProfile.avatar || "/avatar-1.png"} alt="User" />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">
+                        {userProfile.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium text-gray-200">Alex Morgan</p>
-                      <p className="text-xs text-gray-400">alex@example.com</p>
+                      <p className="text-sm font-medium text-gray-200">{userProfile.name}</p>
+                      <p className="text-xs text-gray-400">{userProfile.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-gray-800" />
@@ -248,13 +320,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator className="bg-gray-800" />
-                  <DropdownMenuItem className="flex items-center cursor-pointer hover:bg-[#22252F] focus:bg-[#22252F]">
+                  <DropdownMenuItem 
+                    className="flex items-center cursor-pointer hover:bg-[#22252F] focus:bg-[#22252F]"
+                    onClick={handleSignOut}
+                  >
                     <LogOut className="w-4 h-4 mr-2 text-purple-400" />
-                    <span>Logout</span>
+                    <span>Sign Out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            ) : null}
           </div>
         </div>
       </header>
@@ -312,6 +387,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content */}
       <main className="pt-16 md:pt-20 md:pl-20 min-h-screen">{children}</main>
+
+      {/* Authentication Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
     </div>
   )
 }

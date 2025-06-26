@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { QueryProvider } from "@/providers/query-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 // Import the AuthProvider
 import { AuthProvider } from "@/lib/auth/auth-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -69,6 +70,11 @@ export default function RootLayout({
                 <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                   <div className="min-h-screen bg-background">{children}</div>
                   <Toaster />
+                  <SonnerToaster 
+                    position="top-right"
+                    richColors
+                    theme="dark"
+                  />
                 </ThemeProvider>
               </QueryProvider>
             </LocationProvider>

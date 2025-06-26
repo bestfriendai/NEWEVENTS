@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Home, ArrowLeft } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
+import { Home } from 'lucide-react'
 
 export default function NotFound() {
   return (
@@ -15,18 +16,13 @@ export default function NotFound() {
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-          <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
-            <Link href="/">
+          <Link href="/">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
               <Home className="mr-2 h-4 w-4" />
               Go Home
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
-            <Link href="javascript:history.back()">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Go Back
-            </Link>
-          </Button>
+            </Button>
+          </Link>
+          <BackButton />
         </div>
       </div>
     </div>

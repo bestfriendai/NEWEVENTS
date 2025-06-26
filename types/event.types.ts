@@ -24,6 +24,10 @@ export interface Event {
   tags?: string[]
   attendeeCount?: number
   isFavorite?: boolean
+  // Additional properties for compatibility
+  latitude?: number
+  longitude?: number
+  rating?: number
 }
 
 export interface EventFilters {
