@@ -102,3 +102,6 @@ jspm_packages/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+
+# Coders in Flow shadow git storage
+.codersinflow/
