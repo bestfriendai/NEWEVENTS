@@ -96,11 +96,21 @@ class UnifiedEventsService {
   private supabase
 
   constructor() {
-    this.supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: {
-        persistSession: false
-      }
-    })
+    // Check if Supabase URL is valid
+    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
+      this.supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: {
+          persistSession: false
+        }
+      })
+    } else {
+      // Create a mock client if Supabase is not configured
+      this.supabase = null
+      logger.warn('Supabase not configured properly, using mock mode')
+    }
   }
 
   /**
@@ -556,9 +566,9 @@ class UnifiedEventsService {
       }
 
       // Only get events cached in the last 4 hours for freshness
-      const fourHoursAgo = new Date()
-      fourHoursAgo.setHours(fourHoursAgo.getHours() - 4)
-      query = query.gte("created_at", fourHoursAgo.toISOString())
+      // const fourHoursAgo = new Date()
+      // fourHoursAgo.setHours(fourHoursAgo.getHours() - 4)
+      // query = query.gte("created_at", fourHoursAgo.toISOString())
 
       const { data, error } = await query.limit(params.limit || 100)
 
@@ -648,6 +658,16 @@ class UnifiedEventsService {
         component: "UnifiedEventsService",
         action: "storeEvents",
         metadata: { source, count: 0 },
+      });
+      return;
+    }
+    
+    // Skip if Supabase is not configured
+    if (!this.supabase) {
+      logger.info(`Skipping event storage - Supabase not configured`, {
+        component: "UnifiedEventsService",
+        action: "storeEvents",
+        metadata: { source, count: events.length },
       });
       return;
     }

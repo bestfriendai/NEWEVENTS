@@ -10,9 +10,8 @@ import { CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import type { Event } from "@/lib/types"
-import EventsMap from "./EventsMap"
-import EventsList from "./EventsList"
+import type { Event } from "@/types"
+import { EventsMap } from "./EventsMap"
 import EventsMapFallback from "./EventsMapFallback"
 
 interface DateAIEventsExplorerProps {
@@ -124,7 +123,6 @@ const DateAIEventsExplorer: React.FC<DateAIEventsExplorerProps> = ({ events }) =
             ) : (
               <EventsMap
                 events={filteredEvents}
-                center={userLocation ? [userLocation.lng, userLocation.lat] : [0, 0]}
                 selectedEvent={selectedEvent}
                 onEventSelect={setSelectedEvent}
                 onError={() => setMapError(true)}

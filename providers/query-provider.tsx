@@ -5,7 +5,7 @@
  * Provides global query client with performance optimizations
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache, useQueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState, ReactNode } from 'react'
 import { logger } from '@/lib/utils/logger'
@@ -22,8 +22,8 @@ function createQueryClient() {
         // Stale time - how long data is considered fresh
         staleTime: 5 * 60 * 1000, // 5 minutes
         
-        // Cache time - how long data stays in cache after becoming unused
-        cacheTime: 10 * 60 * 1000, // 10 minutes
+        // GC time - how long data stays in cache after becoming unused
+        gcTime: 10 * 60 * 1000, // 10 minutes
         
         // Retry configuration
         retry: (failureCount, error: any) => {
@@ -66,7 +66,7 @@ function createQueryClient() {
     },
     
     // Global error handler
-    queryCache: {
+    queryCache: new QueryCache({
       onError: (error, query) => {
         logger.error('Query error:', {
           error: error instanceof Error ? error.message : String(error),
@@ -74,10 +74,10 @@ function createQueryClient() {
           queryHash: query.queryHash,
         })
       },
-    },
+    }),
     
     // Global mutation error handler
-    mutationCache: {
+    mutationCache: new MutationCache({
       onError: (error, variables, context, mutation) => {
         logger.error('Mutation error:', {
           error: error instanceof Error ? error.message : String(error),
@@ -92,7 +92,7 @@ function createQueryClient() {
           variables,
         })
       },
-    },
+    }),
   })
 }
 
@@ -107,7 +107,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
       {process.env.NODE_ENV === 'development' && (
         <ReactQueryDevtools 
           initialIsOpen={false}
-          position="bottom-right"
+          position="bottom"
           toggleButtonProps={{
             style: {
               marginLeft: '5px',
@@ -217,7 +217,7 @@ export const queryUtils = {
 
 // Performance monitoring hook
 export function useQueryPerformance() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient ? useQueryClient() : null
   
   const getQueryStats = () => {
     const cache = queryClient.getQueryCache()

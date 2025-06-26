@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['mapbox-gl'],
   experimental: {
-    serverComponentsExternalPackages: ['mapbox-gl'],
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons']
   },
   eslint: {

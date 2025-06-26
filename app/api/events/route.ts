@@ -199,11 +199,11 @@ export async function GET(request: NextRequest) {
       sortOrder: searchParams.get("sortOrder") || "asc",
       tags: searchParams.get("tags") ? searchParams.get("tags")!.split(",") : [],
       source: searchParams.get("source") || "all",
-      hasImages: searchParams.get("hasImages"),
-      hasDescription: searchParams.get("hasDescription"),
-      forceRefresh: searchParams.get("forceRefresh"),
-      startDate: searchParams.get("startDate"),
-      endDate: searchParams.get("endDate"),
+      hasImages: searchParams.get("hasImages") || "false",
+      hasDescription: searchParams.get("hasDescription") || "false",
+      forceRefresh: searchParams.get("forceRefresh") || "false",
+      startDate: searchParams.get("startDate") || undefined,
+      endDate: searchParams.get("endDate") || undefined,
     }
 
     // Determine which validation to use (this logic might need to be revisited based on how useEnhancedValidation is set)

@@ -49,10 +49,7 @@ export function EventMap({ event }: EventMapProps) {
         }
 
         // Use the safe Mapbox utilities
-        mapInstance = await createMap(mapRef.current!, {
-          center: [lng, lat],
-          zoom: 14,
-        })
+        mapInstance = await createMap()
 
         // Create marker element
         const el = document.createElement("div")
@@ -70,18 +67,11 @@ export function EventMap({ event }: EventMapProps) {
         `
 
         // Create and add marker with no default styling
-        const marker = await createMarker({
-          element: el,
-          anchor: 'center'
-        })
+        const marker = await createMarker()
         marker.setLngLat([lng, lat]).addTo(mapInstance)
 
         // Create and add popup
-        const popup = await createPopup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 25,
-        })
+        const popup = await createPopup()
         popup
           .setLngLat([lng, lat])
           .setHTML(`<div class="p-2"><div class="font-medium text-sm">${event.title}</div></div>`)
@@ -101,7 +91,7 @@ export function EventMap({ event }: EventMapProps) {
 
     return () => {
       if (mapInstance) {
-        cleanupMap(mapInstance)
+        cleanupMap()
       }
     }
   }, [event])

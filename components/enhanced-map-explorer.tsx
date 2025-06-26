@@ -18,7 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { env } from "@/lib/env"
 import { cn } from "@/lib/utils"
-import { logger } from "@/lib/utils/logger"
+import { logger, logError } from "@/lib/utils/logger"
 import { fetchEvents } from "@/app/actions/event-actions"
 import { reverseGeocode } from "@/lib/api/map-api"
 import type { EventDetail } from "@/types/event.types"
@@ -277,10 +277,10 @@ logger.info("Initializing map", {
         }
       })
     } catch (err) {
-      logger.error("Error initializing map", {
+      logError("Error initializing map", err instanceof Error ? err : new Error(String(err)), {
         component: "EnhancedMapExplorer",
         action: "map_init_error"
-      }, err instanceof Error ? err : new Error(String(err)))
+      })
       const error = err as Error
       if (error.message && error.message.includes("401")) {
         setMapError("Invalid Mapbox API key. Please check your configuration.")
@@ -560,10 +560,10 @@ try {
         action: "layer_init_success"
       })
     } catch (error) {
-      logger.error("Error initializing map layers", {
+      logError("Error initializing map layers", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "layer_init_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       setMapError("Error setting up map features. Please refresh the page.")
     }
   }, [events, showClusters, showTerrain, show3DBuildings])
@@ -606,10 +606,10 @@ try {
         "waterway-label",
       )
     } catch (error) {
-      logger.error("Error adding 3D buildings", {
+      logError("Error adding 3D buildings", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "3d_buildings_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [])
 
@@ -622,10 +622,10 @@ try {
         mapRef.current.removeLayer("3d-buildings")
       }
     } catch (error) {
-      logger.error("Error removing 3D buildings", {
+      logError("Error removing 3D buildings", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "3d_buildings_remove_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [])
 
@@ -661,10 +661,10 @@ try {
         },
       })
     } catch (error) {
-      logger.error("Error adding terrain", {
+      logError("Error adding terrain", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "terrain_add_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [])
 
@@ -686,10 +686,10 @@ try {
         mapRef.current.removeSource("mapbox-dem")
       }
     } catch (error) {
-      logger.error("Error removing terrain", {
+      logError("Error removing terrain", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "terrain_remove_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [])
 
@@ -722,10 +722,10 @@ try {
 
       clusterLayerRef.current = "clusters"
     } catch (error) {
-      logger.error("Error adding cluster layers", {
+      logError("Error adding cluster layers", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "cluster_layers_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [])
 
@@ -737,10 +737,10 @@ try {
       mapRef.current.setStyle(`mapbox://styles/mapbox/${mapStyle}`)
       styleLoadedRef.current = false // Reset style loaded flag
     } catch (error) {
-      logger.error("Error updating map style", {
+      logError("Error updating map style", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "style_update_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
       setMapError("Error updating map style. Please refresh the page.")
     }
   }, [mapStyle, mapboxLoaded])
@@ -756,10 +756,10 @@ try {
         remove3DBuildingsFromMap()
       }
     } catch (error) {
-      logger.error("Error toggling 3D buildings", {
+      logError("Error toggling 3D buildings", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "3d_buildings_toggle_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [show3DBuildings, mapboxLoaded, add3DBuildingsToMap, remove3DBuildingsFromMap])
 
@@ -774,10 +774,10 @@ try {
         removeTerrainFromMap()
       }
     } catch (error) {
-      logger.error("Error toggling terrain", {
+      logError("Error toggling terrain", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "terrain_toggle_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [showTerrain, mapboxLoaded, addTerrainToMap, removeTerrainFromMap])
 
@@ -792,10 +792,10 @@ try {
       // Force refresh by updating the data
       updateGeoJsonSource()
     } catch (error) {
-      logger.error("Error toggling clustering", {
+      logError("Error toggling clustering", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "clustering_toggle_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [showClusters, mapboxLoaded])
 
@@ -849,10 +849,10 @@ logger.info("Generated GeoJSON features", {
         features,
       })
     } catch (error) {
-      logger.error("Error updating GeoJSON source", {
+      logError("Error updating GeoJSON source", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "geojson_update_error"
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
     }
   }, [filteredEvents])
 
@@ -879,10 +879,10 @@ logger.info("Generated GeoJSON features", {
             const locationName = await reverseGeocode(latitude, longitude)
             setDefaultLocation({ name: locationName, lat: latitude, lng: longitude })
           } catch (error) {
-            logger.error("Error getting location name", {
+            logError("Error getting location name", error instanceof Error ? error : new Error(String(error)), {
               component: "EnhancedMapExplorer",
               action: "location_name_error"
-            }, error instanceof Error ? error : new Error(String(error)))
+            })
             setDefaultLocation({ name: "Your Location", lat: latitude, lng: longitude })
           }
 
@@ -935,10 +935,10 @@ logger.info("Generated GeoJSON features", {
           // Location request completed
         },
         (error) => {
-          logger.error("Error getting location", {
+          logError("Error getting location", error instanceof Error ? error : new Error(String(error)), {
             component: "EnhancedMapExplorer",
             action: "geolocation_error"
-          }, error instanceof Error ? error : new Error(String(error)))
+          })
           setMapError(
             error.code === 1
               ? "Location permission denied. Please enable location services to see events near you."
@@ -1013,11 +1013,11 @@ logger.info("Events processed with coordinates", {
       setEvents(eventsWithCoordinates)
       setFilteredEvents(eventsWithCoordinates)
     } catch (error) {
-      logger.error("Error loading events", {
+      logError("Error loading events", error instanceof Error ? error : new Error(String(error)), {
         component: "EnhancedMapExplorer",
         action: "load_events_error",
         metadata: { lat, lng, radius }
-      }, error instanceof Error ? error : new Error(String(error)))
+      })
 
       // Set empty events on error
       setEvents([])
