@@ -50,7 +50,9 @@
       "Bash(pkill:*)",
       "Bash(true)",
       "Bash(supabase secrets:*)",
-      "Bash(supabase functions:*)"
+      "Bash(supabase functions:*)",
+      "Bash(supabase migration:*)",
+      "Bash(supabase db:*)"
     ],
     "deny": []
   },

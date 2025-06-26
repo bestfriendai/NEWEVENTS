@@ -177,12 +177,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             >
               <DropdownMenuLabel className="flex items-center space-x-2">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src="/avatar-1.png" alt="User" />
-                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">DA</AvatarFallback>
+                  <AvatarImage src={userProfile?.avatar || "/avatar-1.png"} alt="User" />
+                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-700">
+                    {userProfile?.name.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium text-gray-200">Alex Morgan</p>
-                  <p className="text-xs text-gray-400">alex@example.com</p>
+                  <p className="text-sm font-medium text-gray-200">{userProfile?.name || "User"}</p>
+                  <p className="text-xs text-gray-400">{userProfile?.email || ""}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-gray-800" />
@@ -199,7 +201,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </DropdownMenuItem>
               </Link>
               <DropdownMenuSeparator className="bg-gray-800" />
-              <DropdownMenuItem className="flex items-center cursor-pointer hover:bg-[#22252F] focus:bg-[#22252F]">
+              <DropdownMenuItem 
+                onClick={handleSignOut}
+                className="flex items-center cursor-pointer hover:bg-[#22252F] focus:bg-[#22252F]"
+              >
                 <LogOut className="w-4 h-4 mr-2 text-purple-400" />
                 <span>Logout</span>
               </DropdownMenuItem>

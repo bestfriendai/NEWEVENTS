@@ -2,97 +2,232 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { EventDetailModal } from "@/components/event-detail-modal";
-import type { EventDetail } from "@/types/event.types";
+import { AppLayout } from "@/components/app-layout"
+import { EventDetailModal } from "@/components/event-detail-modal"
 import { FavoritesHeader } from "@/components/favorites/favorites-header"
 import { FavoritesFilters } from "@/components/favorites/favorites-filters"
 import { EmptyFavorites } from "@/components/favorites/empty-favorites"
 import { FavoritesFooter } from "@/components/favorites/favorites-footer"
 import { EventCard } from "@/components/event-card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Calendar, MapPin, Heart, Loader2 } from "lucide-react"
+import { useFavorites, useFavoriteToggle } from "@/contexts/FavoritesContext"
+import { getSupabaseClient } from "@/lib/auth/anonymous-auth"
+import { useAuth } from "@/lib/auth/auth-provider"
+import type { EventDetail } from "@/types/event.types"
+import type { Event } from "@/types/event.types"
 
-// Sample favorites data
-const initialFavorites: EventDetail[] = [
-  {
-    id: 102,
-    title: "Underground Techno Night",
-    description:
-      "Dive into the underground techno scene with this exclusive warehouse party featuring cutting-edge techno artists and producers. The raw industrial setting creates the perfect atmosphere for authentic techno sounds and minimalist aesthetics. Limited capacity ensures an intimate experience for true techno enthusiasts.",
-    category: "Techno",
-    date: "May 29, 2025",
-    time: "11:00 PM - 6:00 AM",
-    location: "The Warehouse",
-    address: "456 Industrial Ave, Eastside",
-    price: "$40",
-    image: "/vibrant-community-event.png?height=400&width=600&query=underground techno party",
-    organizer: {
-      name: "Techno Collective",
-      avatar: "/avatar-2.png?height=40&width=40&query=techno dj",
-    },
-    attendees: 450,
-    isFavorite: true,
-  },
-  {
-    id: 105,
-    title: "80s Retro Dance Night",
-    description:
-      "Step back in time to the golden era of synth-pop, new wave, and disco at our 80s themed dance party. Dress in your best retro outfits and dance to iconic hits from Madonna, Michael Jackson, Prince, and more. Our vintage decorations, light shows, and special themed cocktails create an authentic 80s atmosphere.",
-    category: "Retro",
-    date: "June 1, 2025",
-    time: "8:00 PM - 2:00 AM",
-    location: "Flashback Lounge",
-    address: "202 Memory Lane, Midtown",
-    price: "$30",
-    image: "/vibrant-community-event.png?height=400&width=600&query=80s retro dance party",
-    organizer: {
-      name: "Time Machine Events",
-      avatar: "/avatar-5.png?height=40&width=40&query=retro dj",
-    },
-    attendees: 540,
-    isFavorite: true,
-  },
-  {
-    id: 2,
-    title: "Urban Art Exhibition",
-    description:
-      "Explore the vibrant world of urban art at this exclusive exhibition featuring works from renowned street artists and emerging talents. Witness live painting demonstrations, participate in interactive workshops, and immerse yourself in the creative energy of the urban art scene.",
-    category: "Art",
-    date: "May 22, 2025",
-    time: "10:00 AM - 6:00 PM",
-    location: "Modern Gallery",
-    address: "456 Art Avenue, Cultural District",
-    price: "$25",
-    image: "/vibrant-community-event.png?height=400&width=600&query=urban art exhibition",
-    organizer: {
-      name: "Art Collective",
-      avatar: "/avatar-2.png?height=40&width=40&query=art curator",
-    },
-    attendees: 520,
-    isFavorite: true,
-  },
-]
+function FavoriteEventCard({ event }: { event: Event }) {
+  const { toggleFavorite } = useFavoriteToggle()
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  const formatPrice = (event: Event) => {
+    if (!event.price) return "Free"
+    if (event.price.min === event.price.max) {
+      return `${event.price.currency || 'USD'} ${event.price.min}`
+    }
+    return `${event.price.currency || 'USD'} ${event.price.min}${event.price.max ? ` - ${event.price.max}` : '+'}`
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="group"
+    >
+      <Card className="overflow-hidden bg-[#1A1D25]/60 border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10">
+        <div className="relative">
+          {event.image && (
+            <img
+              src={event.image}
+              alt={event.title}
+              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=200&fit=crop&q=80`
+              }}
+            />
+          )}
+          <div className="absolute top-3 right-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full backdrop-blur-sm bg-red-500/80 text-white hover:bg-red-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleFavorite(event.id.toString())
+              }}
+            >
+              <Heart className="h-4 w-4 fill-current" />
+            </Button>
+          </div>
+          <div className="absolute top-3 left-3">
+            <Badge variant="secondary" className="bg-purple-600/80 text-white">
+              {event.source}
+            </Badge>
+          </div>
+        </div>
+
+        <CardContent className="p-4 space-y-3">
+          <div className="space-y-2">
+            <h3 className="font-semibold text-white text-lg line-clamp-2 group-hover:text-purple-400 transition-colors">
+              {event.title}
+            </h3>
+            <p className="text-gray-400 text-sm line-clamp-2">
+              {event.description || "No description available"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <Calendar className="h-4 w-4 text-purple-400" />
+            <span>{formatDate(event.date)}</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <MapPin className="h-4 w-4 text-purple-400" />
+            <span className="line-clamp-1">
+              {event.location.name || event.location.city || event.location.address || "Location TBD"}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-purple-400 border-purple-400/50">
+                {event.category}
+              </Badge>
+              <span className="text-lg font-semibold text-green-400">
+                {formatPrice(event)}
+              </span>
+            </div>
+          </div>
+
+          {event.url && (
+            <Button
+              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+              onClick={(e) => {
+                e.stopPropagation()
+                window.open(event.url, '_blank')
+              }}
+            >
+              Get Tickets
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
 
 export default function FavoritesPage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isPageLoading, setIsPageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
-  const [favorites, setFavorites] = useState<EventDetail[]>(initialFavorites)
+  const [favoriteEvents, setFavoriteEvents] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<EventDetail | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [isSearching, setIsSearching] = useState(false)
-  const [filteredFavorites, setFilteredFavorites] = useState<EventDetail[]>(initialFavorites)
+  const [filteredFavorites, setFilteredFavorites] = useState<Event[]>([])
+  
+  const { favorites, isLoading: isFavoritesLoading } = useFavorites()
+  const { isAuthenticated } = useAuth()
 
+  // Load favorite events from database
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [])
+    const loadFavoriteEvents = async () => {
+      if (!isAuthenticated || favorites.length === 0) {
+        setFavoriteEvents([])
+        setIsPageLoading(false)
+        return
+      }
+
+      try {
+        const supabase = getSupabaseClient()
+        if (!supabase) {
+          setIsPageLoading(false)
+          return
+        }
+
+        // Fetch events data for all favorite IDs
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .in('id', favorites.map(id => parseInt(id)))
+          .eq('is_active', true)
+
+        if (error) {
+          console.error('Error loading favorite events:', error)
+        } else if (data) {
+          // Transform database events to match Event type
+          const transformedEvents: Event[] = data.map(event => ({
+            id: event.id,
+            externalId: event.external_id,
+            title: event.title || '',
+            description: event.description || '',
+            category: event.category || 'Other',
+            date: event.start_date,
+            endDate: event.end_date,
+            location: {
+              name: event.location_name || '',
+              address: event.location_address || '',
+              city: event.location_city || '',
+              state: event.location_state || '',
+              country: event.location_country || '',
+              lat: event.location_lat || 0,
+              lng: event.location_lng || 0
+            },
+            image: event.image_url || '',
+            url: event.ticket_url || '',
+            source: event.source || 'database',
+            price: {
+              min: event.price_min || 0,
+              max: event.price_max || 0,
+              currency: event.price_currency || 'USD'
+            },
+            organizer: {
+              name: event.organizer_name || '',
+              url: event.organizer_url || ''
+            },
+            venue: {
+              id: event.venue_id || '',
+              name: event.venue_name || event.location_name || '',
+              address: event.location_address || ''
+            },
+            isVirtual: event.is_virtual || false,
+            isFeatured: event.is_featured || false,
+            rating: event.popularity_score || 0
+          }))
+
+          setFavoriteEvents(transformedEvents)
+        }
+      } catch (error) {
+        console.error('Error loading favorite events:', error)
+      } finally {
+        setIsPageLoading(false)
+      }
+    }
+
+    loadFavoriteEvents()
+  }, [favorites, isAuthenticated])
 
   // Filter favorites when search query or active tab changes
   useEffect(() => {
-    let filtered = [...favorites]
+    let filtered = [...favoriteEvents]
 
     // Filter by search query
     if (searchQuery) {
@@ -100,116 +235,168 @@ export default function FavoritesPage() {
       filtered = filtered.filter(
         (event) =>
           event.title.toLowerCase().includes(query) ||
-          event.location.toLowerCase().includes(query) ||
-          event.category.toLowerCase().includes(query),
+          event.description?.toLowerCase().includes(query) ||
+          event.category.toLowerCase().includes(query) ||
+          event.location.name?.toLowerCase().includes(query) ||
+          event.location.city?.toLowerCase().includes(query)
       )
     }
 
     // Filter by tab
     if (activeTab !== "all") {
       if (activeTab === "upcoming") {
-        // Filter for upcoming events (simple implementation)
-        const today = new Date()
-        filtered = filtered.filter((event) => {
-          const eventDate = new Date(event.date)
-          return eventDate >= today
-        })
+        filtered = filtered.filter((event) => new Date(event.date) > new Date())
+      } else if (activeTab === "past") {
+        filtered = filtered.filter((event) => new Date(event.date) <= new Date())
       } else {
         // Filter by category
-        filtered = filtered.filter((event) => event.category.toLowerCase() === activeTab.toLowerCase())
+        filtered = filtered.filter((event) => 
+          event.category.toLowerCase().includes(activeTab.toLowerCase())
+        )
       }
     }
 
-    setFilteredFavorites(filtered)
-  }, [favorites, searchQuery, activeTab])
+    // Sort by date
+    filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-  const handleViewEventDetails = (event: EventDetail) => {
-    setSelectedEvent(event)
+    setFilteredFavorites(filtered)
+  }, [searchQuery, activeTab, favoriteEvents])
+
+  const handleViewDetails = (event: Event) => {
+    // Convert to EventDetail format for modal
+    const eventDetail: EventDetail = {
+      id: event.id,
+      title: event.title,
+      description: event.description || '',
+      category: event.category,
+      date: new Date(event.date).toLocaleDateString(),
+      time: new Date(event.date).toLocaleTimeString(),
+      location: event.location.name || event.location.city || '',
+      address: event.location.address || '',
+      price: event.price ? `$${event.price.min}${event.price.max ? `-${event.price.max}` : ''}` : 'Free',
+      image: event.image || '',
+      organizer: {
+        name: event.organizer?.name || 'Unknown',
+        avatar: '/avatar-1.png'
+      },
+      attendees: Math.floor(Math.random() * 1000) + 100,
+      isFavorite: true
+    }
+    setSelectedEvent(eventDetail)
     setIsModalOpen(true)
   }
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setTimeout(() => setSelectedEvent(null), 300) // Clear after animation completes
+  const handleRemoveFavorite = () => {
+    if (selectedEvent) {
+      setFavoriteEvents(prev => prev.filter(e => e.id !== selectedEvent.id))
+      setIsModalOpen(false)
+    }
   }
 
-  const handleRemoveFavorite = (id: number) => {
-    setFavorites((prev) => prev.filter((event) => event.id !== id))
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
   }
 
-  const handleSearch = () => {
-    setIsSearching(true)
-    // Simulate search delay
-    setTimeout(() => {
-      setIsSearching(false)
-    }, 800)
+  if (!isAuthenticated) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen bg-gradient-to-b from-[#0A0B10] via-[#0F1419] to-[#0A0B10] py-8">
+          <div className="container mx-auto px-4">
+            <div className="text-center py-20">
+              <Heart className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-2">Sign in to view favorites</h2>
+              <p className="text-gray-400">
+                Create an account to save your favorite events
+              </p>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    )
   }
+
+  const isLoading = isPageLoading || isFavoritesLoading
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0F1116] text-gray-200">
-      {/* Header */}
-      <FavoritesHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+    <AppLayout>
+      <div className="min-h-screen bg-gradient-to-b from-[#0A0B10] via-[#0F1419] to-[#0A0B10] py-8">
+        <div className="container mx-auto px-4 space-y-8">
+          <FavoritesHeader
+            totalFavorites={favoriteEvents.length}
+            isSearching={false}
+            onSearch={handleSearch}
+          />
 
-      {/* Main content */}
-      <main className="flex-1 p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-[80vh]">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
-              <p className="text-gray-400">Loading your favorites...</p>
-            </motion.div>
-          </div>
-        ) : (
-          <>
-            <FavoritesFilters
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              isSearching={isSearching}
-              handleSearch={handleSearch}
-            />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-4" />
+                <p className="text-gray-400">Loading your favorites...</p>
+              </div>
+            </div>
+          ) : favoriteEvents.length === 0 ? (
+            <EmptyFavorites />
+          ) : (
+            <>
+              <FavoritesFilters
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                favorites={favoriteEvents}
+              />
 
-            <Tabs defaultValue="all" className="mt-0">
-              <TabsContent value="all" className="mt-0">
-                {filteredFavorites.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredFavorites.map((event, i) => (
-                      <motion.div
-                        key={event.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 * i, duration: 0.4 }}
-                        whileHover={{ y: -5 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        layout
-                      >
-                        <EventCard
-                          event={event}
-                          onViewDetails={() => handleViewEventDetails(event)}
-                          onToggleFavorite={() => handleRemoveFavorite(event.id)}
-                          index={i}
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyFavorites searchQuery={searchQuery} />
-                )}
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </main>
+              <Tabs value={activeTab} className="w-full">
+                <TabsContent value={activeTab} className="mt-6">
+                  {filteredFavorites.length === 0 ? (
+                    <div className="text-center py-20">
+                      <Heart className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-400">
+                        No {activeTab === "all" ? "" : activeTab} favorites found
+                      </h3>
+                      <p className="text-gray-500 mt-2">
+                        {searchQuery
+                          ? "Try adjusting your search"
+                          : "Events you favorite will appear here"}
+                      </p>
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                    >
+                      {filteredFavorites.map((event, index) => (
+                        <motion.div
+                          key={event.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          onClick={() => handleViewDetails(event)}
+                          className="cursor-pointer"
+                        >
+                          <FavoriteEventCard event={event} />
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+                </TabsContent>
+              </Tabs>
 
-      {/* Footer */}
-      <FavoritesFooter />
+              {filteredFavorites.length > 0 && (
+                <FavoritesFooter totalEvents={filteredFavorites.length} />
+              )}
+            </>
+          )}
+        </div>
+      </div>
 
-      {/* Event Detail Modal */}
-      <EventDetailModal
-        event={selectedEvent}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onFavorite={handleRemoveFavorite}
-      />
-    </div>
+      {selectedEvent && (
+        <EventDetailModal
+          event={selectedEvent}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onToggleFavorite={handleRemoveFavorite}
+        />
+      )}
+    </AppLayout>
   )
 }

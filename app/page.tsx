@@ -1,191 +1,388 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import dynamic from "next/dynamic"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { AppLayout } from "@/components/app-layout"
-import { MapPin, Search, ArrowRight, Users, Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { LocationSelector } from "@/components/location-selector"
+import { useLocation } from "@/hooks/use-location"
+import { useRealEvents } from "@/hooks/use-real-events"
+import { useFavoriteToggle } from "@/contexts/FavoritesContext"
+import { 
+  Search, 
+  MapPin, 
+  Calendar, 
+  Music, 
+  Palette, 
+  Trophy, 
+  Utensils,
+  Briefcase,
+  Film,
+  Heart,
+  TrendingUp,
+  Users,
+  Clock,
+  Sparkles,
+  ArrowRight,
+  Loader2
+} from "lucide-react"
 
-// Dynamic import for COBE globe (properly implemented)
-const CobeGlobe = dynamic(() => import("@/components/cobe-globe"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-[600px] h-[600px] max-w-full aspect-square rounded-full bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="w-8 h-8 text-purple-400 mx-auto mb-4 animate-spin" />
-        <p className="text-gray-400 text-sm">Loading Interactive Globe...</p>
-      </div>
-    </div>
-  ),
-})
+// Event categories with icons and colors
+const CATEGORIES = [
+  { id: "Music", label: "Music", icon: Music, color: "from-purple-600 to-pink-600" },
+  { id: "Arts & Culture", label: "Arts", icon: Palette, color: "from-pink-600 to-rose-600" },
+  { id: "Sports", label: "Sports", icon: Trophy, color: "from-green-600 to-emerald-600" },
+  { id: "Food & Drink", label: "Food", icon: Utensils, color: "from-orange-600 to-red-600" },
+  { id: "Business", label: "Business", icon: Briefcase, color: "from-gray-600 to-slate-600" },
+  { id: "Entertainment", label: "Entertainment", icon: Film, color: "from-yellow-600 to-orange-600" },
+]
+
+function EventCard({ event }: { event: any }) {
+  const { toggleFavorite, isFavorite } = useFavoriteToggle()
+  const isFav = isFavorite(event.id.toString())
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -5 }}
+      className="group cursor-pointer"
+    >
+      <Card className="overflow-hidden bg-[#1A1D25]/60 border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 h-full">
+        <div className="relative h-48">
+          {event.image && (
+            <img
+              src={event.image}
+              alt={event.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=200&fit=crop&q=80`
+              }}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute top-3 right-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`rounded-full backdrop-blur-sm transition-colors ${
+                isFav
+                  ? "bg-red-500/80 text-white hover:bg-red-600"
+                  : "bg-black/30 text-white hover:bg-black/50"
+              }`}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleFavorite(event.id.toString())
+              }}
+            >
+              <Heart className={`h-4 w-4 ${isFav ? "fill-current" : ""}`} />
+            </Button>
+          </div>
+          <div className="absolute bottom-3 left-3">
+            <Badge className="bg-purple-600/80 text-white">
+              {event.category}
+            </Badge>
+          </div>
+        </div>
+
+        <CardContent className="p-4 space-y-3">
+          <h3 className="font-semibold text-white text-lg line-clamp-2 group-hover:text-purple-400 transition-colors">
+            {event.title}
+          </h3>
+
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <Calendar className="h-4 w-4 text-purple-400" />
+            <span>{formatDate(event.date)}</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <MapPin className="h-4 w-4 text-purple-400" />
+            <span className="line-clamp-1">
+              {event.location.city || event.location.name || "Location TBD"}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
 
 export default function Home() {
-  const [isClient, setIsClient] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const { location } = useLocation()
+  const { 
+    featuredEvents, 
+    isFeaturedLoading, 
+    loadFeaturedEvents,
+    searchEvents
+  } = useRealEvents()
 
-  // Simple client-side check
-  if (typeof window !== "undefined" && !isClient) {
-    setIsClient(true)
+  // Load featured events on mount and when location changes
+  useEffect(() => {
+    const locationString = location.city && location.state 
+      ? `${location.city}, ${location.state}` 
+      : "United States"
+    loadFeaturedEvents(locationString, 8)
+  }, [location, loadFeaturedEvents])
+
+  const handleSearch = () => {
+    if (!searchQuery.trim() && !selectedCategory) return
+    
+    // Navigate to events page with search params
+    const params = new URLSearchParams()
+    if (searchQuery) params.set('q', searchQuery)
+    if (selectedCategory) params.set('category', selectedCategory)
+    window.location.href = `/events?${params.toString()}`
+  }
+
+  const handleCategoryClick = (categoryId: string) => {
+    setSelectedCategory(categoryId)
+    window.location.href = `/events?category=${categoryId}`
   }
 
   return (
     <AppLayout>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#0A0B10] via-[#0F1419] to-[#0A0B10] pt-10 pb-16 md:pt-16 md:pb-24 lg:pt-20 lg:pb-32 min-h-[90vh] flex items-center">
-        {/* Animated Background Elements */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0A0B10] via-[#0F1419] to-[#0A0B10] pt-16 pb-20">
+        {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden">
-          {/* Gradient orbs */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-2000"></div>
+          <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Hero Content */}
-            <div className="text-center lg:text-left space-y-6">
-              <div className="space-y-4">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-                  Discover Amazing{" "}
-                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-                    Events
-                  </span>{" "}
-                  Near You
-                </h1>
-                <p className="text-lg md:text-xl text-gray-300 mb-6 md:mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                  DateAI uses artificial intelligence to help you discover events that perfectly match your interests and
-                  preferences around the globe.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                <Link href="/events">
-                  <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105">
-                    Explore Events
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link href="/create-event">
-                  <Button
-                    variant="outline"
-                    className="border-gray-700 text-white py-6 px-8 rounded-xl text-base font-medium hover:bg-white/5 backdrop-blur-sm"
-                  >
-                    Create Event
-                  </Button>
-                </Link>
-              </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-8 max-w-4xl mx-auto"
+          >
+            <div className="space-y-4">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight">
+                Find Your Next
+                <span className="block bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                  Amazing Event
+                </span>
+              </h1>
+              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                Discover concerts, festivals, sports, and more happening near you
+              </p>
             </div>
 
-            {/* Interactive Globe Container */}
-            <div className="relative mx-auto max-w-4xl">
-              <div className="relative z-10 flex justify-center">
-                <div className="relative">
-                  {/* Interactive COBE Globe */}
-                  <CobeGlobe
-                    size={600}
-                    className="drop-shadow-2xl"
-                    markers={[
-                      { location: [37.7595, -122.4367], size: 0.04 }, // San Francisco
-                      { location: [40.7128, -74.0060], size: 0.04 },  // New York
-                      { location: [51.5074, -0.1278], size: 0.04 },   // London
-                      { location: [35.6762, 139.6503], size: 0.04 },  // Tokyo
-                      { location: [48.8566, 2.3522], size: 0.04 },    // Paris
-                      { location: [-33.8688, 151.2093], size: 0.04 }, // Sydney
-                      { location: [19.4326, -99.1332], size: 0.04 },  // Mexico City
-                      { location: [-22.9068, -43.1729], size: 0.04 }, // Rio de Janeiro
-                      { location: [55.7558, 37.6173], size: 0.04 },   // Moscow
-                      { location: [39.9042, 116.4074], size: 0.04 },  // Beijing
-                      { location: [34.0522, -118.2437], size: 0.04 }, // Los Angeles
-                      { location: [19.076, 72.8777], size: 0.04 },    // Mumbai
-                    ]}
+            {/* Search Bar */}
+            <div className="bg-[#1A1D25]/60 backdrop-blur-md rounded-2xl border border-gray-800/50 p-6 shadow-2xl">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Input
+                    placeholder="Search events, artists, venues..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="pl-12 h-14 bg-[#0F1116] border-gray-700 text-white text-lg"
                   />
-                  {/* Enhanced Glow effect around globe */}
-                  <div className="absolute inset-0 bg-gradient-radial from-purple-500/30 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none"></div>
-                  <div className="absolute inset-0 bg-gradient-radial from-blue-500/20 via-transparent to-transparent rounded-full blur-3xl pointer-events-none"></div>
                 </div>
-              </div>
-
-              {/* Floating particles effect */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-purple-400 rounded-full opacity-60 animate-pulse"></div>
-                <div className="absolute top-3/4 right-1/4 w-1 h-1 bg-blue-400 rounded-full opacity-40 animate-pulse delay-1000"></div>
-                <div className="absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-pink-400 rounded-full opacity-50 animate-pulse delay-2000"></div>
-                <div className="absolute top-1/2 right-1/3 w-1 h-1 bg-indigo-400 rounded-full opacity-30 animate-pulse delay-3000"></div>
+                <LocationSelector className="h-14" />
+                <Button 
+                  onClick={handleSearch}
+                  className="h-14 px-8 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-lg"
+                >
+                  <Search className="mr-2 h-5 w-5" />
+                  Search
+                </Button>
               </div>
             </div>
+
+            {/* Quick Stats */}
+            <div className="flex flex-wrap justify-center gap-8 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="flex items-center gap-2"
+              >
+                <TrendingUp className="h-5 w-5 text-purple-400" />
+                <span className="text-gray-300">
+                  <span className="text-2xl font-bold text-white">1000+</span> Events Daily
+                </span>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-2"
+              >
+                <Users className="h-5 w-5 text-purple-400" />
+                <span className="text-gray-300">
+                  <span className="text-2xl font-bold text-white">50K+</span> Active Users
+                </span>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="flex items-center gap-2"
+              >
+                <MapPin className="h-5 w-5 text-purple-400" />
+                <span className="text-gray-300">
+                  <span className="text-2xl font-bold text-white">200+</span> Cities
+                </span>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-16 bg-[#0A0B10]">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-10"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Browse by Category
+            </h2>
+            <p className="text-gray-400 text-lg">
+              Find events that match your interests
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {CATEGORIES.map((category, index) => {
+              const Icon = category.icon
+              return (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  onClick={() => handleCategoryClick(category.id)}
+                  className="group cursor-pointer"
+                >
+                  <Card className="bg-[#1A1D25]/60 border-gray-800/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 p-6 text-center">
+                    <div className={`w-16 h-16 mx-auto mb-4 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                      <Icon className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-white font-medium group-hover:text-purple-400 transition-colors">
+                      {category.label}
+                    </h3>
+                  </Card>
+                </motion.div>
+              )
+            })}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 md:py-24 bg-[#0A0B10]">
+      {/* Featured Events */}
+      <section className="py-16 bg-gradient-to-b from-[#0A0B10] to-[#0F1419]">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-              Why Choose DateAI?
-            </h2>
-            <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-              Discover the perfect events with our AI-powered platform that understands your preferences and connects you with amazing experiences.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-[#12141D]/80 backdrop-blur-md rounded-xl p-6 border border-gray-800/50 hover:border-purple-500/30 transition-all duration-300">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl flex items-center justify-center mb-4">
-                <Search className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">Smart Discovery</h3>
-              <p className="text-gray-400">
-                Our AI analyzes your preferences to suggest events you&apos;ll love, from concerts to workshops and everything in between.
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="flex items-center justify-between mb-10"
+          >
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+                <Sparkles className="h-8 w-8 text-purple-400" />
+                Featured Events Near You
+              </h2>
+              <p className="text-gray-400 text-lg">
+                {location.city ? `Happening in ${location.city}` : 'Top events in your area'}
               </p>
             </div>
+            <Link href="/events">
+              <Button variant="outline" className="border-gray-700 hover:border-purple-500">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
 
-            <div className="bg-[#12141D]/80 backdrop-blur-md rounded-xl p-6 border border-gray-800/50 hover:border-purple-500/30 transition-all duration-300">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl flex items-center justify-center mb-4">
-                <MapPin className="w-6 h-6 text-white" />
+          {isFeaturedLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-4" />
+                <p className="text-gray-400">Loading amazing events...</p>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-3">Location-Based</h3>
-              <p className="text-gray-400">
-                Find events happening near you or explore exciting opportunities in cities around the world.
-              </p>
             </div>
-
-            <div className="bg-[#12141D]/80 backdrop-blur-md rounded-xl p-6 border border-gray-800/50 hover:border-purple-500/30 transition-all duration-300">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl flex items-center justify-center mb-4">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">Community Driven</h3>
-              <p className="text-gray-400">
-                Connect with like-minded people and build lasting relationships through shared experiences and interests.
-              </p>
+          ) : featuredEvents.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredEvents.slice(0, 8).map((event) => (
+                <Link key={event.id} href={`/events/${event.id}`}>
+                  <EventCard event={event} />
+                </Link>
+              ))}
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-20">
+              <MapPin className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-400 mb-2">No events found</h3>
+              <p className="text-gray-500 mb-6">
+                Try adjusting your location or check back later
+              </p>
+              <Link href="/events">
+                <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700">
+                  Browse All Events
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 md:py-24 bg-gradient-to-r from-purple-900/20 to-indigo-900/20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Discover Amazing Events?</h2>
-          <p className="text-lg text-gray-300 mb-8">
-            Join thousands of users who are finding the perfect events for their next adventure.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/events">
-              <Button className="bg-white hover:bg-gray-100 text-gray-900 py-6 px-8 rounded-xl text-base font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 w-full sm:w-auto">
-                Start Exploring
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/create-event">
-              <Button
-                variant="outline"
-                className="border-gray-700 text-white py-6 px-8 rounded-xl text-base font-medium hover:bg-white/5 backdrop-blur-sm w-full sm:w-auto"
-              >
-                Create Event
-              </Button>
-            </Link>
-          </div>
+      <section className="py-20 bg-[#0F1419]">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-gradient-to-r from-purple-600/20 to-indigo-600/20 rounded-3xl border border-purple-500/30 p-12 text-center"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Ready to Discover Amazing Events?
+            </h2>
+            <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
+              Join thousands of people finding their perfect events every day
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Link href="/events">
+                <Button size="lg" className="bg-white hover:bg-gray-100 text-gray-900 px-8">
+                  Explore Events
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/create-event">
+                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 px-8">
+                  Host an Event
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </section>
     </AppLayout>

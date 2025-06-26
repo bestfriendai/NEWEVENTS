@@ -6,6 +6,9 @@ export interface LocationData {
   lng: number
   name: string
   address: string
+  city?: string
+  state?: string
+  country?: string
 }
 
 // Function to geocode an address using Mapbox (primary) or TomTom (fallback)
@@ -414,4 +417,86 @@ export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2
 
 function toRad(degrees: number): number {
   return (degrees * Math.PI) / 180
+}
+
+// Alias for geocodeAddress to match usage in components
+export const geocodeLocation = geocodeAddress
+
+// Function to reverse geocode coordinates and return detailed location data
+export async function reverseGeocodeCoordinates(lat: number, lng: number): Promise<LocationData | null> {
+  try {
+    if (typeof lat !== "number" || typeof lng !== "number" || isNaN(lat) || isNaN(lng)) {
+      console.error("Invalid coordinates for reverse geocoding:", { lat, lng })
+      return null
+    }
+
+    // Try Mapbox first
+    if (API_CONFIG.maps.mapbox.clientApiKey) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${API_CONFIG.maps.mapbox.clientApiKey}`
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+
+          if (data.features && data.features.length > 0) {
+            // Extract city, state, country from features
+            let city = ""
+            let state = ""
+            let country = ""
+            let address = ""
+
+            for (const feature of data.features) {
+              if (feature.place_type?.includes("place") && !city) {
+                city = feature.text
+              }
+              if (feature.place_type?.includes("region") && !state) {
+                state = feature.text
+              }
+              if (feature.place_type?.includes("country") && !country) {
+                country = feature.text
+              }
+            }
+
+            address = data.features[0].place_name || `${city}, ${state}`
+
+            return {
+              lat,
+              lng,
+              name: city || "Unknown location",
+              address,
+              city,
+              state,
+              country
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Mapbox reverse geocoding failed, trying fallback:", error)
+      }
+    }
+
+    // Fallback to simple reverse geocode
+    const locationName = await reverseGeocode(lat, lng)
+    const parts = locationName.split(",").map(s => s.trim())
+    
+    return {
+      lat,
+      lng,
+      name: locationName,
+      address: locationName,
+      city: parts[0] || "",
+      state: parts[1] || "",
+      country: "United States"
+    }
+  } catch (error) {
+    console.error("Error reverse geocoding coordinates:", error)
+    return null
+  }
 }

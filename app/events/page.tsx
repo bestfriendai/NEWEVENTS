@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AppLayout } from "@/components/app-layout"
 import { useRealEvents } from "@/hooks/use-real-events"
+import { useFavoriteToggle } from "@/contexts/FavoritesContext"
+import { LocationSelector } from "@/components/location-selector"
+import { useLocation } from "@/hooks/use-location"
 import type { Event, EventSearchParams } from "@/types/event.types"
 
 // Categories for filtering
@@ -34,7 +37,8 @@ const SORT_OPTIONS = [
 ]
 
 function EventCard({ event }: { event: Event }) {
-  const [isFavorite, setIsFavorite] = useState(false)
+  const { toggleFavorite, isFavorite } = useFavoriteToggle()
+  const isFav = isFavorite(event.id.toString())
 
   const formatDate = (dateString: string) => {
     try {
@@ -83,13 +87,13 @@ function EventCard({ event }: { event: Event }) {
               variant="ghost"
               size="icon"
               className={`rounded-full backdrop-blur-sm transition-colors ${
-                isFavorite
+                isFav
                   ? "bg-red-500/80 text-white hover:bg-red-600"
                   : "bg-black/30 text-white hover:bg-black/50"
               }`}
-              onClick={() => setIsFavorite(!isFavorite)}
+              onClick={() => toggleFavorite(event.id.toString())}
             >
-              <Heart className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+              <Heart className={`h-4 w-4 ${isFav ? "fill-current" : ""}`} />
             </Button>
           </div>
           <div className="absolute top-3 left-3">
@@ -158,7 +162,7 @@ export default function RealEventsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortBy, setSortBy] = useState("date")
   const [viewMode, setViewMode] = useState("grid")
-  const [location, setLocation] = useState("United States")
+  const { location } = useLocation()
 
   // Use real events hook
   const {
@@ -218,7 +222,9 @@ export default function RealEventsPage() {
   const handleSearch = async () => {
     const searchParams: EventSearchParams = {
       keyword: searchQuery,
-      location,
+      location: location.city && location.state ? `${location.city}, ${location.state}` : "United States",
+      lat: location.lat,
+      lng: location.lng,
       category: selectedCategory !== "all" ? selectedCategory : undefined,
       sortBy: sortBy as "date" | "popularity" | "price" | "distance",
       limit: 50
@@ -229,14 +235,12 @@ export default function RealEventsPage() {
 
   // Handle filter changes
   useEffect(() => {
-    if (searchQuery || selectedCategory !== "all") {
-      const delayedSearch = setTimeout(() => {
-        handleSearch()
-      }, 500) // Debounce search
+    const delayedSearch = setTimeout(() => {
+      handleSearch()
+    }, 500) // Debounce search
 
-      return () => clearTimeout(delayedSearch)
-    }
-  }, [searchQuery, selectedCategory, sortBy])
+    return () => clearTimeout(delayedSearch)
+  }, [searchQuery, selectedCategory, sortBy, location])
 
   return (
     <AppLayout>
@@ -299,6 +303,7 @@ export default function RealEventsPage() {
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
+              <LocationSelector onLocationChange={() => handleSearch()} />
             </div>
 
             {/* Filters */}
