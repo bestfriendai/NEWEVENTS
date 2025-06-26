@@ -34,7 +34,7 @@ export const env = {
   ...serverEnv,
 } as const
 
-// API Configuration - MAPBOX FOCUSED
+// API Configuration - MAPBOX ONLY
 export const API_CONFIG = {
   ticketmaster: {
     baseUrl: "https://app.ticketmaster.com/discovery/v2",
@@ -67,9 +67,6 @@ export const API_CONFIG = {
       geocodingUrl: "https://api.mapbox.com/geocoding/v5/mapbox.places",
       stylesUrl: "https://api.mapbox.com/styles/v1",
       tilesUrl: "https://api.mapbox.com/v4",
-    },
-    tomtom: {
-      apiKey: serverEnv.TOMTOM_API_KEY,
     },
   },
   supabase: {

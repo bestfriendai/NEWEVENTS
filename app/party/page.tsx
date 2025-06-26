@@ -35,7 +35,7 @@ import { PartyHero } from "@/components/party/party-hero"
 import { FeaturedArtists } from "@/components/party/featured-artists"
 import { PartyFooter } from "@/components/party/party-footer"
 import { useLocationContext } from "@/contexts/LocationContext"
-import { fetchEvents } from "@/app/actions/event-actions"
+import { fetchEvents, type EventSearchResult } from "@/app/actions/event-actions"
 import { logger } from "@/lib/utils/logger"
 
 // Party-specific categories
@@ -193,14 +193,16 @@ export default function PartyPage() {
         location: userLocation ? `${userLocation.lat},${userLocation.lng}` : "New York, NY",
         radius: searchRadius,
         limit: 100,
+        page: currentPage - 1, // Adjust page for server action
+        size: eventsPerPage,
       }
 
       logger.info("Fetching events with parameters", { searchParams })
 
       // Fetch events from real API
-      const result = await fetchEvents(searchParams)
+      const result: EventSearchResult = await fetchEvents(searchParams)
 
-      if (result.success && result.events) {
+      if (result && result.events) {
         // Filter events for party relevance
         const partyEvents = result.events.filter((event) => {
           const eventText = `${event.title} ${event.description} ${event.category}`.toLowerCase()
@@ -246,7 +248,7 @@ export default function PartyPage() {
         })
       } else {
         setApiStatus("error")
-        setError(result.error || "Failed to load events")
+        setError(result.error?.message || "Failed to load events")
         setEvents([])
       }
     } catch (error) {
@@ -258,7 +260,7 @@ export default function PartyPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery, selectedCategory, userLocation, searchRadius])
+  }, [searchQuery, selectedCategory, userLocation, searchRadius, currentPage, eventsPerPage])
 
   // Location handling functions
   const handleGetCurrentLocation = useCallback(async () => {
@@ -302,7 +304,7 @@ export default function PartyPage() {
       const category = partyCategories.find((c) => c.id === selectedCategory)
       if (category && category.keywords.length > 0) {
         filtered = filtered.filter((event) => {
-          const eventText = `${event.category} ${event.title} ${event.description}`.toLowerCase()
+          const eventText = `${event.title} ${event.description} ${event.category}`.toLowerCase()
           return category.keywords.some((keyword) => eventText.includes(keyword.toLowerCase()))
         })
       }
@@ -389,7 +391,6 @@ export default function PartyPage() {
   // Update filtered events and reset pagination when filters change
   useEffect(() => {
     setFilteredEvents(filterEvents)
-    setCurrentPage(1)
   }, [filterEvents])
 
   // Load events when location changes or on mount
@@ -451,6 +452,10 @@ export default function PartyPage() {
     if (priceString.toLowerCase() === "free") return 0
     const match = priceString.match(/\$(\d+)/)
     return match ? Number.parseInt(match[1]) : 999999
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
   }
 
   return (
@@ -835,7 +840,7 @@ export default function PartyPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                             disabled={currentPage === 1}
                             className="border-gray-700"
                           >
@@ -850,7 +855,7 @@ export default function PartyPage() {
                                   key={pageNum}
                                   variant={currentPage === pageNum ? "default" : "outline"}
                                   size="sm"
-                                  onClick={() => setCurrentPage(pageNum)}
+                                  onClick={() => handlePageChange(pageNum)}
                                   className={
                                     currentPage === pageNum
                                       ? "bg-purple-600 text-white"
@@ -866,7 +871,7 @@ export default function PartyPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
                             className="border-gray-700"
                           >

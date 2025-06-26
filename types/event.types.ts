@@ -88,15 +88,15 @@ export interface EventSearchParams {
   }
 
   // Sorting and pagination
-  sortBy?: 'date' | 'distance' | 'popularity' | 'price' | 'relevance'
-  sortOrder?: 'asc' | 'desc'
+  sortBy?: "date" | "distance" | "popularity" | "price" | "relevance"
+  sortOrder?: "asc" | "desc"
   page?: number
   limit?: number
   offset?: number
 
   // Advanced filters
   tags?: string[]
-  source?: 'rapidapi' | 'ticketmaster' | 'eventbrite' | 'all'
+  source?: "rapidapi" | "ticketmaster" | "eventbrite" | "all"
   hasImages?: boolean
   hasDescription?: boolean
 

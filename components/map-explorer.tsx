@@ -15,8 +15,6 @@ import { API_CONFIG } from "@/lib/env"
 import { cn } from "@/lib/utils"
 import type { EventDetail } from "@/types/event.types"
 
-// This component now uses real events passed via props
-
 // Categories for filtering
 const CATEGORIES = [
   { id: "all", label: "All" },
@@ -84,9 +82,7 @@ export function MapExplorer({ events = [] }: MapExplorerProps) {
 
     try {
       const mapboxgl = (window as any).mapboxgl
-      mapboxgl.accessToken =
-        API_CONFIG.maps.mapbox.apiKey ||
-        "pk.eyJ1IjoiZGF0ZWFpIiwiYSI6ImNsbjRtYnFvejAyaWsycXBmcTkzYnN0am0ifQ.Z5Z9_rv0PVvJAGrb7AJmRg"
+      mapboxgl.accessToken = API_CONFIG.maps.mapbox.clientApiKey
 
       // Initialize map
       mapRef.current = new mapboxgl.Map({
@@ -140,7 +136,6 @@ export function MapExplorer({ events = [] }: MapExplorerProps) {
         addMarkersToMap()
       })
     } catch (err) {
-      // console.error("Error initializing map:", err)
       setIsLoading(false)
     }
 
@@ -176,7 +171,7 @@ export function MapExplorer({ events = [] }: MapExplorerProps) {
       markerEl.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)"
       markerEl.style.cursor = "pointer"
       markerEl.style.transition = "transform 0.2s ease"
-      markerEl.style.position = "relative" // Add position relative for the pulse
+      markerEl.style.position = "relative"
 
       // Add pulse effect
       const pulse = document.createElement("div")
@@ -295,10 +290,7 @@ export function MapExplorer({ events = [] }: MapExplorerProps) {
 
   // Toggle favorite status
   const handleToggleFavorite = (eventId: number) => {
-    const updatedEvents = events.map((event) =>
-      event.id === eventId ? { ...event, isFavorite: !event.isFavorite } : event,
-    )
-    setEvents(updatedEvents)
+    // Implementation for toggling favorites
   }
 
   // View event details
@@ -368,7 +360,7 @@ export function MapExplorer({ events = [] }: MapExplorerProps) {
                         src={selectedEvent.image || "/community-event.png"}
                         alt={selectedEvent.title}
                         fill
-                        style={{ objectFit: 'cover' }}
+                        style={{ objectFit: "cover" }}
                         sizes="80px"
                       />
                     </div>
@@ -610,7 +602,13 @@ function EventListItem({ event, isSelected, onSelect, onViewDetails, onToggleFav
       <div className="p-3">
         <div className="flex gap-3">
           <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 relative">
-            <Image src={event.image || "/community-event.png"} alt={event.title} fill style={{ objectFit: 'cover' }} sizes="64px" />
+            <Image
+              src={event.image || "/community-event.png"}
+              alt={event.title}
+              fill
+              style={{ objectFit: "cover" }}
+              sizes="64px"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
@@ -651,7 +649,7 @@ function EventListItem({ event, isSelected, onSelect, onViewDetails, onToggleFav
                   strokeLinejoin="round"
                   className={event.isFavorite ? "text-purple-500" : "text-gray-400"}
                 >
-                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                 </svg>
               </motion.button>
             </div>

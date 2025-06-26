@@ -43,7 +43,9 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
     }
 
     return () => {
-      document.body.removeChild(script)
+      if (document.body.contains(script)) {
+        document.body.removeChild(script)
+      }
       if (link.parentNode) {
         document.head.removeChild(link)
       }
@@ -55,7 +57,7 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
     if (!mapLoaded) return
 
     const mapboxgl = (window as any).mapboxgl
-    mapboxgl.accessToken = API_CONFIG.maps.mapbox.apiKey
+    mapboxgl.accessToken = API_CONFIG.maps.mapbox.clientApiKey
 
     const map = new mapboxgl.Map({
       container: "location-picker-map",
@@ -138,7 +140,6 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
         lng: location.lng,
       })
     } catch (err) {
-      // console.error("Error geocoding address:", err)
       setError("An error occurred while finding this location.")
     } finally {
       setIsLoading(false)
@@ -190,7 +191,6 @@ export function LocationPicker({ onLocationSelect, defaultAddress = "", classNam
           setIsLoading(false)
         },
         (_error) => {
-          // console.error("Error getting current location:", error)
           setError("Could not get your current location. Please try entering an address.")
           setIsLoading(false)
         },
