@@ -172,27 +172,38 @@ export function validateEnv() {
 
 // Helper functions to check API key availability
 export function hasMapboxApiKey(): boolean {
-  return !!(serverEnv.MAPBOX_API_KEY || clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY)
+  const key = serverEnv.MAPBOX_API_KEY || clientEnv.NEXT_PUBLIC_MAPBOX_API_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
 }
 
 export function hasTicketmasterApiKey(): boolean {
-  return !!serverEnv.TICKETMASTER_API_KEY
+  const key = serverEnv.TICKETMASTER_API_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
 }
 
 export function hasEventbriteApiKey(): boolean {
-  return !!(serverEnv.EVENTBRITE_PRIVATE_TOKEN || serverEnv.EVENTBRITE_API_KEY)
+  const key = serverEnv.EVENTBRITE_PRIVATE_TOKEN || serverEnv.EVENTBRITE_API_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
 }
 
 export function hasPredictHQApiKey(): boolean {
-  return !!(serverEnv.PREDICTHQ_API_KEY || clientEnv.NEXT_PUBLIC_PREDICTHQ_API_KEY)
+  const key = serverEnv.PREDICTHQ_API_KEY || clientEnv.NEXT_PUBLIC_PREDICTHQ_API_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
 }
 
 export function hasRapidApiKey(): boolean {
-  return !!serverEnv.RAPIDAPI_KEY
+  const key = serverEnv.RAPIDAPI_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
 }
 
 export function hasTomTomApiKey(): boolean {
-  return !!serverEnv.TOMTOM_API_KEY
+  const key = serverEnv.TOMTOM_API_KEY
+  return !!(key && !key.includes('your-') && key.length > 10)
+}
+
+// Check if an API key is valid (not a placeholder)
+export function isValidApiKey(key: string | undefined): boolean {
+  return !!(key && !key.includes('your-') && !key.includes('placeholder') && key.length > 10)
 }
 
 // Validated environment configuration
