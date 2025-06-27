@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { env, serverEnv } from "@/lib/env"
 import { logger } from "@/lib/utils/logger"
 import { searchTicketmasterEvents, type TicketmasterSearchParams } from "./ticketmaster-api"
+import { mockEventsAPI } from "./mock-events-api"
 import type { EventDetailProps } from "@/components/event-detail-modal"
 
 export interface UnifiedEventSearchParams {
@@ -147,16 +148,24 @@ class UnifiedEventsService {
       const allEvents: EventDetailProps[] = []
 
       // First, check for cached events in Supabase (quick check)
-      const cachedEvents = await this.getCachedEvents(normalizedParams)
-      if (cachedEvents.length > 0) {
-        allEvents.push(...cachedEvents)
-        sources.cached = cachedEvents.length
-        logger.info(`Found ${cachedEvents.length} cached events`)
+      if (normalizedParams.includeCache !== false && !normalizedParams.forceRefresh) {
+        const cachedEvents = await this.getCachedEvents(normalizedParams)
+        if (cachedEvents.length > 0) {
+          allEvents.push(...cachedEvents)
+          sources.cached = cachedEvents.length
+          logger.info(`Found ${cachedEvents.length} cached events`)
+        }
       }
 
-      // If we don't have enough cached events, fetch from APIs in parallel
-      const remainingLimit = (normalizedParams.limit || 50) - allEvents.length
-      if (remainingLimit > 0) {
+      // Always fetch from APIs to get fresh events, unless specifically disabled
+      const shouldFetchFromAPIs = normalizedParams.source !== 'cached' && 
+                                  (normalizedParams.forceRefresh || 
+                                   normalizedParams.includeCache === false ||
+                                   allEvents.length < (normalizedParams.limit || 50) ||
+                                   true) // Always fetch for now to ensure fresh data
+                                   
+      if (shouldFetchFromAPIs) {
+        const remainingLimit = Math.max((normalizedParams.limit || 50) - allEvents.length, 0)
         const apiLimit = Math.max(remainingLimit, 50) // Reduced back to 50
 
         // Run API calls in parallel for better performance
@@ -164,9 +173,16 @@ class UnifiedEventsService {
 
         // RapidAPI promise with better error handling
         if (serverEnv.RAPIDAPI_KEY) {
+          logger.info("Adding RapidAPI to search", {
+            hasKey: !!serverEnv.RAPIDAPI_KEY,
+            keyLength: serverEnv.RAPIDAPI_KEY?.length
+          })
           apiPromises.push(
             this.fetchFromRapidAPI(normalizedParams, apiLimit)
-              .then((events) => ({ source: "rapidapi", events }))
+              .then((events) => {
+                logger.info(`RapidAPI promise resolved with ${events.length} events`)
+                return { source: "rapidapi", events }
+              })
               .catch((error) => {
                 logger.error("RapidAPI fetch failed", {
                   error: error instanceof Error ? error.message : String(error),
@@ -175,6 +191,8 @@ class UnifiedEventsService {
                 return { source: "rapidapi", events: [] }
               }),
           )
+        } else {
+          logger.warn("Skipping RapidAPI - no API key configured")
         }
 
         // Ticketmaster promise with better error handling and rate limiting
@@ -200,6 +218,8 @@ class UnifiedEventsService {
 
         // Process results and store events
         for (const result of apiResults) {
+          logger.info(`API result from ${result.source}: ${result.events.length} events`)
+          
           if (result.events.length > 0) {
             // Store events in background (don't wait)
             this.storeEvents(result.events, result.source as "rapidapi" | "ticketmaster").catch((error) =>
@@ -213,8 +233,11 @@ class UnifiedEventsService {
       }
 
       // Remove duplicates and apply advanced filtering
+      logger.info(`Before deduplication: ${allEvents.length} total events`)
       const uniqueEvents = this.removeDuplicates(allEvents)
+      logger.info(`After deduplication: ${uniqueEvents.length} unique events`)
       const filteredEvents = this.applyAdvancedFilters(uniqueEvents, normalizedParams)
+      logger.info(`After filtering: ${filteredEvents.length} filtered events`)
 
       // Apply sorting
       const sortedEvents = this.applySorting(filteredEvents, normalizedParams)
@@ -233,6 +256,35 @@ class UnifiedEventsService {
       })
 
       const responseTime = Date.now() - startTime
+      // If no events found from APIs, use mock events as fallback
+      if (paginatedEvents.length === 0) {
+        logger.info("No events from APIs, using mock events as fallback", {
+          component: "UnifiedEventsService",
+          action: "searchEvents",
+          metadata: { params: normalizedParams }
+        })
+        
+        const mockResult = await mockEventsAPI.searchEvents({
+          lat: normalizedParams.lat,
+          lng: normalizedParams.lng,
+          location: normalizedParams.keyword || normalizedParams.query,
+          category: normalizedParams.category,
+          limit: normalizedParams.limit || 50,
+          offset: normalizedParams.offset || 0,
+          startDate: normalizedParams.startDate,
+          endDate: normalizedParams.endDate
+        })
+        
+        return {
+          events: mockResult.events,
+          totalCount: mockResult.totalCount,
+          hasMore: mockResult.totalCount > (normalizedParams.offset || 0) + mockResult.events.length,
+          sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
+          responseTime: Date.now() - startTime,
+          error: "Using mock data - configure API keys for real events"
+        }
+      }
+
       return {
         events: paginatedEvents,
         totalCount,
@@ -247,6 +299,33 @@ class UnifiedEventsService {
         action: "searchEvents",
         error: errorMessage,
       })
+
+      // Return mock events on error
+      try {
+        const mockResult = await mockEventsAPI.searchEvents({
+          lat: params.lat,
+          lng: params.lng,
+          location: params.keyword || params.query,
+          category: params.category,
+          limit: params.limit || 50,
+          offset: params.offset || 0
+        })
+        
+        return {
+          events: mockResult.events,
+          totalCount: mockResult.totalCount,
+          hasMore: mockResult.totalCount > (params.offset || 0) + mockResult.events.length,
+          sources: { rapidapi: 0, ticketmaster: 0, cached: 0 },
+          responseTime: Date.now() - startTime,
+          error: errorMessage + " - Using mock data"
+        }
+      } catch (mockError) {
+        logger.error("Mock events also failed", {
+          component: "UnifiedEventsService",
+          action: "searchEvents",
+          error: mockError instanceof Error ? mockError.message : String(mockError)
+        })
+      }
 
       return {
         events: [],
@@ -298,16 +377,17 @@ class UnifiedEventsService {
       // Take only the requested limit
       const featuredEvents = sortedEvents.slice(0, limit)
 
-      // If we still don't have enough events, generate more comprehensive fallback events
+      // If we still don't have enough events, use mock events
       if (featuredEvents.length < Math.min(limit, 3)) {
-        logger.info("Using enhanced fallback events due to insufficient API results")
-        const fallbackEvents = this.generateEnhancedFallbackEvents(limit - featuredEvents.length, { lat, lng })
-        const featuredEventsNew = [...featuredEvents, ...fallbackEvents].slice(0, limit)
+        logger.info("Using mock events due to insufficient API results")
+        const mockEvents = await mockEventsAPI.getFeaturedEvents(limit)
+        const combinedEvents = [...featuredEvents, ...mockEvents].slice(0, limit)
         return {
-          events: featuredEventsNew,
-          totalCount: featuredEventsNew.length,
+          events: combinedEvents,
+          totalCount: combinedEvents.length,
           hasMore: false,
-          sources: { rapidapi: 0, ticketmaster: 0, cached: featuredEventsNew.length },
+          sources: { rapidapi: 0, ticketmaster: 0, cached: combinedEvents.length },
+          error: featuredEvents.length === 0 ? "Using mock data - configure API keys for real events" : undefined
         }
       }
 
@@ -346,40 +426,98 @@ class UnifiedEventsService {
         return []
       }
 
-      // Use the enhanced RapidAPI search from events-api.ts
-      const { searchRapidApiEvents } = await import("./events-api")
+      // Use the new RapidAPI Real-Time Events Search service
+      const { rapidAPIRealtimeEventsService } = await import("./rapidapi-realtime-events")
 
-      // Build enhanced search parameters
-      const searchParams = {
-        keyword: params.query,
-        location: params.lat && params.lng ? `${params.lat},${params.lng}` : undefined,
-        coordinates: params.lat && params.lng ? { lat: params.lat, lng: params.lng } : undefined,
-        radius: params.radius || 25,
-        startDateTime: params.startDate || new Date().toISOString(), // Only future events
-        endDateTime: params.endDate,
-        size: Math.min(limit, 200),
-        sort: "date",
+      // Handle location parameter properly
+      let locationString = undefined
+      if (params.lat && params.lng) {
+        // Prefer coordinates if available
+        locationString = `${params.lat},${params.lng}`
+      } else if (params.query && this.isLocationQuery(params.query)) {
+        // If query looks like a location and no coordinates, use it as location
+        locationString = params.query
       }
 
-      logger.debug("RapidAPI search parameters", {
+      // Build search parameters for Real-Time Events API
+      // RapidAPI works better with a query parameter, so add a default if none provided
+      const searchParams = {
+        query: params.query && !this.isLocationQuery(params.query) ? params.query : "events music concert festival show",
+        location: locationString,
+        coordinates: params.lat && params.lng ? { lat: params.lat, lng: params.lng } : undefined,
+        radius: params.radius || 25,
+        startDate: params.startDate || new Date().toISOString().split('T')[0], // Only future events
+        endDate: params.endDate,
+        limit: Math.max(limit, 100), // Increase to get more RapidAPI events
+      }
+
+      logger.info("RapidAPI Real-Time Events search parameters", {
         component: "UnifiedEventsService",
         action: "fetchFromRapidAPI",
-        metadata: { searchParams },
+        metadata: { 
+          searchParams,
+          hasApiKey: !!serverEnv.RAPIDAPI_KEY,
+          apiKeyLength: serverEnv.RAPIDAPI_KEY?.length
+        },
       })
 
-      const events = await searchRapidApiEvents(searchParams)
-
-      // Filter out past events
-      const futureEvents = events.filter((event) => {
-        const eventDate = new Date(event.date)
-        return eventDate >= new Date()
+      const events = await rapidAPIRealtimeEventsService.searchEvents(searchParams)
+      
+      logger.info(`RapidAPI service returned ${events.length} events`, {
+        component: "UnifiedEventsService",
+        action: "fetchFromRapidAPI",
+        metadata: {
+          eventsCount: events.length,
+          firstEvent: events[0]?.title || 'N/A'
+        }
       })
 
-      logger.info(`RapidAPI returned ${events.length} events, ${futureEvents.length} are future events`)
+      // Add source and externalId to events
+      const eventsWithSource = events.map(event => ({
+        ...event,
+        source: "rapidapi" as const,
+        externalId: (event as any).externalId || `rapidapi_${event.id}`
+      }))
+
+      // Filter out past events - be more lenient with date parsing
+      const now = new Date()
+      const futureEvents = eventsWithSource.filter((event) => {
+        try {
+          // RapidAPI dates might be in format like "June 27, 2025"
+          // Try to parse the date more carefully
+          let eventDate: Date
+          
+          // If date looks like "Month DD, YYYY" format
+          if (event.date && event.date.match(/^[A-Za-z]+ \d{1,2}, \d{4}$/)) {
+            eventDate = new Date(event.date)
+          } else {
+            eventDate = new Date(event.date)
+          }
+          
+          // Check if date is valid
+          if (isNaN(eventDate.getTime())) {
+            logger.warn(`Invalid date for RapidAPI event: ${event.title}, date: ${event.date}`)
+            // Include events with invalid dates rather than filtering them out
+            return true
+          }
+          
+          const isFuture = eventDate >= now
+          if (!isFuture) {
+            logger.debug(`Filtering out past RapidAPI event: ${event.title} on ${event.date}`)
+          }
+          return isFuture
+        } catch (e) {
+          logger.warn(`Error parsing date for RapidAPI event: ${event.title}, date: ${event.date}`)
+          // Include events with parse errors
+          return true
+        }
+      })
+
+      logger.info(`RapidAPI Real-Time Events: ${events.length} total, ${futureEvents.length} future events`)
       return futureEvents
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error("RapidAPI fetch error", {
+      logger.error("RapidAPI Real-Time Events fetch error", {
         component: "UnifiedEventsService",
         action: "fetchFromRapidAPI",
         metadata: {
@@ -387,7 +525,6 @@ class UnifiedEventsService {
           errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
           hasApiKey: !!serverEnv.RAPIDAPI_KEY,
-          apiHost: serverEnv.RAPIDAPI_HOST,
           params: params,
         },
       })
@@ -824,29 +961,39 @@ class UnifiedEventsService {
   }
 
   /**
-   * Remove duplicate events based on their numeric id
+   * Remove duplicate events based on external ID or composite key
    */
   private removeDuplicates(events: EventDetailProps[]): EventDetailProps[] {
-    const uniqueEventsById = new Map<number, EventDetailProps>()
+    const uniqueEventsMap = new Map<string, EventDetailProps>()
+    
     for (const event of events) {
-      if (!event.id) {
-        // Handle events that might not have an ID, though this should be rare for EventDetailProps
-        // Depending on requirements, these could be skipped or assigned a temporary unique key
-        // For now, we'll assume valid events always have an ID and skip those that don't for safety.
-        logger.warn("Event without ID encountered during deduplication", { eventTitle: event.title });
-        continue;
-      }
-      if (!uniqueEventsById.has(event.id)) {
-        uniqueEventsById.set(event.id, event)
+      // Use external ID if available, otherwise create a composite key
+      let uniqueKey: string
+      
+      if ((event as any).externalId) {
+        uniqueKey = (event as any).externalId
       } else {
-        // Optional: Log if a duplicate ID is found and skipped
-        logger.info(`Duplicate event ID ${event.id} found and skipped: "${event.title}" at "${event.location}"`, {
+        // Create composite key from title, date, and location to identify unique events
+        const normalizedTitle = event.title.toLowerCase().replace(/\s+/g, '')
+        const normalizedLocation = event.location.toLowerCase().replace(/\s+/g, '')
+        uniqueKey = `${normalizedTitle}_${event.date}_${normalizedLocation}`
+      }
+      
+      if (!uniqueEventsMap.has(uniqueKey)) {
+        uniqueEventsMap.set(uniqueKey, event)
+      } else {
+        logger.debug(`Duplicate event found and skipped: "${event.title}" at "${event.location}"`, {
           component: "UnifiedEventsService",
-          action: "removeDuplicates"
+          action: "removeDuplicates",
+          uniqueKey
         });
       }
     }
-    return Array.from(uniqueEventsById.values())
+    
+    const uniqueEvents = Array.from(uniqueEventsMap.values())
+    logger.info(`Deduplication complete: ${events.length} events -> ${uniqueEvents.length} unique events`)
+    
+    return uniqueEvents
   }
 
   /**
@@ -857,11 +1004,21 @@ class UnifiedEventsService {
 
     // Filter by location radius if coordinates provided
     if (params.lat && params.lng && params.radius) {
+      const beforeFilter = filtered.length
       filtered = filtered.filter((event) => {
-        if (!event.coordinates) return false
+        // If event doesn't have coordinates, include it anyway (don't filter out)
+        if (!event.coordinates) {
+          logger.debug(`Event without coordinates included: ${event.title}`)
+          return true
+        }
         const distance = this.calculateDistance(params.lat!, params.lng!, event.coordinates.lat, event.coordinates.lng)
-        return distance <= params.radius!
+        const isWithinRadius = distance <= params.radius!
+        if (!isWithinRadius) {
+          logger.debug(`Event filtered out by distance: ${event.title} (${distance}km > ${params.radius}km)`)
+        }
+        return isWithinRadius
       })
+      logger.info(`Location filter: ${beforeFilter} -> ${filtered.length} events (filtered ${beforeFilter - filtered.length})`)
     }
 
     // Filter by multiple categories
@@ -925,6 +1082,31 @@ class UnifiedEventsService {
     if (params.hasDescription) {
       filtered = filtered.filter((event) => event.description && event.description.length > 10)
     }
+
+    // Always filter out events without proper images (unless it's the default image)
+    filtered = filtered.filter((event) => {
+      return event.image && 
+             event.image !== '' && 
+             event.image !== '/community-event.png' &&
+             event.image.startsWith('http')
+    })
+
+    // Filter out events without minimal required data
+    filtered = filtered.filter((event) => {
+      // Must have a title
+      if (!event.title || event.title.length < 3) return false
+      
+      // Must have a valid date
+      if (!event.date || event.date === "Date TBA") return false
+      
+      // Must have either description or ticket links (not both required)
+      const hasDescription = event.description && 
+                           event.description.length > 10 && 
+                           event.description !== "No description available."
+      const hasTicketLinks = event.ticketLinks && event.ticketLinks.length > 0
+      
+      return hasDescription || hasTicketLinks
+    })
 
     return filtered
   }
@@ -1196,6 +1378,29 @@ class UnifiedEventsService {
     const images = categoryImages[category] || categoryImages["General Events"]
     const randomIndex = Math.floor(Math.random() * images.length)
     return images[randomIndex]
+  }
+
+  /**
+   * Check if a query string looks like a location
+   */
+  private isLocationQuery(query: string): boolean {
+    if (!query || query.length < 2) return false
+    
+    const locationPatterns = [
+      // Countries
+      /^(united states|usa|us|canada|mexico|uk|united kingdom|france|germany|spain|italy)$/i,
+      // States
+      /^(new york|california|texas|florida|illinois|pennsylvania|ohio|georgia|north carolina|michigan)$/i,
+      // Cities
+      /^(new york|los angeles|chicago|houston|phoenix|philadelphia|san antonio|san diego|dallas|san jose)$/i,
+      // Format patterns
+      /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*,?\s*[A-Z]{2}$/i, // City, State
+      /^\d{5}(-\d{4})?$/, // ZIP code
+      // Common location keywords
+      /^(near me|nearby|around me)$/i
+    ]
+    
+    return locationPatterns.some(pattern => pattern.test(query.trim()))
   }
 
 

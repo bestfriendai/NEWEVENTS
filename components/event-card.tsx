@@ -98,11 +98,15 @@ export function EventCard({
           <div className="flex items-center p-2">
             <div className="relative w-14 h-14 rounded-md overflow-hidden mr-2.5 flex-shrink-0">
               <motion.img
-                src={eventData.image}
+                src={eventData.image || "/community-event.png"}
                 alt={eventData.title}
                 className="w-full h-full object-cover"
                 animate={{ scale: isHovered ? 1.1 : 1 }}
                 transition={{ duration: 0.3 }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = "/community-event.png"
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25]/70 to-transparent"></div>
             </div>
@@ -158,11 +162,15 @@ export function EventCard({
         <div className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/50 rounded-xl overflow-hidden h-full transition-all duration-300 group-hover:shadow-glow-sm group-hover:border-purple-500/30">
           <div className="relative h-48 overflow-hidden">
             <motion.img
-              src={eventData.image}
+              src={eventData.image || "/community-event.png"}
               alt={eventData.title}
               className="w-full h-full object-cover"
               animate={{ scale: isHovered ? 1.05 : 1 }}
               transition={{ duration: 0.5 }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = "/community-event.png"
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25] via-transparent to-transparent opacity-80"></div>
 
@@ -259,11 +267,15 @@ export function EventCard({
       <div className="bg-[#1A1D25]/60 backdrop-blur-sm border border-gray-800/50 rounded-xl overflow-hidden h-full transition-all duration-300 group-hover:shadow-glow-sm group-hover:border-purple-500/30">
         <div className="relative h-40 overflow-hidden">
           <motion.img
-            src={eventData.image}
+            src={eventData.image || "/community-event.png"}
             alt={eventData.title}
             className="w-full h-full object-cover"
             animate={{ scale: isHovered ? 1.05 : 1 }}
             transition={{ duration: 0.5 }}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/community-event.png"
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#1A1D25] via-transparent to-transparent opacity-70"></div>
 

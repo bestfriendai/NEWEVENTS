@@ -1,0 +1,56 @@
+#!/bin/bash
+
+echo "==================================="
+echo "Supabase Secrets Management Script"
+echo "==================================="
+echo ""
+
+# Check if logged in
+echo "1. First, make sure you're logged in to Supabase:"
+echo "   Run: supabase login"
+echo ""
+echo "   This will open a browser window for authentication."
+echo ""
+
+# Check if project is linked
+echo "2. Link your project (if not already linked):"
+echo "   Run: supabase link --project-ref ejsllpjzxnbndrrfpjkz"
+echo ""
+
+echo "3. To check current secrets:"
+echo "   Run: supabase secrets list"
+echo ""
+
+echo "4. To set/update the API keys:"
+echo "   Run the following commands:"
+echo ""
+echo "   supabase secrets set RAPIDAPI_KEY=92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9"
+echo "   supabase secrets set TICKETMASTER_API_KEY=DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9"
+echo "   supabase secrets set TICKETMASTER_SECRET=H1dYvpxiiaTgJow5"
+echo ""
+
+echo "5. After setting secrets, redeploy the Edge Function:"
+echo "   Run: supabase functions deploy get-api-keys"
+echo ""
+
+echo "==================================="
+echo "Quick Commands to Copy/Paste:"
+echo "==================================="
+echo ""
+echo "# Login (if needed)"
+echo "supabase login"
+echo ""
+echo "# Link project (if needed)"
+echo "supabase link --project-ref ejsllpjzxnbndrrfpjkz"
+echo ""
+echo "# Check secrets"
+echo "supabase secrets list"
+echo ""
+echo "# Set all secrets at once"
+echo "supabase secrets set RAPIDAPI_KEY=92bc1b4fc7mshacea9f118bf7a3fp1b5a6cjsnd2287a72fcb9 && \\"
+echo "supabase secrets set TICKETMASTER_API_KEY=DpUgBswNV5hHthFyjKK5M5lN3PSLZNU9 && \\"
+echo "supabase secrets set TICKETMASTER_SECRET=H1dYvpxiiaTgJow5"
+echo ""
+echo "# Deploy Edge Function"
+echo "supabase functions deploy get-api-keys"
+echo ""

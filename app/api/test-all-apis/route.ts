@@ -1,10 +1,40 @@
 import { NextResponse } from "next/server"
 import { getServerConfig } from "@/lib/env"
+import { getSupabaseApiConfig } from "@/lib/api/supabase-env-config"
 import { logger, logError } from "@/lib/utils/logger"
 
 export async function GET() {
   try {
-    const config = getServerConfig()
+    // Try to get config from Supabase first, fallback to local env
+    let apiKeys = await getSupabaseApiConfig()
+    const localConfig = getServerConfig()
+    
+    // Merge configs, preferring Supabase values when available
+    const config = {
+      ticketmaster: {
+        baseUrl: localConfig.ticketmaster.baseUrl,
+        apiKey: apiKeys.TICKETMASTER_API_KEY || localConfig.ticketmaster.apiKey,
+      },
+      rapidapi: {
+        baseUrl: localConfig.rapidapi.baseUrl,
+        apiKey: apiKeys.RAPIDAPI_KEY || localConfig.rapidapi.apiKey,
+        host: localConfig.rapidapi.host,
+      },
+      eventbrite: {
+        baseUrl: localConfig.eventbrite.baseUrl,
+        apiKey: apiKeys.EVENTBRITE_API_KEY || localConfig.eventbrite.apiKey,
+        privateToken: apiKeys.EVENTBRITE_PRIVATE_TOKEN || localConfig.eventbrite.privateToken,
+      },
+      tomtom: {
+        baseUrl: localConfig.tomtom.baseUrl,
+        apiKey: apiKeys.TOMTOM_API_KEY || localConfig.tomtom.apiKey,
+      },
+      predicthq: {
+        baseUrl: localConfig.predicthq.baseUrl,
+        apiKey: apiKeys.PREDICTHQ_API_KEY || localConfig.predicthq.apiKey,
+      },
+    }
+    
     const results: Record<string, { status: string; message: string; data?: any }> = {}
 
     // Test Ticketmaster API
@@ -37,29 +67,26 @@ export async function GET() {
       }
     }
 
-    // Test RapidAPI
+    // Test RapidAPI using our service
     try {
-      const rapidResponse = await fetch(`${config.rapidapi.baseUrl}/search-events?query=music&location=New York`, {
-        method: "GET",
-        headers: {
-          "X-RapidAPI-Key": config.rapidapi.apiKey || "",
-          "X-RapidAPI-Host": config.rapidapi.host || "",
-          Accept: "application/json",
-        },
+      const { rapidAPIRealtimeEventsService } = await import("@/lib/api/rapidapi-realtime-events")
+      const rapidEvents = await rapidAPIRealtimeEventsService.searchEvents({
+        query: "music concert",
+        location: "New York",
+        limit: 10
       })
-
-      if (rapidResponse.ok) {
-        const rapidData = await rapidResponse.json()
-        results.rapidapi = {
-          status: "success",
-          message: "RapidAPI connected successfully",
-          data: { hasData: !!rapidData },
-        }
-      } else {
-        results.rapidapi = {
-          status: "error",
-          message: `RapidAPI error: ${rapidResponse.status}`,
-        }
+      
+      results.rapidapi = {
+        status: "success",
+        message: "RapidAPI connected successfully",
+        data: { 
+          eventCount: rapidEvents.length,
+          events: rapidEvents.slice(0, 3).map(e => ({
+            name: e.title,
+            date: e.date,
+            location: e.location
+          }))
+        },
       }
     } catch (error) {
       results.rapidapi = {

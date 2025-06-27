@@ -53,7 +53,16 @@
       "Bash(supabase functions:*)",
       "Bash(supabase migration:*)",
       "Bash(supabase db:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(supabase:*)",
+      "Bash(brew install:*)",
+      "Bash(npx next lint:*)",
+      "Bash(open http://localhost:3000)",
+      "Bash(npm start)",
+      "Bash(./test-local.sh:*)",
+      "Bash(./check-supabase-secrets.sh:*)",
+      "Bash(open http://localhost:3000/events)",
+      "Bash(kill:*)"
     ],
     "deny": []
   },

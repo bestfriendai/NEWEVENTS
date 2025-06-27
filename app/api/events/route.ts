@@ -259,8 +259,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Convert to unified service parameters
+    // Handle location parameter - if location is provided without coordinates, use it as query
+    let enhancedQuery = validatedParams.query
+    if (validatedParams.location && !validatedParams.lat && !validatedParams.lng) {
+      // If we have a location string but no coordinates, include it in the query
+      enhancedQuery = validatedParams.query 
+        ? `${validatedParams.query} ${validatedParams.location}`.trim() 
+        : validatedParams.location
+    }
+
     const unifiedParams = {
-      query: validatedParams.query || undefined,
+      query: enhancedQuery || undefined,
       lat: validatedParams.lat,
       lng: validatedParams.lng,
       radius: validatedParams.radius,

@@ -20,7 +20,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
     }
 
     // Try Mapbox first
-    if (API_CONFIG.maps.mapbox.clientApiKey) {
+    if (API_CONFIG.maps.mapbox.clientApiKey && API_CONFIG.maps.mapbox.clientApiKey.length > 10 && !API_CONFIG.maps.mapbox.clientApiKey.includes('your-')) {
       try {
         const encodedAddress = encodeURIComponent(address.trim())
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${API_CONFIG.maps.mapbox.clientApiKey}`
@@ -53,7 +53,7 @@ export async function geocodeAddress(address: string): Promise<LocationData | nu
     }
 
     // Fallback to TomTom
-    if (API_CONFIG.tomtom.apiKey) {
+    if (API_CONFIG.tomtom.apiKey && API_CONFIG.tomtom.apiKey.length > 10 && !API_CONFIG.tomtom.apiKey.includes('your-')) {
       try {
         const encodedAddress = encodeURIComponent(address.trim())
         const url = `https://api.tomtom.com/search/2/geocode/${encodedAddress}.json?key=${API_CONFIG.tomtom.apiKey}`
@@ -140,7 +140,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     }
 
     // Fallback to TomTom
-    if (API_CONFIG.tomtom.apiKey) {
+    if (API_CONFIG.tomtom.apiKey && API_CONFIG.tomtom.apiKey.length > 10 && !API_CONFIG.tomtom.apiKey.includes('your-')) {
       try {
         const url = `https://api.tomtom.com/search/2/reverseGeocode/${lat},${lng}.json?key=${API_CONFIG.tomtom.apiKey}`
 
