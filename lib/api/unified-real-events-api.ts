@@ -352,18 +352,23 @@ class UnifiedRealEventsAPI {
 
       const url = new URL("https://real-time-events-search.p.rapidapi.com/search-events")
 
-      if (params.keyword || params.query) {
-        url.searchParams.set("query", params.keyword || params.query || "")
-      }
+      // RapidAPI requires a query parameter
+      const query = params.keyword || params.query || "events music concert festival show"
+      url.searchParams.set("query", query)
 
-      if (params.location) {
+      // RapidAPI requires more specific location than just "United States"
+      if (params.location && params.location !== "United States") {
         url.searchParams.set("location", params.location)
+      } else if (params.lat && params.lng) {
+        // Use coordinates if available
+        url.searchParams.set("location", `${params.lat},${params.lng}`)
+      } else {
+        // Default to a major city if location is too generic
+        url.searchParams.set("location", "New York")
       }
 
-      if (params.startDate) {
-        url.searchParams.set("start_date", params.startDate.split("T")[0])
-      }
-
+      // RapidAPI uses "start" for pagination offset, not date filtering
+      url.searchParams.set("start", "0")
       url.searchParams.set("limit", String(params.limit || 50))
 
       const headers = {
@@ -380,39 +385,66 @@ class UnifiedRealEventsAPI {
       const response = await fetch(url.toString(), { headers })
 
       if (!response.ok) {
-        throw new Error(`RapidAPI error: ${response.status} ${response.statusText}`)
+        const errorText = await response.text().catch(() => "")
+        logger.error("RapidAPI request failed", {
+          component: "UnifiedRealEventsAPI",
+          action: "fetchFromRapidAPI",
+          metadata: {
+            status: response.status,
+            statusText: response.statusText,
+            errorBody: errorText,
+            url: url.toString().replace(config.rapidapi.key, "***")
+          }
+        })
+        throw new Error(`RapidAPI error: ${response.status} ${errorText}`)
       }
 
       const data = await response.json()
+      
+      // Validate response structure
+      if (!data || (!data.data && !Array.isArray(data))) {
+        logger.warn("Invalid RapidAPI response structure", {
+          component: "UnifiedRealEventsAPI",
+          action: "fetchFromRapidAPI",
+          metadata: { responseKeys: Object.keys(data || {}) }
+        })
+        return { events: [], totalCount: 0, hasMore: false }
+      }
 
-      const events: Event[] = data.data?.map((event: RapidAPIEvent, index: number) => ({
-        id: `rapid_${event.event_id || index}_${Date.now()}`,
-        title: event.title || event.name || "",
+      const eventsArray = Array.isArray(data) ? data : (data.data || [])
+      
+      const events: Event[] = eventsArray.map((event: any, index: number) => ({
+        id: `rapid_${event.event_id || event.id || index}_${Date.now()}`,
+        title: event.name || event.title || "",
         description: event.description || "",
         date: event.start_time || event.date || "",
         location: {
-          name: event.venue_name || event.venue || "",
-          address: event.venue_address || event.location || "",
-          city: event.location || "",
+          name: event.venue?.name || event.venue_name || "",
+          address: event.venue?.full_address || event.venue_address || event.location || "",
+          city: event.venue?.city || event.location || "",
           coordinates: {
-            lat: parseFloat(event.latitude || "0"),
-            lng: parseFloat(event.longitude || "0")
+            lat: parseFloat(event.venue?.latitude || event.latitude || "0"),
+            lng: parseFloat(event.venue?.longitude || event.longitude || "0")
           }
         },
-        category: event.category || "Event",
-        price: (event.min_price || event.max_price) ? {
-          min: parseFloat(event.min_price || "0"),
-          max: event.max_price ? parseFloat(event.max_price) : undefined,
+        category: event.category || event.labels?.[0] || "Event",
+        price: event.is_free === true ? {
+          min: 0,
+          max: 0,
+          currency: "USD"
+        } : (event.min_ticket_price || event.max_ticket_price) ? {
+          min: parseFloat(event.min_ticket_price || event.min_price || "0"),
+          max: event.max_ticket_price ? parseFloat(event.max_ticket_price) : undefined,
           currency: "USD"
         } : undefined,
         image: event.thumbnail || event.image || "",
-        url: event.link || "",
-        source: "predicthq",
-        tags: [event.category?.toLowerCase() || "event"],
-        latitude: parseFloat(event.latitude || "0"),
-        longitude: parseFloat(event.longitude || "0"),
+        url: event.link || event.url || "",
+        source: "rapidapi",
+        tags: event.tags || event.labels || [event.category?.toLowerCase() || "event"],
+        latitude: parseFloat(event.venue?.latitude || event.latitude || "0"),
+        longitude: parseFloat(event.venue?.longitude || event.longitude || "0"),
         rating: Math.random() * 1 + 4 // Mock rating between 4-5
-      })) || []
+      }))
 
       return {
         events,
